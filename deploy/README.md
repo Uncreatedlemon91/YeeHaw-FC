@@ -141,6 +141,11 @@ Caddy fetches and renews the certificates itself. DNS has to resolve to
 the droplet first, so if the first attempt fails, give it a few minutes
 and reload again.
 
+The Caddyfile also carries the droplet's second site, Ravenfall HQ
+(`ravenfallpmc.com` → port 8002; see `ravenfall/README.md`). Its block is
+harmless while that site isn't deployed, but keep it in the file: copying
+a Caddyfile without it takes that site offline.
+
 Visit `https://yeehaw-fc.club`, sign in with Discord, and check:
 
 ```bash

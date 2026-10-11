@@ -1,6 +1,10 @@
-# YeeHaw FC reverse proxy. Caddy fetches and renews a free Let's Encrypt
-# certificate automatically, then proxies HTTPS traffic to the site, which
-# listens only on localhost.
+# Reverse proxy for every site on the droplet: YeeHaw FC (port 8001) and
+# Ravenfall HQ (port 8002, see ravenfall/README.md). Caddy fetches and renews
+# a free Let's Encrypt certificate for each domain automatically, then
+# proxies HTTPS traffic to the sites, which listen only on localhost.
+#
+# This file replaces /etc/caddy/Caddyfile wholesale, so every site the
+# droplet serves must have its block here.
 #
 # Needs two DNS A records pointing at the droplet: yeehaw-fc.club and
 # www.yeehaw-fc.club. Put this file at /etc/caddy/Caddyfile, then:
@@ -18,4 +22,18 @@ yeehaw-fc.club {
 # to get a certificate for it.
 www.yeehaw-fc.club {
     redir https://yeehaw-fc.club{uri} permanent
+}
+
+# --- Ravenfall HQ ------------------------------------------------------- #
+# Needs A records for ravenfallpmc.com and www.ravenfallpmc.com. Until the
+# app is running on 8002 this block just answers 502; YeeHaw FC is
+# unaffected either way. Same apex-canonical rule as above: the Discord
+# OAuth redirect names ravenfallpmc.com.
+ravenfallpmc.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8002
+}
+
+www.ravenfallpmc.com {
+    redir https://ravenfallpmc.com{uri} permanent
 }

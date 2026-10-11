@@ -1,0 +1,186 @@
+// Ravenfall HQ data model. Members are keyed by Discord ID: there is no
+// local registration, so a User row exists for anyone who has signed in
+// with Discord or been acted on by the bot.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MemberStatus {
+  CANDIDATE
+  ACTIVE
+  INACTIVE
+  DISCHARGED
+}
+
+enum ServiceRecordType {
+  ENLISTMENT
+  PROMOTION
+  AWARD
+  QUALIFICATION
+  DISCIPLINARY
+  TRANSFER
+  DISCHARGE
+  NOTE
+}
+
+enum EventType {
+  OP
+  TRAINING
+  BRIEFING
+}
+
+enum AttendanceStatus {
+  ATTENDING
+  ABSENT
+  EXCUSED
+  NOSHOW
+}
+
+enum QualificationCategory {
+  WEAPONS
+  LEADERSHIP
+  MEDICAL
+  PILOT
+  GENERAL
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+model User {
+  id              String       @id @default(cuid())
+  discordId       String       @unique
+  discordUsername String
+  avatar          String?
+  callsign        String?      @unique
+  rank            String?
+  unitRole        String?
+  squad           String?
+  status          MemberStatus @default(CANDIDATE)
+  enlistedAt      DateTime?
+  lastLoginAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  serviceRecords       ServiceRecord[]          @relation("RecordSubject")
+  issuedRecords        ServiceRecord[]          @relation("RecordIssuer")
+  qualifications       UserQualification[]      @relation("QualHolder")
+  awardedQuals         UserQualification[]      @relation("QualAwarder")
+  attendances          Attendance[]
+  applications         RecruitmentApplication[] @relation("Applicant")
+  reviewedApplications RecruitmentApplication[] @relation("Reviewer")
+  eventsCreated        Event[]                  @relation("EventCreator")
+  debriefsWritten      Event[]                  @relation("EventDebriefer")
+  documentsEdited      Qualification[]
+}
+
+model ServiceRecord {
+  id          String            @id @default(cuid())
+  userId      String
+  user        User              @relation("RecordSubject", fields: [userId], references: [id], onDelete: Cascade)
+  type        ServiceRecordType
+  title       String
+  description String?
+  issuedById  String?
+  issuedBy    User?             @relation("RecordIssuer", fields: [issuedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime          @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model Event {
+  id          String       @id @default(cuid())
+  title       String
+  description String       @default("")
+  type        EventType
+  location    String?
+  startTime   DateTime
+  endTime     DateTime?
+  mandatory   Boolean      @default(false)
+  // After-action report, Markdown. Null until a leader files one.
+  debrief     String?
+  debriefById String?
+  debriefBy   User?        @relation("EventDebriefer", fields: [debriefById], references: [id], onDelete: SetNull)
+  debriefAt   DateTime?
+  createdById String?
+  createdBy   User?        @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  attendances Attendance[]
+
+  @@index([startTime])
+}
+
+model Attendance {
+  id        String           @id @default(cuid())
+  eventId   String
+  event     Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Before the event this is the member's RSVP (ATTENDING / ABSENT); the
+  // AAR overwrites it with what actually happened.
+  status    AttendanceStatus
+  updatedAt DateTime         @updatedAt
+
+  @@unique([eventId, userId])
+}
+
+// A qualification and its manual are one thing: the document is the
+// standard a member is certified against.
+model Qualification {
+  id          String                @id @default(cuid())
+  slug        String                @unique
+  title       String
+  category    QualificationCategory
+  summary     String                @default("")
+  content     String                @default("")
+  version     Int                   @default(1)
+  updatedById String?
+  updatedBy   User?                 @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  holders     UserQualification[]
+}
+
+model UserQualification {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation("QualHolder", fields: [userId], references: [id], onDelete: Cascade)
+  qualificationId String
+  qualification   Qualification @relation(fields: [qualificationId], references: [id], onDelete: Cascade)
+  awardedAt       DateTime      @default(now())
+  awardedById     String?
+  awardedBy       User?         @relation("QualAwarder", fields: [awardedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, qualificationId])
+}
+
+model RecruitmentApplication {
+  id               String            @id @default(cuid())
+  discordId        String
+  discordUsername  String
+  userId           String
+  user             User              @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
+  answers          Json
+  status           ApplicationStatus @default(PENDING)
+  reviewedById     String?
+  reviewedBy       User?             @relation("Reviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNote       String?
+  // The embed on #recruitment-board, so a decision made on the website
+  // can update the Discord post too.
+  boardMessageId   String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([status, createdAt])
+  @@index([discordId])
+}

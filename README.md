@@ -14,6 +14,8 @@ interactions webhook — no gateway connection, nothing to keep online.
 ```
 proclubs/      the application  — see proclubs/README.md
 deploy/        systemd units, Caddy config, install/backup/restore
+ravenfall/     a second, unrelated site on the same droplet: Ravenfall HQ,
+               a milsim unit portal (ravenfallpmc.com) — see ravenfall/README.md
 design-fc27/   the earlier broadcast design canvas (superseded by the
                management UI described in proclubs/README.md)
 ```
