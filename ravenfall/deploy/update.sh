@@ -18,7 +18,9 @@ as_app npm ci --no-audit --no-fund
 echo "== Applying database migrations"
 as_app npx prisma migrate deploy
 echo "== Building (takes a few minutes on a small droplet)"
-as_app npm run build
+# On a 1 GB droplet Node defaults to a ~256 MB heap, which the type-check
+# step outgrows. Let the build use swap instead (README step 2).
+as_app env NODE_OPTIONS=--max-old-space-size=1536 npm run build
 
 cp deploy/ravenfall.service deploy/ravenfall-backup.service deploy/ravenfall-backup.timer /etc/systemd/system/
 systemctl daemon-reload
