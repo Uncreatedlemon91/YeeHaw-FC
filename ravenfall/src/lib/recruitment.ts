@@ -3,7 +3,7 @@ import { APPLICATION_QUESTIONS, nickname, RANKS, RECRUIT_RANK, rankName, UNIT } 
 import {
   addRole,
   ButtonStyle,
-  discord,
+  dm,
   editMessage,
   explain,
   linkButton,
@@ -96,14 +96,6 @@ async function refreshBoard(app: RecruitmentApplication, decision: Parameters<ty
   await editMessage(env.boardChannelId, app.boardMessageId, boardMessage(app, decision));
 }
 
-async function dm(discordId: string, content: string) {
-  const channel = await discord<{ id: string }>("/users/@me/channels", {
-    method: "POST",
-    body: { recipient_id: discordId },
-  });
-  await sendMessage(channel.id, { content, allowed_mentions: { parse: [] } });
-}
-
 // --- Decisions ----------------------------------------------------------- //
 
 export type DecisionResult = { ok: true; warnings: string[] } | { ok: false; error: string };
@@ -140,7 +132,7 @@ export async function approveApplication(opts: {
     if (claimed.count === 0) return null;
     await tx.user.update({
       where: { id: app.userId },
-      data: { callsign, rank, status: "ACTIVE", enlistedAt: new Date() },
+      data: { callsign, rank, rankSince: new Date(), status: "ACTIVE", enlistedAt: new Date() },
     });
     await tx.serviceRecord.create({
       data: {

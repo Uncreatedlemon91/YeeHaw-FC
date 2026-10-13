@@ -1,6 +1,15 @@
 // Read lazily: `next build` imports these modules without a production
 // .env present, so nothing here may throw at import time.
 
+/** "Alpha=123, Bravo=456" -> { Alpha: "123", Bravo: "456" }. */
+function pairs(name: string): Record<string, string> {
+  return Object.fromEntries(
+    list(name)
+      .map((p) => p.split("=").map((s) => s.trim()))
+      .filter((kv) => kv.length === 2 && kv[0] && kv[1]),
+  );
+}
+
 function list(name: string): string[] {
   return (process.env[name] ?? "")
     .split(",")
@@ -51,5 +60,17 @@ export const env = {
   },
   get opsChannelId() {
     return process.env.OPS_ANNOUNCE_CHANNEL_ID ?? "";
+  },
+  /** Where role, callsign and leave requests are posted for a decision. */
+  get personnelChannelId() {
+    return process.env.PERSONNEL_BOARD_CHANNEL_ID ?? "";
+  },
+  /** Discord role per squad name, kept in step with each member's squad. */
+  get squadRoleIds() {
+    return pairs("ROLE_IDS_SQUADS");
+  },
+  /** Discord role per unit role (primary or secondary), kept in step too. */
+  get billetRoleIds() {
+    return pairs("ROLE_IDS_BILLETS");
   },
 };

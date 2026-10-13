@@ -4,11 +4,12 @@ import type { MemberStatus, ServiceRecordType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionState } from "@/components/action-form";
-import { nickname, RANKS, rankIndex, rankName, SQUADS, UNIT_ROLES } from "@/config/unit";
+import { MAX_SECONDARY_ROLES, nickname, RANKS, rankIndex, rankName, squadDef, SQUADS, UNIT_ROLES } from "@/config/unit";
 import { assertPerm } from "@/lib/auth";
 import { explain, setNickname } from "@/lib/discord";
 import { env } from "@/lib/env";
 import { hasPerm } from "@/lib/permissions";
+import { billetFill, billetKey, heldRoles, recordTypesFor, syncUnitRoles } from "@/lib/personnel";
 import { prisma } from "@/lib/prisma";
 import { CALLSIGN_RE } from "@/lib/recruitment";
 
@@ -22,6 +23,7 @@ const profileSchema = z.object({
   rank: z.enum(RANKS.map((r) => r.abbr) as [string, ...string[]]).nullable(),
   squad: z.enum(SQUADS.map((s) => s.name) as [string, ...string[]]).nullable(),
   unitRole: z.enum(UNIT_ROLES as [string, ...string[]]).nullable(),
+  secondaryRoles: z.array(z.enum(UNIT_ROLES as [string, ...string[]])).max(MAX_SECONDARY_ROLES, `Up to ${MAX_SECONDARY_ROLES} secondary roles.`),
   status: z.enum(["CANDIDATE", "ACTIVE", "INACTIVE", "DISCHARGED"]),
 });
 
@@ -36,10 +38,11 @@ export async function updateProfile(_: ActionState, data: FormData): Promise<Act
     rank: opt(data.get("rank")),
     squad: opt(data.get("squad")),
     unitRole: opt(data.get("unitRole")),
+    secondaryRoles: [...new Set(data.getAll("secondaryRoles").map(String).filter(Boolean))],
     status: data.get("status"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
-  const next = parsed.data;
+  const next = { ...parsed.data, secondaryRoles: parsed.data.secondaryRoles.filter((r) => r !== parsed.data.unitRole) };
   const prev = await prisma.user.findUnique({ where: { id: userId } });
   if (!prev) return { error: "Member not found." };
 
@@ -83,12 +86,32 @@ export async function updateProfile(_: ActionState, data: FormData): Promise<Act
         ...next,
         status: next.status as MemberStatus,
         enlistedAt: next.status === "ACTIVE" && !prev.enlistedAt ? new Date() : undefined,
+        rankSince: next.rank !== prev.rank ? (next.rank ? new Date() : null) : undefined,
       },
     }),
     ...records.map((r) => prisma.serviceRecord.create({ data: { ...r, userId, issuedById: me.id } })),
   ]);
 
+  // Command may over-strength a billet, but should know they did.
   const warnings: string[] = [];
+  if (next.squad && next.unitRole && (next.squad !== prev.squad || next.unitRole !== prev.unitRole)) {
+    const cap = squadDef(next.squad)?.billets[next.unitRole] ?? 0;
+    const filled = (await billetFill()).get(billetKey(next.squad, next.unitRole)) ?? 0;
+    if (filled > cap)
+      warnings.push(
+        cap ? `${next.squad} is now over strength on ${next.unitRole} (${filled}/${cap}).` : `${next.squad} has no ${next.unitRole} billet in the ORBAT.`,
+      );
+  }
+  if (next.squad !== prev.squad || next.unitRole !== prev.unitRole || next.secondaryRoles.join() !== prev.secondaryRoles.join()) {
+    warnings.push(
+      ...(await syncUnitRoles(
+        prev.discordId,
+        { squad: prev.squad, roles: heldRoles(prev) },
+        { squad: next.squad, roles: [next.unitRole, ...next.secondaryRoles].filter((r): r is string => !!r) },
+        `Profile updated by ${me.name}`,
+      )),
+    );
+  }
   if ((next.rank !== prev.rank || next.callsign !== prev.callsign) && next.callsign && env.botToken) {
     try {
       await setNickname(prev.discordId, nickname(next.rank, next.callsign), `Profile updated by ${me.name}`);
@@ -101,17 +124,19 @@ export async function updateProfile(_: ActionState, data: FormData): Promise<Act
   return { ok: records.length ? `Saved. Added ${records.length} service record entr${records.length === 1 ? "y" : "ies"}.` : "Saved.", warnings };
 }
 
-const MANUAL_TYPES: ServiceRecordType[] = ["ENLISTMENT", "PROMOTION", "AWARD", "DISCIPLINARY", "TRANSFER", "DISCHARGE", "NOTE"];
-
 export async function addRecord(_: ActionState, data: FormData): Promise<ActionState> {
-  const me = await assertPerm("RECRUITER");
+  const me = await assertPerm("OPERATOR");
   const type = String(data.get("type")) as ServiceRecordType;
-  // Recruiters log enlistments and notes; everything else is Command's call.
-  const allowed = hasPerm(me.perms, "ADMIN") ? MANUAL_TYPES : (["ENLISTMENT", "NOTE"] as ServiceRecordType[]);
+  const userId = String(data.get("userId"));
+  const [viewer, member] = await Promise.all([
+    prisma.user.findUnique({ where: { id: me.id } }),
+    prisma.user.findUnique({ where: { id: userId } }),
+  ]);
+  if (!member) return { error: "Member not found." };
+  const allowed = recordTypesFor(me.perms, viewer, member.squad, me.id === userId);
   if (!allowed.includes(type)) return { error: "You can't add that type of entry." };
   const title = String(data.get("title") ?? "").trim();
   if (!title || title.length > 120) return { error: "Give the entry a title (up to 120 characters)." };
-  const userId = String(data.get("userId"));
   await prisma.serviceRecord.create({
     data: { userId, type, title, description: opt(data.get("description")), issuedById: me.id },
   });

@@ -10,8 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/input";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { RANKS, rankIndex, SQUADS, UNIT_ROLES } from "@/config/unit";
+import { RANKS, rankIndex, roleDef, SQUADS, UNIT_ROLES } from "@/config/unit";
 import { requireUser } from "@/lib/auth";
+import { onLeave } from "@/lib/personnel";
 import { prisma } from "@/lib/prisma";
 import { fmtDate } from "@/lib/time";
 
@@ -45,6 +46,7 @@ export default async function Roster({ searchParams }: { searchParams: Promise<Q
     include: { _count: { select: { qualifications: true, attendances: { where: { status: "ATTENDING", event: { startTime: { lt: new Date() } } } } } } },
     take: 500,
   });
+  const away = await onLeave(members.map((m) => m.id));
   // Highest rank first, then callsign.
   members.sort(
     (a, b) => rankIndex(b.rank) - rankIndex(a.rank) || (a.callsign ?? a.discordUsername).localeCompare(b.callsign ?? b.discordUsername),
@@ -119,12 +121,18 @@ export default async function Roster({ searchParams }: { searchParams: Promise<Q
                   </Link>
                 </TD>
                 <TD className="hidden sm:table-cell">{m.squad ?? "—"}</TD>
-                <TD className="hidden md:table-cell">{m.unitRole ?? "—"}</TD>
+                <TD className="hidden md:table-cell">
+                  {m.unitRole ?? "—"}
+                  {m.unitRole && <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">{roleDef(m.unitRole)?.code}</span>}
+                </TD>
                 <TD className="hidden md:table-cell">{m._count.attendances}</TD>
                 <TD className="hidden md:table-cell">{m._count.qualifications}</TD>
                 <TD className="hidden whitespace-nowrap text-muted-foreground lg:table-cell">{m.enlistedAt ? fmtDate(m.enlistedAt) : "—"}</TD>
                 <TD>
-                  <MemberStatusBadge status={m.status} />
+                  <span className="flex flex-wrap gap-1">
+                    <MemberStatusBadge status={m.status} />
+                    {away.has(m.id) && <Badge variant="accent">LOA</Badge>}
+                  </span>
                 </TD>
               </TR>
             ))}

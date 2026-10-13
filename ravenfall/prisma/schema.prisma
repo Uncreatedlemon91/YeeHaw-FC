@@ -27,6 +27,9 @@ enum ServiceRecordType {
   TRANSFER
   DISCHARGE
   NOTE
+  // Leadership's performance and counselling notes. Seen by the member,
+  // their squad leadership and Command.
+  COUNSELING
 }
 
 enum EventType {
@@ -50,6 +53,19 @@ enum QualificationCategory {
   GENERAL
 }
 
+enum RequestType {
+  ROLE
+  CALLSIGN
+  LOA
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  DENIED
+  CANCELLED
+}
+
 enum ApplicationStatus {
   PENDING
   APPROVED
@@ -63,10 +79,20 @@ model User {
   avatar          String?
   callsign        String?      @unique
   rank            String?
+  // Primary billet; secondaryRoles are what else they're cleared to fill.
   unitRole        String?
+  secondaryRoles  String[]     @default([])
   squad           String?
   status          MemberStatus @default(CANDIDATE)
   enlistedAt      DateTime?
+  // Start of time-in-grade. Null for members ranked before it existed;
+  // the career panel then falls back to their last promotion entry.
+  rankSince       DateTime?
+  // Self-service: what the member says about themselves.
+  bio             String?
+  timezone        String?
+  availability    String[]     @default([])
+  loadout         String?
   lastLoginAt     DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -81,6 +107,8 @@ model User {
   eventsCreated        Event[]                  @relation("EventCreator")
   debriefsWritten      Event[]                  @relation("EventDebriefer")
   documentsEdited      Qualification[]
+  requests             PersonnelRequest[]       @relation("Requester")
+  reviewedRequests     PersonnelRequest[]       @relation("RequestReviewer")
 }
 
 model ServiceRecord {
@@ -165,22 +193,50 @@ model UserQualification {
 }
 
 model RecruitmentApplication {
-  id               String            @id @default(cuid())
-  discordId        String
-  discordUsername  String
-  userId           String
-  user             User              @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
-  answers          Json
-  status           ApplicationStatus @default(PENDING)
-  reviewedById     String?
-  reviewedBy       User?             @relation("Reviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  reviewNote       String?
+  id              String            @id @default(cuid())
+  discordId       String
+  discordUsername String
+  userId          String
+  user            User              @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
+  answers         Json
+  status          ApplicationStatus @default(PENDING)
+  reviewedById    String?
+  reviewedBy      User?             @relation("Reviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNote      String?
   // The embed on #recruitment-board, so a decision made on the website
   // can update the Discord post too.
-  boardMessageId   String?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  boardMessageId  String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   @@index([status, createdAt])
   @@index([discordId])
+}
+
+// Role changes, callsign changes and leaves of absence: asked for by the
+// member, decided by their squad leadership or Command (see
+// src/lib/personnel.ts for who may decide what).
+model PersonnelRequest {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation("Requester", fields: [userId], references: [id], onDelete: Cascade)
+  type           RequestType
+  status         RequestStatus @default(PENDING)
+  // ROLE: { squad, primary, secondary[] }. CALLSIGN: { callsign }. LOA: {}.
+  payload        Json          @default("{}")
+  // LOA window, inclusive. Kept as columns so "who is on leave" is a query.
+  startDate      DateTime?
+  endDate        DateTime?
+  reason         String?
+  reviewedById   String?
+  reviewedBy     User?         @relation("RequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNote     String?
+  decidedAt      DateTime?
+  // The post on the personnel board, so either side can update it.
+  boardMessageId String?
+  createdAt      DateTime      @default(now())
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+  @@index([type, status, startDate, endDate])
 }

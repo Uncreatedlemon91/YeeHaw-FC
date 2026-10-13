@@ -20,11 +20,28 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   `[RCT] Callsign`, adds the Recruit role, removes Candidate, creates the
   member's profile and writes their ENLISTMENT service record. The board
   post updates itself, whichever side the decision came from.
-- **Roster and dossiers.** Searchable by callsign, rank, squad, role and
-  status. Each dossier shows the service record timeline, a ribbon rack of
-  qualifications, and attendance stats. Changing a member's rank, squad or
+- **Roster and personnel files.** Searchable by callsign, rank, squad, role
+  and status. Each member has a personnel jacket: an ID card with service
+  number and rank insignia, a ribbon rack, and tabs for their file
+  (statement, availability, deployment log), a filterable service record,
+  career progress, billet and requests. Changing a member's rank, squad or
   status writes the PROMOTION / TRANSFER / DISCHARGE entry for you and
   renames them on Discord.
+- **Billets and the ORBAT.** Every squad has slot caps per role, and every
+  role lists the vault qualifications it needs (both in `unit.ts`). `/orbat`
+  shows the unit tree with filled and vacant slots. A vacant slot the
+  viewer qualifies for links straight to a billet request.
+- **S1 Desk (`/personnel`).** Members request a billet (one primary, up to
+  two secondaries), a callsign change or a leave of absence from their own
+  file. Requests post to the personnel board on Discord with Approve / Deny
+  and queue on the S1 Desk. Approving applies the change, writes the service
+  record, syncs squad and billet roles and the nickname on Discord, and DMs
+  the member. Approved leave excuses them from every event in the window,
+  and the AAR form pre-marks them Excused. The desk also has a promotion
+  board (members meeting the next rank's criteria) and a leave roster.
+- **Career progression.** Per-rank criteria (ops attended, days
+  time-in-grade, required qualifications) live in `unit.ts`. The career tab
+  shows the checklist and an Eligible stamp; Command still promotes by hand.
 - **Operations.** List and month-calendar views, one-click RSVP, optional
   Discord announcement, and an after-action report editor where leaders
   write the debrief and mark who actually attended, was excused or no-showed.
@@ -43,7 +60,22 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
 | guest / candidate | no mapped role | landing page, `/apply`, their application status |
 
 RECRUITER and INSTRUCTOR each include OPERATOR; one person can hold both.
-Disciplinary entries are visible only to Command and the member concerned.
+
+**Squad leadership** isn't a Discord role. It comes from the billet: an
+active member whose primary role has `leads: true` in `unit.ts` (Team
+Leader, Squad Leader) leads their own squad, and a Command billet leads
+every squad. Personnel files have three clearance tiers:
+
+| Clearance | Who | Sees |
+|---|---|---|
+| Unit | any operator | the public file: identity, billet, quals, statement, service record |
+| Squad leadership | the member, and leaders of their squad | plus availability, attendance detail, counselling entries, promotion progress, requests and leave reasons |
+| Command | ADMIN | everything, including disciplinary entries (also shown to the member) |
+
+Restricted sections render as redaction bars. Leaders decide billet
+changes within their squad and their squad's leave. Transfers between
+squads and callsign changes go to Command. Nobody decides their own
+request.
 
 ### The bot
 
@@ -60,14 +92,19 @@ src/lib/auth.ts              NextAuth + Discord role → permission sync
 src/lib/permissions.ts       the permission model
 src/lib/discord.ts           Discord REST client
 src/lib/recruitment.ts       approve / deny pipeline (shared by web and Discord)
+src/lib/personnel.ts         clearance, billets, leave, and the S1 request pipeline (shared by web and Discord)
+src/lib/career.ts            promotion criteria checklist
 src/app/api/discord/interactions/route.ts   slash commands, buttons, modals
 src/app/*                    pages; each folder's actions.ts holds its server actions
 prisma/schema.prisma         data model
 deploy/                      systemd units, update and backup scripts
 ```
 
-Ranks, squads, unit roles, the doctrine blurbs and the application
-questions are all in `src/config/unit.ts`. Edit and redeploy.
+Ranks (with promotion criteria), squads (with billet caps), unit roles
+(with qualification prerequisites), the doctrine blurbs and the
+application questions are all in `src/config/unit.ts`. Edit and redeploy.
+Qualification prerequisites refer to vault slugs, so a renamed manual
+needs its slug updated there too.
 
 ## Local development
 
@@ -111,6 +148,10 @@ Don't reuse YeeHaw FC's: each app has exactly one interactions endpoint.
    you save, so the site has to be running first.
 7. Sign in, open **Admin**, and press **Register commands** and **Post to
    welcome channel**. Pin the welcome message in Discord.
+8. Optional, for the S1 Desk: set `PERSONNEL_BOARD_CHANNEL_ID` to a
+   leadership-only channel. To have squad and billet roles follow
+   assignments, create those roles, drag the bot's role above them, and map
+   them in `ROLE_IDS_SQUADS` / `ROLE_IDS_BILLETS` (`Name=roleId` pairs).
 
 Role and channel IDs: enable Developer Mode (User Settings → Advanced),
 then right-click → Copy ID. For first setup, put your own user ID in

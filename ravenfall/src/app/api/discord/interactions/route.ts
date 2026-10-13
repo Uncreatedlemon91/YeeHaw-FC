@@ -5,6 +5,7 @@ import { editOriginal, explain, linkButton, row } from "@/lib/discord";
 import { env } from "@/lib/env";
 import { hasPerm, permsFromRoles } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { decideRequest, REQUEST_LABEL } from "@/lib/personnel";
 import { answersOf, approveApplication, denyApplication } from "@/lib/recruitment";
 import { discordTime } from "@/lib/time";
 
@@ -112,6 +113,7 @@ const textInput = (custom_id: string, label: string, o: { value?: string; long?:
 
 async function component(i: Interaction) {
   const [ns, action, appId] = (i.data?.custom_id ?? "").split(":");
+  if (ns === "per" && appId) return personnelButton(i, action, appId);
   if (ns !== "rec" || !appId) return reply("Unknown button.");
   if (!isRecruiter(i)) return reply("Only recruiters can decide applications.");
 
@@ -148,6 +150,10 @@ async function component(i: Interaction) {
 
 async function modalSubmit(i: Interaction) {
   const [ns, action, appId] = (i.data?.custom_id ?? "").split(":");
+  if (ns === "per" && action === "deny-modal" && appId) {
+    const note = (i.data?.components ?? []).flatMap((r) => r.components).find((c) => c.custom_id === "note")?.value ?? "";
+    return personnelDecision(i, appId, false, note.trim() || null);
+  }
   if (ns !== "rec" || !appId) return reply("Unknown form.");
   if (!isRecruiter(i)) return reply("Only recruiters can decide applications.");
   const values = Object.fromEntries(
@@ -181,5 +187,57 @@ async function modalSubmit(i: Interaction) {
     await editOriginal(i.token, { content, allowed_mentions: { parse: [] } }).catch(() => {});
   });
 
+  return NextResponse.json({ type: R.DEFERRED_MESSAGE, data: { flags: EPHEMERAL } });
+}
+
+// --- Personnel board (S1) ------------------------------------------------ //
+// Who may decide is worked out in decideRequest from the clicker's Discord
+// roles and their billet on the site, exactly as on the S1 Desk.
+
+async function personnelButton(i: Interaction, action: string, requestId: string) {
+  const req = await prisma.personnelRequest.findUnique({ where: { id: requestId }, include: { user: true } });
+  if (!req) return reply("That request no longer exists.");
+  if (req.status !== "PENDING") return reply(`This request was already ${req.status.toLowerCase()}.`);
+  if (action === "approve") return personnelDecision(i, requestId, true, null);
+  if (action === "deny") {
+    return NextResponse.json({
+      type: R.MODAL,
+      data: {
+        custom_id: `per:deny-modal:${requestId}`,
+        title: `Deny ${REQUEST_LABEL[req.type].toLowerCase()}`.slice(0, 45),
+        components: [textInput("note", "Reason (sent to the member)", { long: true, required: false, max: 500 })],
+      },
+    });
+  }
+  return reply("Unknown button.");
+}
+
+function personnelDecision(i: Interaction, requestId: string, approve: boolean, note: string | null) {
+  const m = i.member;
+  if (!m) return reply("Use this in the server.");
+  after(async () => {
+    let content: string;
+    try {
+      const reviewer = await prisma.user.upsert({
+        where: { discordId: m.user.id },
+        create: { discordId: m.user.id, discordUsername: m.user.username, avatar: m.user.avatar ?? null },
+        update: {},
+      });
+      const result = await decideRequest({
+        requestId,
+        approve,
+        reviewer: { id: reviewer.id, perms: permsFromRoles(m.roles, m.user.id) },
+        reviewerName: m.nick || m.user.global_name || m.user.username,
+        note,
+      });
+      content = !result.ok
+        ? `⚠️ ${result.error}`
+        : (approve ? "✅ Approved." : "❌ Denied.") +
+          (result.warnings.length ? `\n\nSome Discord steps failed:\n${result.warnings.map((w) => `• ${w}`).join("\n")}` : "");
+    } catch (e) {
+      content = `⚠️ Something went wrong: ${explain(e)}`;
+    }
+    await editOriginal(i.token, { content, allowed_mentions: { parse: [] } }).catch(() => {});
+  });
   return NextResponse.json({ type: R.DEFERRED_MESSAGE, data: { flags: EPHEMERAL } });
 }

@@ -7,6 +7,7 @@ import { Field, Select, Textarea } from "@/components/ui/input";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { rankIndex } from "@/config/unit";
 import { requireUser } from "@/lib/auth";
+import { onLeave } from "@/lib/personnel";
 import { prisma } from "@/lib/prisma";
 import { fmt } from "@/lib/time";
 import { saveDebrief } from "../../actions";
@@ -41,6 +42,8 @@ export default async function Debrief({ params }: { params: Promise<{ id: string
   const people = await prisma.user.findMany({
     where: { OR: [{ status: "ACTIVE" }, { id: { in: [...marked.keys()] } }] },
   });
+  // Approved leave covering the start of the op pre-excuses the member.
+  const away = await onLeave(people.map((p) => p.id), event.startTime);
   people.sort(
     (a, b) =>
       Number(marked.has(b.id)) - Number(marked.has(a.id)) ||
@@ -85,9 +88,9 @@ export default async function Debrief({ params }: { params: Promise<{ id: string
                     {p.rank && <span className="mr-2 text-xs text-muted-foreground">{p.rank}</span>}
                     <span className="font-semibold">{p.callsign ?? p.discordUsername}</span>
                   </TD>
-                  <TD className="text-xs text-muted-foreground">{marked.get(p.id) ?? "—"}</TD>
+                  <TD className="text-xs text-muted-foreground">{marked.get(p.id) ?? (away.has(p.id) ? "On leave" : "—")}</TD>
                   <TD>
-                    <Select name={`att:${p.id}`} defaultValue={marked.get(p.id) ?? ""} className="h-8">
+                    <Select name={`att:${p.id}`} defaultValue={marked.get(p.id) ?? (away.has(p.id) ? "EXCUSED" : "")} className="h-8">
                       <option value="">—</option>
                       <option value="ATTENDING">Attended</option>
                       <option value="EXCUSED">Excused</option>

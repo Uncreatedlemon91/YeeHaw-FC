@@ -1,4 +1,4 @@
-import { ChevronRight, ClipboardList, Inbox } from "lucide-react";
+import { ChevronRight, ClipboardList, FileStack, Inbox } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Avatar } from "@/components/avatar";
@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { rankName } from "@/config/unit";
 import { requireUser } from "@/lib/auth";
 import { hasPerm } from "@/lib/permissions";
+import { canDecide, isLeader } from "@/lib/personnel";
 import { prisma } from "@/lib/prisma";
 import { fmt, fmtDate } from "@/lib/time";
 
@@ -47,13 +48,21 @@ export default async function Dashboard() {
     }),
   ]);
 
+  // Requests waiting on this member as leadership (S1 Desk).
+  const s1 =
+    hasPerm(me.perms, "ADMIN") || isLeader(profile)
+      ? (await prisma.personnelRequest.findMany({ where: { status: "PENDING" }, include: { user: true } })).filter((r) =>
+          canDecide(me, profile, r, r.user),
+        ).length
+      : 0;
+
   return (
     <Container>
       <PageHeader eyebrow="Dashboard" title={`Welcome back, ${profile.callsign ?? me.name}`} />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <div className="flex flex-col gap-6">
-          {(pending > 0 || needAar.length > 0) && (
+          {(pending > 0 || needAar.length > 0 || s1 > 0) && (
             <div className="grid gap-3 sm:grid-cols-2">
               {pending > 0 && (
                 <Link href="/recruitment" className="flex items-center gap-3 rounded-lg border border-accent/40 bg-accent/10 p-4 hover:bg-accent/15">
@@ -61,6 +70,15 @@ export default async function Dashboard() {
                   <div>
                     <div className="font-semibold">{pending} pending application{pending === 1 ? "" : "s"}</div>
                     <div className="text-xs text-muted-foreground">Waiting on a recruiter</div>
+                  </div>
+                </Link>
+              )}
+              {s1 > 0 && (
+                <Link href="/personnel" className="flex items-center gap-3 rounded-lg border border-accent/40 bg-accent/10 p-4 hover:bg-accent/15">
+                  <FileStack className="size-6 text-accent" />
+                  <div>
+                    <div className="font-semibold">{s1} personnel request{s1 === 1 ? "" : "s"}</div>
+                    <div className="text-xs text-muted-foreground">Waiting on you at the S1 Desk</div>
                   </div>
                 </Link>
               )}
@@ -138,7 +156,7 @@ export default async function Dashboard() {
               <dd className="text-right">{profile._count.qualifications}</dd>
             </dl>
             <Link href={`/roster/${profile.id}`} className="text-sm text-accent underline-offset-4 hover:underline">
-              View my dossier
+              Open my personnel file
             </Link>
           </CardContent>
         </Card>

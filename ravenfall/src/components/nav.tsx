@@ -13,6 +13,8 @@ const ITEMS: Item[] = [
   { href: "/dashboard", label: "Dashboard", perm: "OPERATOR" },
   { href: "/ops", label: "Operations", perm: "OPERATOR" },
   { href: "/roster", label: "Roster", perm: "OPERATOR" },
+  { href: "/orbat", label: "ORBAT", perm: "OPERATOR" },
+  { href: "/personnel", label: "S1 Desk", perm: "OPERATOR" },
   { href: "/vault", label: "Vault", perm: "OPERATOR" },
   { href: "/recruitment", label: "Recruitment", perm: "RECRUITER" },
   { href: "/admin", label: "Admin", perm: "ADMIN" },

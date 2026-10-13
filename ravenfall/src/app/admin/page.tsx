@@ -37,6 +37,9 @@ export default async function Admin() {
     ["Recruit role", !!env.recruitRoleId, "ROLE_ID_RECRUIT"],
     ["Candidate role", !!env.candidateRoleId, "ROLE_ID_CANDIDATE"],
     ["Ops announcements (optional)", !!env.opsChannelId, "OPS_ANNOUNCE_CHANNEL_ID"],
+    ["Personnel board (optional)", !!env.personnelChannelId, "PERSONNEL_BOARD_CHANNEL_ID"],
+    ["Squad role sync (optional)", Object.keys(env.squadRoleIds).length > 0, "ROLE_IDS_SQUADS"],
+    ["Billet role sync (optional)", Object.keys(env.billetRoleIds).length > 0, "ROLE_IDS_BILLETS"],
   ];
 
   return (

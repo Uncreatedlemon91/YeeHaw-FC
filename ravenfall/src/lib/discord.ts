@@ -105,6 +105,14 @@ export function editMessage(channelId: string, messageId: string, payload: objec
   return discord<Message>(`/channels/${channelId}/messages/${messageId}`, { method: "PATCH", body: payload });
 }
 
+export async function dm(discordId: string, content: string) {
+  const channel = await discord<{ id: string }>("/users/@me/channels", {
+    method: "POST",
+    body: { recipient_id: discordId },
+  });
+  await sendMessage(channel.id, { content, allowed_mentions: { parse: [] } });
+}
+
 /** Edit the message an interaction came from, via its 15-minute token. */
 export function editOriginal(interactionToken: string, payload: object) {
   return discord(`/webhooks/${env.clientId}/${interactionToken}/messages/@original`, {

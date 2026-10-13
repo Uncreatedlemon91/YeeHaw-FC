@@ -23,44 +23,108 @@ export const DOCTRINE = [
 ];
 
 // Highest last. `abbr` is what goes in a member's Discord nickname.
-export const RANKS = [
-  { abbr: "RCT", name: "Recruit" },
-  { abbr: "PVT", name: "Private" },
-  { abbr: "PFC", name: "Private First Class" },
-  { abbr: "SPC", name: "Specialist" },
-  { abbr: "CPL", name: "Corporal" },
-  { abbr: "SGT", name: "Sergeant" },
-  { abbr: "SSG", name: "Staff Sergeant" },
-  { abbr: "SFC", name: "Sergeant First Class" },
-  { abbr: "2LT", name: "Second Lieutenant" },
-  { abbr: "1LT", name: "First Lieutenant" },
-  { abbr: "CPT", name: "Captain" },
-  { abbr: "MAJ", name: "Major" },
-] as const;
+// `requires` is what it takes to be promoted *into* that rank: ops attended
+// (in total), days held at the rank below, and qualification slugs from the
+// vault. The dossier shows it as a checklist; Command still promotes by hand.
+export type RankDef = {
+  abbr: string;
+  name: string;
+  grade: string;
+  tier: "enlisted" | "nco" | "officer";
+  requires?: { ops?: number; days?: number; quals?: string[] };
+};
+
+export const RANKS: readonly RankDef[] = [
+  { abbr: "RCT", name: "Recruit", grade: "E-1", tier: "enlisted" },
+  { abbr: "PVT", name: "Private", grade: "E-2", tier: "enlisted", requires: { ops: 2, days: 7, quals: ["basic-combat-training"] } },
+  { abbr: "PFC", name: "Private First Class", grade: "E-3", tier: "enlisted", requires: { ops: 6, days: 21 } },
+  { abbr: "SPC", name: "Specialist", grade: "E-4", tier: "enlisted", requires: { ops: 12, days: 30 } },
+  { abbr: "CPL", name: "Corporal", grade: "E-4", tier: "nco", requires: { ops: 20, days: 45, quals: ["team-leader-course"] } },
+  { abbr: "SGT", name: "Sergeant", grade: "E-5", tier: "nco", requires: { ops: 30, days: 60, quals: ["team-leader-course"] } },
+  { abbr: "SSG", name: "Staff Sergeant", grade: "E-6", tier: "nco", requires: { ops: 45, days: 90 } },
+  { abbr: "SFC", name: "Sergeant First Class", grade: "E-7", tier: "nco", requires: { ops: 60, days: 120 } },
+  { abbr: "2LT", name: "Second Lieutenant", grade: "O-1", tier: "officer", requires: { ops: 75, days: 120 } },
+  { abbr: "1LT", name: "First Lieutenant", grade: "O-2", tier: "officer", requires: { ops: 90, days: 150 } },
+  { abbr: "CPT", name: "Captain", grade: "O-3", tier: "officer", requires: { ops: 110, days: 180 } },
+  { abbr: "MAJ", name: "Major", grade: "O-4", tier: "officer", requires: { ops: 140, days: 240 } },
+];
 
 export const RECRUIT_RANK = RANKS[0].abbr;
 
-export const SQUADS = [
-  { name: "Command", blurb: "Mission planning, coordination and unit leadership." },
-  { name: "Alpha", blurb: "Line infantry. Assault, clearance and holding ground." },
-  { name: "Bravo", blurb: "Line infantry. Fire support and manoeuvre element." },
-  { name: "Charlie", blurb: "Reconnaissance, marksmen and forward observers." },
-  { name: "Reaper", blurb: "Rotary-wing transport, CAS and medevac." },
-  { name: "Medical", blurb: "Combat medics and casualty evacuation." },
+// Billets are slot caps per role: an ORBAT entry, not a suggestion. A role
+// a squad doesn't list can't be held in that squad.
+export type SquadDef = { name: string; callsign: string; blurb: string; billets: Record<string, number> };
+
+export const SQUADS: readonly SquadDef[] = [
+  {
+    name: "Command",
+    callsign: "Raven",
+    blurb: "Mission planning, coordination and unit leadership.",
+    billets: { Command: 3, "Radio Operator": 1 },
+  },
+  {
+    name: "Alpha",
+    callsign: "Wardog 1",
+    blurb: "Line infantry. Assault, clearance and holding ground.",
+    billets: { "Squad Leader": 1, "Team Leader": 2, "Radio Operator": 1, "Combat Medic": 1, "Automatic Rifleman": 2, Grenadier: 2, Rifleman: 4 },
+  },
+  {
+    name: "Bravo",
+    callsign: "Wardog 2",
+    blurb: "Line infantry. Fire support and manoeuvre element.",
+    billets: { "Squad Leader": 1, "Team Leader": 2, "Radio Operator": 1, "Combat Medic": 1, "Automatic Rifleman": 2, Grenadier: 2, Rifleman: 4 },
+  },
+  {
+    name: "Charlie",
+    callsign: "Shadow",
+    blurb: "Reconnaissance, marksmen and forward observers.",
+    billets: { "Squad Leader": 1, "Team Leader": 1, "Radio Operator": 1, Marksman: 4, Rifleman: 2 },
+  },
+  {
+    name: "Reaper",
+    callsign: "Reaper",
+    blurb: "Rotary-wing transport, CAS and medevac.",
+    billets: { "Squad Leader": 1, Pilot: 4 },
+  },
+  {
+    name: "Medical",
+    callsign: "Lifeline",
+    blurb: "Combat medics and casualty evacuation.",
+    billets: { "Team Leader": 1, "Combat Medic": 4 },
+  },
 ];
 
-export const UNIT_ROLES = [
-  "Rifleman",
-  "Automatic Rifleman",
-  "Grenadier",
-  "Marksman",
-  "Combat Medic",
-  "Radio Operator",
-  "Team Leader",
-  "Squad Leader",
-  "Pilot",
-  "Command",
+// Roles (MOS). `requires` lists vault qualification slugs the member must
+// hold to request it as primary or secondary. `leads` marks billets whose
+// holders act as leadership for their own squad: they see its restricted
+// files and decide its role and leave requests.
+export type RoleDef = { name: string; code: string; blurb: string; requires: string[]; leads?: boolean };
+
+export const ROLES: readonly RoleDef[] = [
+  { name: "Rifleman", code: "11B", blurb: "The backbone of the fireteam.", requires: ["basic-combat-training"] },
+  { name: "Automatic Rifleman", code: "11B-AR", blurb: "Suppressive fire with the team's LMG.", requires: ["basic-combat-training"] },
+  { name: "Grenadier", code: "11B-GR", blurb: "Indirect fire and smoke with the UGL.", requires: ["basic-combat-training"] },
+  { name: "Marksman", code: "11B-DM", blurb: "Precision fire at extended range.", requires: ["basic-combat-training", "marksman"] },
+  { name: "Combat Medic", code: "68W", blurb: "Casualty care under fire.", requires: ["basic-combat-training", "combat-lifesaver"] },
+  { name: "Radio Operator", code: "25C", blurb: "Keeps the element on the net.", requires: ["basic-combat-training"] },
+  { name: "Team Leader", code: "11B-TL", blurb: "Leads a fireteam of four.", requires: ["basic-combat-training", "team-leader-course"], leads: true },
+  { name: "Squad Leader", code: "11B-SL", blurb: "Leads the squad and its teams.", requires: ["basic-combat-training", "team-leader-course"], leads: true },
+  { name: "Pilot", code: "153A", blurb: "Rotary-wing aviator.", requires: ["rotary-wing-pilot"] },
+  { name: "Command", code: "HQ", blurb: "Unit command staff.", requires: ["team-leader-course"], leads: true },
 ];
+
+export const UNIT_ROLES = ROLES.map((r) => r.name);
+export const MAX_SECONDARY_ROLES = 2;
+
+export function roleDef(name: string | null | undefined): RoleDef | undefined {
+  return ROLES.find((r) => r.name === name);
+}
+
+export function squadDef(name: string | null | undefined): SquadDef | undefined {
+  return SQUADS.find((s) => s.name === name);
+}
+
+export const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 export function rankIndex(abbr: string | null | undefined): number {
   return RANKS.findIndex((r) => r.abbr === abbr);
