@@ -204,6 +204,23 @@ def division_stats(platform, club_id, *, blocking: bool = True):
     return None
 
 
+def division_label(current_division):
+    """EA's currentDivision as the division the game actually shows, e.g.
+    "Division 2" -- or None if it isn't a number.
+
+    EA's value runs one above the in-game division: it reported 4 while the
+    club was in Division 3, and 3 after promotion to Division 2. The likely
+    reading is that EA counts Elite as 1, so 1 maps to "Elite" here -- that
+    end of the scale is inferred, not yet observed."""
+    try:
+        n = int(float(current_division))
+    except (TypeError, ValueError):
+        return None
+    if n < 1:
+        return None
+    return "Elite" if n == 1 else f"Division {n - 1}"
+
+
 def member_career_stats(platform, club_id):
     return _get("members/career/stats", {"platform": platform, "clubId": club_id})
 

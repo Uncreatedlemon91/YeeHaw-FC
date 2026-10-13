@@ -25,6 +25,7 @@ import config  # noqa: E402
 import database  # noqa: E402
 import db  # noqa: E402
 import discord_announce  # noqa: E402
+import ea_client  # noqa: E402
 import services  # noqa: E402
 import weekly_article  # noqa: E402
 
@@ -140,10 +141,9 @@ def test_gather_period_covers_results_players_and_signings(monkeypatch):
     json.dumps(facts)  # must be serializable for the prompt
 
 
-def test_standing_carries_skill_rating_but_never_the_stale_division(monkeypatch):
-    # The snapshot's division/points come from EA's lagging all-time
-    # leaderboard -- the article once called a promotion to Division 2 one
-    # to Division 3. Only the live skill rating is handed over.
+def test_standing_reports_the_in_game_division_not_eas_raw_number(monkeypatch):
+    # EA's currentDivision runs one above the game's: it said 3 while the club
+    # was in Division 2, and the article once announced the wrong division.
     monkeypatch.setattr(config, "ROUNDUP_DAYS", 2)
     db.record_snapshot(PLATFORM, CLUB, {"skillRating": "1500"}, {"currentDivision": "3", "points": "20"})
     _squad_move("release", "B")
@@ -151,9 +151,30 @@ def test_standing_carries_skill_rating_but_never_the_stale_division(monkeypatch)
     facts = weekly_article.gather_period(PLATFORM, CLUB, int(time.time()))
 
     assert facts["standing"]["skill_rating"] == 1500
-    assert "division" not in json.dumps(facts["standing"])
+    assert facts["standing"]["division"] == "Division 2"
+    assert "division_at_start" not in facts["standing"]  # no earlier snapshot to compare
     assert "points" not in facts["standing"]
-    assert "Never state which division" in weekly_article.SYSTEM_PROMPT
+
+
+def test_standing_shows_a_promotion_across_the_period(monkeypatch):
+    monkeypatch.setattr(config, "ROUNDUP_DAYS", 2)
+    db.record_snapshot(PLATFORM, CLUB, {"skillRating": "1400"}, {"currentDivision": "4"})
+    conn = db._connect()
+    with conn:  # backdate it to before the period
+        conn.execute("UPDATE club_snapshots SET captured_at = captured_at - 5 * 86400")
+    conn.close()
+    db.record_snapshot(PLATFORM, CLUB, {"skillRating": "1500"}, {"currentDivision": "3"})
+    _squad_move("release", "B")
+
+    standing = weekly_article.gather_period(PLATFORM, CLUB, int(time.time()))["standing"]
+
+    assert (standing["division_at_start"], standing["division"]) == ("Division 3", "Division 2")
+
+
+@pytest.mark.parametrize("raw, label", [("3", "Division 2"), ("4", "Division 3"), ("11", "Division 10"),
+                                        ("1", "Elite"), (None, None), ("", None), ("0", None)])
+def test_division_label_shifts_eas_number_down_one(raw, label):
+    assert ea_client.division_label(raw) == label
 
 
 def test_transfer_news_comes_from_squad_moves_not_ea_member_diffs(monkeypatch):

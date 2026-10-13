@@ -1150,7 +1150,8 @@ like any other article. Staff can edit or unpublish it afterwards like any
 other post.
 
 - **What it's written from:** only the last `ROUNDUP_DAYS` days -- results,
-  per-player totals, skill-rating movement, league table position and form
+  per-player totals, division (EA's number minus one -- see
+  `ea_client.division_label`), skill-rating movement, league table position and form
   from `data/history.db`, and transfer news from Squad Moves. Claude is told to use those
   facts and nothing else, and runs with every tool disabled.
 - **Transfer news** comes from Squad Moves -- exactly what the home page's
