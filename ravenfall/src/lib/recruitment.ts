@@ -14,6 +14,7 @@ import {
 } from "./discord";
 import { env } from "./env";
 import { prisma } from "./prisma";
+import { getRoleConfig } from "./role-config";
 
 // The approval pipeline lives here so the website dashboard and the Discord
 // buttons run exactly the same steps.
@@ -160,8 +161,10 @@ export async function approveApplication(opts: {
   };
   if (env.botToken) {
     await step("Nickname", () => setNickname(app.discordId, nickname(rank, callsign), reason));
-    if (env.recruitRoleId) await step("Recruit role", () => addRole(app.discordId, env.recruitRoleId, reason));
-    if (env.candidateRoleId) await step("Candidate role", () => removeRole(app.discordId, env.candidateRoleId, reason));
+    const roles = await getRoleConfig();
+    if (roles.recruit) await step("Recruit role", () => addRole(app.discordId, roles.recruit, reason));
+    if (roles.candidate) await step("Candidate role", () => removeRole(app.discordId, roles.candidate, reason));
+    if (roles.ranks[rank]) await step("Rank role", () => addRole(app.discordId, roles.ranks[rank], reason));
     await step("Board post", () => refreshBoard(updated, { by, callsign, note: opts.note }));
     await step("Welcome DM", () =>
       dm(

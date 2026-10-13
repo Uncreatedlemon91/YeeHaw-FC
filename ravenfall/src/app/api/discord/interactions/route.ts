@@ -6,13 +6,14 @@ import { env } from "@/lib/env";
 import { hasPerm, permsFromRoles } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { decideRequest, REQUEST_LABEL } from "@/lib/personnel";
+import { getRoleConfig } from "@/lib/role-config";
 import { answersOf, approveApplication, denyApplication } from "@/lib/recruitment";
 import { discordTime } from "@/lib/time";
 
 // Discord's interactions webhook. Set it in the Developer Portal as
 //   https://ravenfallpmc.com/api/discord/interactions
-// Every slash command and button press arrives here as a signed POST, which
-// is what lets the bot run with no always-on gateway process.
+// Every slash command and button press arrives here as a signed POST, so
+// they keep working even if the gateway process (scripts/gateway.mjs) is down.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -95,8 +96,8 @@ async function command(i: Interaction) {
 
 // --- Approve / Deny buttons ---------------------------------------------- //
 
-function isRecruiter(i: Interaction) {
-  return hasPerm(permsFromRoles(i.member?.roles ?? [], i.member?.user.id), "RECRUITER");
+async function isRecruiter(i: Interaction) {
+  return hasPerm(permsFromRoles(i.member?.roles ?? [], i.member?.user.id, (await getRoleConfig()).perms), "RECRUITER");
 }
 
 const textInput = (custom_id: string, label: string, o: { value?: string; long?: boolean; required?: boolean; max?: number; min?: number }) =>
@@ -115,7 +116,7 @@ async function component(i: Interaction) {
   const [ns, action, appId] = (i.data?.custom_id ?? "").split(":");
   if (ns === "per" && appId) return personnelButton(i, action, appId);
   if (ns !== "rec" || !appId) return reply("Unknown button.");
-  if (!isRecruiter(i)) return reply("Only recruiters can decide applications.");
+  if (!(await isRecruiter(i))) return reply("Only recruiters can decide applications.");
 
   const app = await prisma.recruitmentApplication.findUnique({ where: { id: appId } });
   if (!app) return reply("That application no longer exists.");
@@ -155,7 +156,7 @@ async function modalSubmit(i: Interaction) {
     return personnelDecision(i, appId, false, note.trim() || null);
   }
   if (ns !== "rec" || !appId) return reply("Unknown form.");
-  if (!isRecruiter(i)) return reply("Only recruiters can decide applications.");
+  if (!(await isRecruiter(i))) return reply("Only recruiters can decide applications.");
   const values = Object.fromEntries(
     (i.data?.components ?? []).flatMap((r) => r.components.map((c) => [c.custom_id, c.value.trim()])),
   );
@@ -226,7 +227,7 @@ function personnelDecision(i: Interaction, requestId: string, approve: boolean, 
       const result = await decideRequest({
         requestId,
         approve,
-        reviewer: { id: reviewer.id, perms: permsFromRoles(m.roles, m.user.id) },
+        reviewer: { id: reviewer.id, perms: permsFromRoles(m.roles, m.user.id, (await getRoleConfig()).perms) },
         reviewerName: m.nick || m.user.global_name || m.user.username,
         note,
       });

@@ -10,6 +10,7 @@ import { env } from "@/lib/env";
 import { hasPerm } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { CALLSIGN_RE, postToBoard } from "@/lib/recruitment";
+import { getRoleConfig } from "@/lib/role-config";
 import { REAPPLY_DAYS } from "./rules";
 
 // Built from the question list, so adding a question needs no change here.
@@ -58,8 +59,9 @@ export async function submitApplication(_: ActionState, data: FormData): Promise
   await postToBoard(app.id);
   // Mark them as a candidate on Discord too, so the approval's role swap has
   // something to remove. Best-effort: they may not have joined the server yet.
-  if (env.candidateRoleId && env.botToken) {
-    await addRole(dbUser.discordId, env.candidateRoleId, "Submitted an application").catch(() => {});
+  const { candidate } = await getRoleConfig();
+  if (candidate && env.botToken) {
+    await addRole(dbUser.discordId, candidate, "Submitted an application").catch(() => {});
   }
   redirect("/apply?submitted=1");
 }

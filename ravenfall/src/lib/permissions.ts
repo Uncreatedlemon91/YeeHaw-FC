@@ -11,8 +11,9 @@ export const PERM_LABELS: Record<Perm, string> = {
   OPERATOR: "Operator",
 };
 
-export function permsFromRoles(roleIds: string[], discordId?: string): Perm[] {
-  const has = (p: Perm) => env.roleIds[p].some((id) => roleIds.includes(id));
+/** `mapping` is the role config's perms (src/lib/role-config.ts). */
+export function permsFromRoles(roleIds: string[], discordId: string | undefined, mapping: Record<Perm, string[]>): Perm[] {
+  const has = (p: Perm) => mapping[p].some((id) => roleIds.includes(id));
   if (has("ADMIN") || (discordId && env.adminUserIds.includes(discordId))) return ["ADMIN", "RECRUITER", "INSTRUCTOR", "OPERATOR"];
   const perms = new Set<Perm>();
   if (has("RECRUITER")) perms.add("RECRUITER").add("OPERATOR");

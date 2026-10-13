@@ -6,6 +6,8 @@ import { getMember, getOwnMember, type GuildMember } from "./discord";
 import { env } from "./env";
 import { hasPerm, permsFromRoles, type Perm } from "./permissions";
 import { prisma } from "./prisma";
+import { importMember } from "./member-sync";
+import { getRoleConfig } from "./role-config";
 
 // Discord roles are re-read this often, so a promotion or removal on Discord
 // reaches the site without the member having to sign out and back in.
@@ -36,7 +38,8 @@ export const authOptions: NextAuthOptions = {
       if (account && profile) {
         const p = profile as unknown as DiscordProfile;
         const member = account.access_token ? await getOwnMember(account.access_token).catch(() => null) : null;
-        const perms = permsFromRoles(member?.roles ?? [], p.id);
+        const roleConfig = await getRoleConfig();
+        const perms = permsFromRoles(member?.roles ?? [], p.id, roleConfig.perms);
         const user = await prisma.user.upsert({
           where: { discordId: p.id },
           create: { discordId: p.id, discordUsername: p.username, avatar: p.avatar ?? null, lastLoginAt: new Date() },
@@ -47,6 +50,9 @@ export const authOptions: NextAuthOptions = {
         if (hasPerm(perms, "OPERATOR") && user.status === "CANDIDATE") {
           await prisma.user.update({ where: { id: user.id }, data: { status: "ACTIVE" } });
         }
+        // Fill rank, squad and billets from their Discord roles where the
+        // file has none yet. Best-effort: never block a sign-in on it.
+        if (member) await importMember(member, roleConfig).catch(() => {});
         token.userId = user.id;
         token.discordId = p.id;
         token.name = displayName(p, member);
@@ -60,7 +66,7 @@ export const authOptions: NextAuthOptions = {
       if (token.discordId && env.botToken && Date.now() - (token.rolesAt ?? 0) > ROLE_REFRESH_MS) {
         try {
           const member = await getMember(token.discordId);
-          token.perms = permsFromRoles(member?.roles ?? [], token.discordId);
+          token.perms = permsFromRoles(member?.roles ?? [], token.discordId, (await getRoleConfig()).perms);
           token.inGuild = !!member;
         } catch {
           // Discord unreachable: keep the last known roles rather than

@@ -22,12 +22,15 @@ echo "== Building (takes a few minutes on a small droplet)"
 # step outgrows. Let the build use swap instead (README step 2).
 as_app env NODE_OPTIONS=--max-old-space-size=1536 npm run build
 
-cp deploy/ravenfall.service deploy/ravenfall-backup.service deploy/ravenfall-backup.timer /etc/systemd/system/
+cp deploy/ravenfall.service deploy/ravenfall-gateway.service deploy/ravenfall-backup.service deploy/ravenfall-backup.timer \
+   /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now ravenfall-backup.timer
-systemctl enable ravenfall
+systemctl enable ravenfall ravenfall-gateway
 systemctl restart ravenfall
-sleep 2
-systemctl --no-pager --lines=5 status ravenfall
+systemctl restart ravenfall-gateway
+sleep 3
+systemctl --no-pager --lines=5 status ravenfall ravenfall-gateway || true
 echo
 echo "Logs: journalctl -u ravenfall -f"
+echo "      journalctl -u ravenfall-gateway -f"

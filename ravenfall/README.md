@@ -13,6 +13,15 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
 - **Discord sign-in only.** There is no registration. Site permissions come
   straight from the member's roles on the unit's server, re-read every five
   minutes, so a promotion on Discord reaches the site without signing out.
+  Which Discord role means what is set on the **Admin** page.
+- **Personnel files from Discord roles.** Anyone holding a mapped role
+  (a permission, rank, squad, billet or Recruit) gets a personnel file
+  without signing in: rank, squad and billets are read from their roles and
+  the callsign from their nickname (`[SGT] Viper` → Viper). The Admin page's
+  **Sync profiles from Discord** does the whole server at once, and with the
+  bot online it happens on its own whenever someone joins or their roles
+  change. Discord only fills blanks: once a file has a rank or squad, the
+  site owns it and pushes changes back out to Discord.
 - **Recruitment pipeline.** `/enlist` on Discord (or the pinned Enlist Now
   button in #welcome) → `/apply` questionnaire → an embed on
   #recruitment-board with **Approve / Deny / View Web Application** →
@@ -53,10 +62,10 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
 
 | Level | From | Can |
 |---|---|---|
-| ADMIN | `ROLE_IDS_ADMIN` (or `ADMIN_USER_IDS`) | everything, plus profile edits, deleting events/docs/records, the Admin page |
-| RECRUITER | `ROLE_IDS_RECRUITER` | decide applications, add enlistment/note entries |
-| INSTRUCTOR | `ROLE_IDS_INSTRUCTOR` | schedule events, file AARs, edit the vault, award qualifications |
-| OPERATOR | `ROLE_IDS_OPERATOR` | dashboard, calendar & RSVP, roster, dossiers, vault |
+| ADMIN | Command Staff roles (or `ADMIN_USER_IDS`) | everything, plus profile edits, deleting events/docs/records, the Admin page |
+| RECRUITER | Recruiter roles | decide applications, add enlistment/note entries |
+| INSTRUCTOR | Instructor / NCO roles | schedule events, file AARs, edit the vault, award qualifications |
+| OPERATOR | Operator roles | dashboard, calendar & RSVP, roster, dossiers, vault |
 | guest / candidate | no mapped role | landing page, `/apply`, their application status |
 
 RECRUITER and INSTRUCTOR each include OPERATOR; one person can hold both.
@@ -79,10 +88,18 @@ request.
 
 ### The bot
 
-There is no `discord.js` process. Slash commands and button presses come in
-as signed HTTP requests to `/api/discord/interactions`, and roles,
-nicknames and embeds go out over Discord's REST API. Nothing extra has to
-stay running, and it costs no memory on a droplet that already runs YeeHaw FC.
+Slash commands and button presses come in as signed HTTP requests to
+`/api/discord/interactions`, and roles, nicknames and embeds go out over
+Discord's REST API. Those work on their own.
+
+A small second service, `ravenfall-gateway` (`scripts/gateway.mjs`, no
+dependencies, ~40 MB), holds a gateway connection. That's what makes Discord
+show the bot **online** (it can't be online without one), and it passes
+member joins and role changes to the site so personnel files follow
+(`/api/internal/member-sync`, authenticated with a token derived from
+`NEXTAUTH_SECRET`). If it's down the bot shows offline and files only
+update on sign-in or a manual sync; everything else keeps working. The
+Admin page shows its status.
 
 ## Code map
 
@@ -94,7 +111,11 @@ src/lib/discord.ts           Discord REST client
 src/lib/recruitment.ts       approve / deny pipeline (shared by web and Discord)
 src/lib/personnel.ts         clearance, billets, leave, and the S1 request pipeline (shared by web and Discord)
 src/lib/career.ts            promotion criteria checklist
+src/lib/role-config.ts       Discord role mapping (Admin page; .env fallback)
+src/lib/member-sync.ts       personnel files generated from Discord roles
 src/app/api/discord/interactions/route.ts   slash commands, buttons, modals
+src/app/api/internal/*       endpoints the gateway process calls
+scripts/gateway.mjs          gateway connection: bot presence + member events
 src/app/*                    pages; each folder's actions.ts holds its server actions
 prisma/schema.prisma         data model
 deploy/                      systemd units, update and backup scripts
@@ -135,7 +156,10 @@ Don't reuse YeeHaw FC's: each app has exactly one interactions endpoint.
 1. **OAuth2** → copy Client ID and Client Secret. Add the redirect
    `https://ravenfallpmc.com/api/auth/callback/discord`.
 2. **General Information** → copy the Public Key.
-3. **Bot** → Reset Token and copy it. No privileged intents are needed.
+3. **Bot** → Reset Token and copy it. Under **Privileged Gateway Intents**,
+   turn on **Server Members Intent**: it lets the bot list members and see
+   role changes, which is how personnel files are generated. Without it the
+   bot still comes online, but files only fill in at sign-in.
 4. **Invite the bot**. Use OAuth2 → URL Generator, with scopes `bot` and
    `applications.commands`. Give it these permissions: View Channels, Send
    Messages, Embed Links, Manage Roles, Manage Nicknames.
@@ -148,15 +172,20 @@ Don't reuse YeeHaw FC's: each app has exactly one interactions endpoint.
    you save, so the site has to be running first.
 7. Sign in, open **Admin**, and press **Register commands** and **Post to
    welcome channel**. Pin the welcome message in Discord.
-8. Optional, for the S1 Desk: set `PERSONNEL_BOARD_CHANNEL_ID` to a
-   leadership-only channel. To have squad and billet roles follow
-   assignments, create those roles, drag the bot's role above them, and map
-   them in `ROLE_IDS_SQUADS` / `ROLE_IDS_BILLETS` (`Name=roleId` pairs).
+8. On **Admin → Discord role mapping**, pick which Discord roles grant each
+   site permission, the Candidate and Recruit roles, and (optionally) the
+   roles for each rank, squad and billet. Save, then press **Sync profiles
+   from Discord** to open personnel files for everyone already in the unit.
+   For any role the bot assigns, drag the bot's role above it first.
+9. Optional, for the S1 Desk: set `PERSONNEL_BOARD_CHANNEL_ID` to a
+   leadership-only channel.
 
-Role and channel IDs: enable Developer Mode (User Settings → Advanced),
+Channel and user IDs: enable Developer Mode (User Settings → Advanced),
 then right-click → Copy ID. For first setup, put your own user ID in
-`ADMIN_USER_IDS`. The Admin page then lists every role with its ID. Move to
-`ROLE_IDS_ADMIN` and clear `ADMIN_USER_IDS` afterwards.
+`ADMIN_USER_IDS` so you can reach the Admin page before any role is mapped,
+and clear it once a Command Staff role is saved. The `ROLE_*` settings in
+`.env` still work, but only until the mapping is first saved on the Admin
+page; after that the page is the one source.
 
 ---
 
@@ -277,9 +306,13 @@ Copy them off the droplet too. `rclone`, set up as in YeeHaw FC's
 - **Sign-in fails**: the redirect registered on Discord must be exactly
   `https://ravenfallpmc.com/api/auth/callback/discord`, and `NEXTAUTH_URL`
   must be `https://ravenfallpmc.com` (no `www`, no trailing slash).
-- **Signed in but "Access denied"**: the member's roles aren't in any
-  `ROLE_IDS_*`, or they aren't in the server. The Admin page shows the
-  mapping by role name.
+- **Signed in but "Access denied"**: none of the member's roles is mapped
+  to a permission on the Admin page, or they aren't in the server.
+- **Bot shows offline**: `systemctl status ravenfall-gateway` and
+  `journalctl -u ravenfall-gateway`. A bad token stops it with a message
+  saying so.
+- **"Sync profiles" says Discord refused**: turn on Server Members Intent
+  (Discord setup step 3).
 - **Approve/Deny buttons say "This interaction failed"**: the interactions
   endpoint URL isn't set, or `DISCORD_PUBLIC_KEY` is wrong (every request
   gets a 401). `journalctl -u ravenfall` shows it.

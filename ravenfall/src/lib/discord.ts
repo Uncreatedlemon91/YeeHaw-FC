@@ -1,7 +1,8 @@
 import { env } from "./env";
 
 // Thin Discord REST client. Everything the bot does — roles, nicknames,
-// embeds — goes through here; there is no gateway connection.
+// embeds — goes through here. The gateway process (scripts/gateway.mjs)
+// only keeps the bot online and reports member changes back to the site.
 
 const API = "https://discord.com/api/v10";
 
@@ -46,9 +47,10 @@ export async function discord<T = unknown>(route: string, init: Init = {}): Prom
 }
 
 export type GuildMember = {
-  user?: { id: string; username: string; global_name?: string | null; avatar?: string | null };
+  user?: { id: string; username: string; global_name?: string | null; avatar?: string | null; bot?: boolean };
   nick?: string | null;
   roles: string[];
+  joined_at?: string;
 };
 
 export type Role = { id: string; name: string; position: number; color: number; managed: boolean };
@@ -74,6 +76,22 @@ export async function getOwnMember(accessToken: string): Promise<GuildMember | n
   } catch (e) {
     if (e instanceof DiscordError && (e.status === 404 || e.status === 403)) return null;
     throw e;
+  }
+}
+
+/**
+ * Every member of the server, 1000 per page. Needs the Server Members
+ * privileged intent switched on for the bot in the Developer Portal;
+ * Discord answers 403 without it.
+ */
+export async function listMembers(): Promise<GuildMember[]> {
+  const all: GuildMember[] = [];
+  let after = "0";
+  for (;;) {
+    const page = await discord<GuildMember[]>(`/guilds/${env.guildId}/members?limit=1000&after=${after}`);
+    all.push(...page);
+    if (page.length < 1000) return all;
+    after = page[page.length - 1].user!.id;
   }
 }
 

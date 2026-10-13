@@ -240,3 +240,11 @@ model PersonnelRequest {
   @@index([userId, createdAt])
   @@index([type, status, startDate, endDate])
 }
+
+// Site settings an admin edits on the Admin page, one JSON value per key.
+// "roles" holds the Discord role mapping (src/lib/role-config.ts).
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}

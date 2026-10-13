@@ -4,6 +4,7 @@ import { addRole, ButtonStyle, dm, editMessage, explain, linkButton, removeRole,
 import { env } from "./env";
 import { hasPerm, type Perm } from "./permissions";
 import { prisma } from "./prisma";
+import { getRoleConfig } from "./role-config";
 import { fmtDate } from "./time";
 
 // The S1 shop: who may see which parts of a personnel file, billet caps,
@@ -248,20 +249,21 @@ export async function refreshBoard(id: string, decidedBy?: string) {
 
 // --- Discord role sync --------------------------------------------------- //
 
-/** Bring the member's squad and billet roles on Discord in line with `next`. */
-export async function syncUnitRoles(
-  discordId: string,
-  prev: { squad: string | null; roles: string[] },
-  next: { squad: string | null; roles: string[] },
-  reason: string,
-): Promise<string[]> {
+type Held = { squad: string | null; roles: string[]; rank?: string | null };
+
+/**
+ * Bring the member's squad, billet and (when given) rank roles on Discord in
+ * line with `next`. Rank is left alone unless `prev` or `next` names one.
+ */
+export async function syncUnitRoles(discordId: string, prev: Held, next: Held, reason: string): Promise<string[]> {
   if (!env.botToken) return [];
   const want = new Set<string>();
   const had = new Set<string>();
-  const squads = env.squadRoleIds;
-  const billets = env.billetRoleIds;
+  const { squads, billets, ranks } = await getRoleConfig();
   if (next.squad && squads[next.squad]) want.add(squads[next.squad]);
   if (prev.squad && squads[prev.squad]) had.add(squads[prev.squad]);
+  if (next.rank && ranks[next.rank]) want.add(ranks[next.rank]);
+  if (prev.rank && ranks[prev.rank]) had.add(ranks[prev.rank]);
   for (const r of next.roles) if (billets[r]) want.add(billets[r]);
   for (const r of prev.roles) if (billets[r]) had.add(billets[r]);
 

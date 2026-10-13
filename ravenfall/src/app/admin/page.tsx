@@ -3,12 +3,26 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Container } from "@/components/container";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { RANKS, ROLES, SQUADS } from "@/config/unit";
 import { requireUser } from "@/lib/auth";
 import { explain, listRoles, type Role } from "@/lib/discord";
 import { env } from "@/lib/env";
 import { PERM_LABELS, type Perm } from "@/lib/permissions";
-import { postRecruitmentMessage, registerCommands } from "./actions";
+import { prisma } from "@/lib/prisma";
+import { getRoleConfig, roleConfigIsSaved } from "@/lib/role-config";
+import { fmt } from "@/lib/time";
+import { postRecruitmentMessage, registerCommands, syncProfiles } from "./actions";
+import { RoleMappingForm } from "./role-mapping-form";
+
+const PERM_HELP: Record<Perm, string> = {
+  ADMIN: "Everything, including this page.",
+  RECRUITER: "Decides applications.",
+  INSTRUCTOR: "Runs training and awards qualifications.",
+  OPERATOR: "Unit member: ops, roster, S1 desk, vault.",
+};
+
+// The gateway checks in every 5 minutes; allow for one missed check-in.
+const GATEWAY_STALE_MS = 11 * 60 * 1000;
 
 export const metadata = { title: "Admin" };
 export const dynamic = "force-dynamic";
@@ -25,7 +39,11 @@ export default async function Admin() {
       rolesError = explain(e);
     }
   }
-  const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? `unknown (${id})`;
+  const cfg = await getRoleConfig();
+  const saved = await roleConfigIsSaved();
+  const gatewayRow = await prisma.setting.findUnique({ where: { key: "gateway" } });
+  const gateway = gatewayRow?.value as { at: string; tag: string; members: boolean } | undefined;
+  const gatewayOnline = !!gateway && Date.now() - new Date(gateway.at).getTime() < GATEWAY_STALE_MS;
 
   const checks: [string, boolean, string][] = [
     ["Discord OAuth", !!(env.clientId && process.env.DISCORD_CLIENT_SECRET), "DISCORD_CLIENT_ID / DISCORD_CLIENT_SECRET"],
@@ -34,12 +52,10 @@ export default async function Admin() {
     ["Interactions endpoint", !!env.publicKey, "DISCORD_PUBLIC_KEY"],
     ["Recruitment board", !!env.boardChannelId, "RECRUITMENT_BOARD_CHANNEL_ID"],
     ["Welcome channel", !!env.welcomeChannelId, "WELCOME_CHANNEL_ID"],
-    ["Recruit role", !!env.recruitRoleId, "ROLE_ID_RECRUIT"],
-    ["Candidate role", !!env.candidateRoleId, "ROLE_ID_CANDIDATE"],
     ["Ops announcements (optional)", !!env.opsChannelId, "OPS_ANNOUNCE_CHANNEL_ID"],
     ["Personnel board (optional)", !!env.personnelChannelId, "PERSONNEL_BOARD_CHANNEL_ID"],
-    ["Squad role sync (optional)", Object.keys(env.squadRoleIds).length > 0, "ROLE_IDS_SQUADS"],
-    ["Billet role sync (optional)", Object.keys(env.billetRoleIds).length > 0, "ROLE_IDS_BILLETS"],
+    ["Recruit role", !!cfg.recruit, "role mapping below"],
+    ["Candidate role", !!cfg.candidate, "role mapping below"],
   ];
 
   return (
@@ -49,11 +65,11 @@ export default async function Admin() {
         <Card>
           <CardHeader>
             <CardTitle>Configuration</CardTitle>
-            <CardDescription>Set in the server&apos;s .env; restart the site after changing it.</CardDescription>
+            <CardDescription>Channels and credentials live in the server&apos;s .env; restart the site after changing it.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             {checks.map(([label, ok, key]) => (
-              <div key={key} className="flex items-center justify-between gap-3 text-sm">
+              <div key={label} className="flex items-center justify-between gap-3 text-sm">
                 <span className="flex items-center gap-2">
                   {ok ? <CheckCircle2 className="size-4 text-green-400" /> : <XCircle className="size-4 text-red-400" />}
                   {label}
@@ -66,18 +82,28 @@ export default async function Admin() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Permission mapping</CardTitle>
-            <CardDescription>Discord roles granting each site permission.</CardDescription>
+            <CardTitle>Bot status</CardTitle>
+            <CardDescription>The gateway service keeps the bot online and watches for role changes.</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-3 text-sm">
-            {(Object.keys(PERM_LABELS) as Perm[]).map((p) => (
-              <div key={p}>
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {PERM_LABELS[p]} <code className="ml-1 font-normal normal-case">ROLE_IDS_{p}</code>
-                </div>
-                <div>{env.roleIds[p].length ? env.roleIds[p].map(roleName).join(", ") : <span className="text-red-400">none set</span>}</div>
-              </div>
-            ))}
+          <CardContent className="flex flex-col gap-2 text-sm">
+            <span className="flex items-center gap-2">
+              {gatewayOnline ? <CheckCircle2 className="size-4 text-green-400" /> : <XCircle className="size-4 text-red-400" />}
+              {gatewayOnline ? `Online as ${gateway!.tag}` : "Offline"}
+            </span>
+            {gateway && (
+              <span className="text-xs text-muted-foreground">Last check-in {fmt(new Date(gateway.at))}</span>
+            )}
+            {gatewayOnline && !gateway!.members && (
+              <p className="text-xs text-accent">
+                Member events are off, so role changes won&apos;t update personnel files on their own. Turn on Server Members
+                Intent (Developer Portal → Bot), then restart <code>ravenfall-gateway</code>.
+              </p>
+            )}
+            {!gatewayOnline && (
+              <p className="text-xs text-muted-foreground">
+                Check <code>systemctl status ravenfall-gateway</code> and <code>journalctl -u ravenfall-gateway</code> on the server.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -112,36 +138,46 @@ export default async function Admin() {
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>Server roles</CardTitle>
-          <CardDescription>Copy IDs from here into the ROLE_* settings.</CardDescription>
+          <CardTitle>Discord role mapping</CardTitle>
+          <CardDescription>
+            Which Discord roles mean what on the site.
+            {!saved && " Not saved yet: showing the ROLE_* values from .env. Once saved here, those .env lines are ignored."}
+          </CardDescription>
         </CardHeader>
-        {rolesError ? (
-          <CardContent className="text-sm text-red-300">{rolesError}</CardContent>
-        ) : roles.length ? (
-          <Table>
-            <THead>
-              <TR>
-                <TH>Role</TH>
-                <TH>ID</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {roles.map((r) => (
-                <TR key={r.id}>
-                  <TD>
-                    <span className="mr-2 inline-block size-2.5 rounded-full" style={{ background: r.color ? `#${r.color.toString(16).padStart(6, "0")}` : "#888" }} />
-                    {r.name}
-                  </TD>
-                  <TD>
-                    <code className="text-xs">{r.id}</code>
-                  </TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
-        ) : (
-          <CardContent className="text-sm text-muted-foreground">Set the bot token and guild ID to list roles.</CardContent>
-        )}
+        <CardContent>
+          {rolesError ? (
+            <p className="text-sm text-red-300">{rolesError}</p>
+          ) : roles.length ? (
+            <RoleMappingForm
+              roles={roles.map((r) => ({ id: r.id, name: r.name, color: r.color }))}
+              perms={(Object.keys(PERM_LABELS) as Perm[]).map((p) => ({ key: p, label: PERM_LABELS[p], help: PERM_HELP[p] }))}
+              initial={cfg}
+              ranks={[...RANKS].reverse().map((r) => ({ key: r.abbr, label: `${r.abbr} · ${r.name}` }))}
+              squads={SQUADS.map((q) => ({ key: q.name, label: q.name }))}
+              billets={ROLES.map((r) => ({ key: r.name, label: r.name }))}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">Set the bot token and guild ID to load the server&apos;s roles.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Personnel files from Discord</CardTitle>
+          <CardDescription>
+            Opens a personnel file for every server member holding a mapped role, with rank, squad and billets read from
+            their roles and the callsign from their nickname. Existing files only have their blanks filled. With the bot
+            online this also happens on its own whenever someone&apos;s roles change.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ActionForm action={syncProfiles}>
+            <SubmitButton variant="secondary" className="self-start" disabled={!env.botToken} pendingText="Syncing…">
+              Sync profiles from Discord
+            </SubmitButton>
+          </ActionForm>
+        </CardContent>
       </Card>
     </Container>
   );

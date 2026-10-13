@@ -102,12 +102,17 @@ export async function updateProfile(_: ActionState, data: FormData): Promise<Act
         cap ? `${next.squad} is now over strength on ${next.unitRole} (${filled}/${cap}).` : `${next.squad} has no ${next.unitRole} billet in the ORBAT.`,
       );
   }
-  if (next.squad !== prev.squad || next.unitRole !== prev.unitRole || next.secondaryRoles.join() !== prev.secondaryRoles.join()) {
+  if (
+    next.squad !== prev.squad ||
+    next.unitRole !== prev.unitRole ||
+    next.secondaryRoles.join() !== prev.secondaryRoles.join() ||
+    next.rank !== prev.rank
+  ) {
     warnings.push(
       ...(await syncUnitRoles(
         prev.discordId,
-        { squad: prev.squad, roles: heldRoles(prev) },
-        { squad: next.squad, roles: [next.unitRole, ...next.secondaryRoles].filter((r): r is string => !!r) },
+        { squad: prev.squad, roles: heldRoles(prev), rank: prev.rank },
+        { squad: next.squad, roles: [next.unitRole, ...next.secondaryRoles].filter((r): r is string => !!r), rank: next.rank },
         `Profile updated by ${me.name}`,
       )),
     );
