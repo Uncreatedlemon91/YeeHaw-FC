@@ -4,7 +4,7 @@ The roundup goes out every config.ROUNDUP_DAYS days (2 by default). The
 systemd timer (deploy/proclubs-weekly-article.service + .timer) fires every
 morning and this skips the days in between, which keeps the rhythm through
 month ends and downtime where a calendar rule wouldn't. Gathers the
-period's facts -- results, player totals, division/points movement and
+period's facts -- results, player totals, skill-rating movement and
 league position from data/history.db, and transfer news from the site's
 Squad Moves (services.public_roster_moves) -- hands them to the Claude Code CLI in headless mode,
 and publishes what comes back as a live article, announced to Discord the
@@ -69,8 +69,10 @@ Rules:
 quotes, opponents, fixtures or events. If a number isn't there, don't state one.
 - Player and club names are gamertags; reproduce them exactly.
 - Cover, where the data has them: the results and the story of those days, \
-standout players, league/division standing and how it moved, and transfer news \
+standout players, league table position, skill rating and how it moved, and transfer news \
 (signings, staff appointments and departures). Skip any section the data has nothing for.
+- Never state which division the club is in or claim a promotion or relegation: \
+the data has no reliable division.
 - 250-500 words. Don't call it a weekly roundup.
 
 Reply with a single JSON object and nothing else -- no code fences, no commentary:
@@ -116,15 +118,18 @@ def gather_period(platform: str, club_id: str, now: int) -> dict:
     matches = [m for m in db.match_history(platform, club_id) if (m["played_at"] or 0) >= since]
     counted = [m for m in matches if not m["forfeit"]]
 
+    # Skill rating only. A snapshot's division and points come from EA's
+    # all-time leaderboard (ea_client.division_stats), which lags live play
+    # -- handing them over had the article announce a promotion to Division 3
+    # after the club had gone up to Division 2. See the README's "The site
+    # doesn't show a division, on purpose"; the article follows the same rule.
     latest = db.latest_snapshot(platform, club_id)
     period_start = db.snapshot_at(platform, club_id, since)
     standing = None
     if latest:
-        standing = {"division": latest["division"], "points": db._num(latest["points"]),
-                    "skill_rating": db._num(latest["skill_rating"])}
+        standing = {"skill_rating": db._num(latest["skill_rating"])}
         if period_start:
-            standing["division_at_start"] = period_start["division"]
-            standing["points_at_start"] = db._num(period_start["points"])
+            standing["skill_rating_at_start"] = db._num(period_start["skill_rating"])
 
     table = db.league_table(platform, club_id)
     league_position = next(

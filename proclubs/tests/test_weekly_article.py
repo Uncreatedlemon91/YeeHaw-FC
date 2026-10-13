@@ -140,6 +140,22 @@ def test_gather_period_covers_results_players_and_signings(monkeypatch):
     json.dumps(facts)  # must be serializable for the prompt
 
 
+def test_standing_carries_skill_rating_but_never_the_stale_division(monkeypatch):
+    # The snapshot's division/points come from EA's lagging all-time
+    # leaderboard -- the article once called a promotion to Division 2 one
+    # to Division 3. Only the live skill rating is handed over.
+    monkeypatch.setattr(config, "ROUNDUP_DAYS", 2)
+    db.record_snapshot(PLATFORM, CLUB, {"skillRating": "1500"}, {"currentDivision": "3", "points": "20"})
+    _squad_move("release", "B")
+
+    facts = weekly_article.gather_period(PLATFORM, CLUB, int(time.time()))
+
+    assert facts["standing"]["skill_rating"] == 1500
+    assert "division" not in json.dumps(facts["standing"])
+    assert "points" not in facts["standing"]
+    assert "Never state which division" in weekly_article.SYSTEM_PROMPT
+
+
 def test_transfer_news_comes_from_squad_moves_not_ea_member_diffs(monkeypatch):
     monkeypatch.setattr(config, "ROUNDUP_DAYS", 2)
     _squad_move("offer", "Signed", response="accepted", confirmed=True)
