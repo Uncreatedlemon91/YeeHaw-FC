@@ -29,8 +29,9 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   `Rct Callsign`, adds the Recruit role, removes Candidate, creates the
   member's profile and writes their ENLISTMENT service record. The board
   post updates itself, whichever side the decision came from.
-- **Roster and personnel files.** Searchable by callsign, rank, squad, role
-  and status. Each member has a personnel jacket: an ID card with service
+- **Roster and personnel files.** One page, two views: by element (the
+  ORBAT, below) or a list searchable by callsign, rank, squad, role and
+  status. Each member has a personnel jacket: an ID card with service
   number and rank insignia, a ribbon rack, and tabs for their file
   (statement, availability, deployment log), a filterable service record,
   career progress, billet and requests. Changing a member's rank, squad or
@@ -39,9 +40,11 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   (`Pvt Viper`, `Cdr Raven`; the short forms are in `unit.ts`). Without a
   callsign their current Discord name is used.
 - **Billets and the ORBAT.** Every squad has slot caps per role, and every
-  role lists the vault qualifications it needs (both in `unit.ts`). `/orbat`
-  shows the unit tree with filled and vacant slots. A vacant slot the
-  viewer qualifies for links straight to a billet request.
+  role lists the vault qualifications it needs (both in `unit.ts`). The
+  roster's default view, **By element**, is the order of battle: the unit
+  tree with filled and vacant slots, and a replacement pool for anyone
+  without one. A vacant slot the viewer qualifies for links straight to a
+  billet request. (`/orbat` redirects there.)
 - **S1 Desk (`/personnel`).** Members request a billet (one primary, up to
   two secondaries), a callsign change or a leave of absence from their own
   file. Requests post to the personnel board on Discord with Approve / Deny

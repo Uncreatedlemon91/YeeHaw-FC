@@ -487,8 +487,8 @@ export default async function Dossier({ params, searchParams }: { params: Promis
             <Typed label="Secondary" value={member.secondaryRoles.join(", ") || "—"} />
             <Typed label="Element callsign" value={squad?.callsign ?? "—"} />
           </dl>
-          <Link href="/orbat" className="mt-4 inline-block text-sm text-accent underline-offset-4 hover:underline">
-            View the ORBAT
+          <Link href="/roster" className="mt-4 inline-block text-sm text-accent underline-offset-4 hover:underline">
+            View the roster by element
           </Link>
         </Section>
       )}

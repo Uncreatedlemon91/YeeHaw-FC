@@ -19,7 +19,7 @@ const text = (v: FormDataEntryValue | null, max: number) => {
 function refresh(userId: string) {
   revalidatePath(`/roster/${userId}`);
   revalidatePath("/personnel");
-  revalidatePath("/orbat");
+  revalidatePath("/roster");
   revalidatePath("/dashboard");
 }
 
