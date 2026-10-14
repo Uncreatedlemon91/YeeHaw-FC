@@ -81,6 +81,7 @@ export default async function S1Desk() {
       path: career({
         rank: u.rank,
         since: u.rankSince ?? u.serviceRecords[0]?.createdAt ?? u.enlistedAt,
+        enlistedAt: u.enlistedAt,
         opsAttended: ops.get(u.id) ?? 0,
         quals: u.qualifications.map((q) => q.qualification.slug),
         now,
@@ -158,7 +159,7 @@ export default async function S1Desk() {
                 <CardTitle className="flex items-center gap-2">
                   <Medal className="size-4 text-accent" /> Promotion board
                 </CardTitle>
-                <CardDescription>Meets every criterion for the next rank.</CardDescription>
+                <CardDescription>Meets every criterion for the next rank. Sergeant and up also need leadership approval.</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 {board.map(({ u, path }) => (
@@ -168,6 +169,7 @@ export default async function S1Desk() {
                       <span className="font-semibold">{u.callsign ?? u.discordUsername}</span>
                       <span className="block text-xs text-muted-foreground">
                         {u.rank} → {path.next?.abbr} · {path.daysInGrade} days in grade
+                        {path.needsApproval && " · needs approval"}
                       </span>
                     </span>
                   </Link>

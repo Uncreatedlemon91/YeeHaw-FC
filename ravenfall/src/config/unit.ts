@@ -26,31 +26,38 @@ export const DOCTRINE = [
 // the Admin page's role mapping, so renaming one needs a data migration (see
 // prisma/migrations/*_command_ranks). `short` is what goes in front of the
 // member's name on Discord: "Pvt Viper".
-// `requires` is what it takes to be promoted *into* that rank: ops attended
-// (in total), days held at the rank below, and qualification slugs from the
-// vault. The dossier shows it as a checklist; Command still promotes by hand.
+// `requires` is what it takes to be promoted *into* that rank: events
+// attended (in total), days in the PMC (since enlistment), days held at the
+// rank below, qualification slugs from the vault, and whether leadership has
+// to sign off. `typical` is the usual time in the PMC by then, for guidance.
+// The personnel file shows it as a checklist; Command still promotes by hand.
+//
+// The pattern: each NCO step adds ~10 events and 15 days in grade, with
+// leadership approval from Sergeant up. Officer ranks carry the same steps
+// on, and the time between them keeps growing.
 export type RankDef = {
   abbr: string;
   short: string;
   name: string;
   grade: string;
   tier: "enlisted" | "nco" | "officer";
-  requires?: { ops?: number; days?: number; quals?: string[] };
+  requires?: { ops?: number; service?: number; days?: number; quals?: string[]; approval?: boolean };
+  typical?: string;
 };
 
 export const RANKS: readonly RankDef[] = [
   { abbr: "RCT", short: "Rct", name: "Recruit", grade: "E-1", tier: "enlisted" },
-  { abbr: "PVT", short: "Pvt", name: "Private", grade: "E-2", tier: "enlisted", requires: { ops: 2, days: 7, quals: ["basic-combat-training"] } },
-  { abbr: "PFC", short: "Pfc", name: "Private First Class", grade: "E-3", tier: "enlisted", requires: { ops: 6, days: 21 } },
-  { abbr: "SPC", short: "Spc", name: "Specialist", grade: "E-4", tier: "enlisted", requires: { ops: 12, days: 30 } },
-  { abbr: "CPL", short: "Cpl", name: "Corporal", grade: "E-4", tier: "nco", requires: { ops: 20, days: 45, quals: ["team-leader-course"] } },
-  { abbr: "SGT", short: "Sgt", name: "Sergeant", grade: "E-5", tier: "nco", requires: { ops: 30, days: 60, quals: ["team-leader-course"] } },
-  { abbr: "SSG", short: "SSgt", name: "Staff Sergeant", grade: "E-6", tier: "nco", requires: { ops: 45, days: 90 } },
-  { abbr: "SFC", short: "SFC", name: "Sergeant First Class", grade: "E-7", tier: "nco", requires: { ops: 60, days: 120 } },
-  { abbr: "2LT", short: "2Lt", name: "Second Lieutenant", grade: "O-1", tier: "officer", requires: { ops: 75, days: 120 } },
-  { abbr: "1LT", short: "1Lt", name: "First Lieutenant", grade: "O-2", tier: "officer", requires: { ops: 90, days: 150 } },
-  { abbr: "DCDR", short: "DCdr", name: "Deputy Commander", grade: "O-3", tier: "officer", requires: { ops: 110, days: 180 } },
-  { abbr: "CDR", short: "Cdr", name: "Commander", grade: "O-4", tier: "officer", requires: { ops: 140, days: 240 } },
+  { abbr: "PVT", short: "Pvt", name: "Private", grade: "E-2", tier: "enlisted", requires: { ops: 1, service: 7 }, typical: "1 week" },
+  { abbr: "PFC", short: "Pfc", name: "Private First Class", grade: "E-3", tier: "enlisted", requires: { ops: 3, service: 14 }, typical: "2 weeks" },
+  { abbr: "SPC", short: "Spc", name: "Specialist", grade: "E-4", tier: "enlisted", requires: { ops: 6, service: 30 } },
+  { abbr: "CPL", short: "Cpl", name: "Corporal", grade: "E-4", tier: "nco", requires: { ops: 12, service: 45 } },
+  { abbr: "SGT", short: "Sgt", name: "Sergeant", grade: "E-5", tier: "nco", requires: { ops: 20, days: 30, approval: true }, typical: "10–12 weeks" },
+  { abbr: "SSG", short: "SSgt", name: "Staff Sergeant", grade: "E-6", tier: "nco", requires: { ops: 30, days: 45, approval: true }, typical: "4–5 months" },
+  { abbr: "SFC", short: "SFC", name: "Sergeant First Class", grade: "E-7", tier: "nco", requires: { ops: 40, days: 60, approval: true }, typical: "6–8 months" },
+  { abbr: "2LT", short: "2Lt", name: "Second Lieutenant", grade: "O-1", tier: "officer", requires: { ops: 50, days: 75, approval: true }, typical: "9–11 months" },
+  { abbr: "1LT", short: "1Lt", name: "First Lieutenant", grade: "O-2", tier: "officer", requires: { ops: 60, days: 90, approval: true }, typical: "12–14 months" },
+  { abbr: "DCDR", short: "DCdr", name: "Deputy Commander", grade: "O-3", tier: "officer", requires: { ops: 75, days: 105, approval: true }, typical: "16–18 months" },
+  { abbr: "CDR", short: "Cdr", name: "Commander", grade: "O-4", tier: "officer", requires: { ops: 90, days: 120, approval: true }, typical: "20–24 months" },
 ];
 
 export const RECRUIT_RANK = RANKS[0].abbr;

@@ -70,7 +70,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
   const titles = (slugs: string[]) => slugs.map((s) => qualTitle[s] ?? s);
   const since =
     member.rankSince ?? member.serviceRecords.find((r) => r.type === "PROMOTION")?.createdAt ?? member.enlistedAt ?? null;
-  const path = career({ rank: member.rank, since, opsAttended: attended, quals: held, qualTitles: qualTitle });
+  const path = career({ rank: member.rank, since, enlistedAt: member.enlistedAt, opsAttended: attended, quals: held, qualTitles: qualTitle });
   const currentLeave = leave.get(id);
   const pendingTypes = new Set(member.requests.filter((r) => r.status === "PENDING").map((r) => r.type));
   const recordTypes = recordTypesFor(me.perms, viewer, member.squad, clr.self);
@@ -404,9 +404,16 @@ export default async function Dossier({ params, searchParams }: { params: Promis
         ) : (
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-3">
-              {path.eligible ? <span className="stamp stamp-ok">Eligible</span> : <span className="stamp stamp-amber">In progress</span>}
+              {!path.eligible ? (
+                <span className="stamp stamp-amber">In progress</span>
+              ) : path.needsApproval ? (
+                <span className="stamp stamp-ok">Ready for review</span>
+              ) : (
+                <span className="stamp stamp-ok">Eligible</span>
+              )}
               <span className="typed text-sm text-muted-foreground">
                 {path.since ? `In grade since ${fmtDate(path.since)}` : "Time-in-grade not recorded"}
+                {path.daysInService !== null && ` · ${path.daysInService} days in the PMC`}
               </span>
             </div>
             <ul className="flex flex-col gap-3">
@@ -418,10 +425,16 @@ export default async function Dossier({ params, searchParams }: { params: Promis
                       {c.detail === "qualification" ? `Qualification: ${c.label}` : c.label}
                     </span>
                     <span className="typed text-xs text-muted-foreground">
-                      {c.detail === "qualification" ? (c.ok ? "held" : "required") : `${Math.min(c.have, c.need)}/${c.need}`}
+                      {c.detail === "approval"
+                        ? "at promotion"
+                        : c.detail === "qualification"
+                          ? c.ok
+                            ? "held"
+                            : "required"
+                          : `${Math.min(c.have, c.need)}/${c.need}`}
                     </span>
                   </div>
-                  {c.detail !== "qualification" && (
+                  {!c.detail && (
                     <div className="h-1.5 overflow-hidden rounded-full bg-foreground/10">
                       <div className={cn("h-full", c.ok ? "bg-success" : "bg-accent")} style={{ width: `${Math.min(100, (c.have / c.need) * 100)}%` }} />
                     </div>
@@ -430,7 +443,12 @@ export default async function Dossier({ params, searchParams }: { params: Promis
               ))}
               {!path.checks.length && <Empty>No criteria set for this rank.</Empty>}
             </ul>
-            <p className="text-xs text-muted-foreground">Meeting the criteria makes a member eligible; promotion is at Command&apos;s discretion.</p>
+            <p className="text-xs text-muted-foreground">
+              {path.next.typical && <>Usually reached about {path.next.typical} into service. </>}
+              {path.needsApproval
+                ? "Meeting the criteria puts a member up for leadership review; the promotion is leadership's call."
+                : "Meeting the criteria makes a member eligible; promotion is at Command's discretion."}
+            </p>
           </div>
         )}
       </Section>

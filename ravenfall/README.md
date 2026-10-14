@@ -53,9 +53,13 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   the member. Approved leave excuses them from every event in the window,
   and the AAR form pre-marks them Excused. The desk also has a promotion
   board (members meeting the next rank's criteria) and a leave roster.
-- **Career progression.** Per-rank criteria (ops attended, days
-  time-in-grade, required qualifications) live in `unit.ts`. The career tab
-  shows the checklist and an Eligible stamp; Command still promotes by hand.
+- **Career progression.** Per-rank criteria live in `unit.ts`: events
+  attended, days in the PMC (up to Corporal) or days in the current rank
+  (Sergeant up), optional qualifications, and leadership approval from
+  Sergeant up, plus the usual total time as guidance. The career tab shows
+  the checklist with an Eligible (or, where approval is needed, Ready for
+  review) stamp, and the S1 Desk's promotion board lists who's there.
+  Command still promotes by hand.
 - **Operations.** List and month-calendar views, one-click RSVP, optional
   Discord announcement, and an after-action report editor where leaders
   write the debrief and mark who actually attended, was excused or no-showed.
