@@ -42,14 +42,14 @@ function Shape({ abbr }: { abbr: string }) {
       return <rect x={14} y={6} width={12} height={28} rx={1.5} fill={GOLD} />;
     case "1LT":
       return <rect x={14} y={6} width={12} height={28} rx={1.5} fill={SILVER} />;
-    case "CPT":
+    case "DCDR":
       return (
         <g fill={SILVER}>
           <rect x={7} y={6} width={10} height={28} rx={1.5} />
           <rect x={23} y={6} width={10} height={28} rx={1.5} />
         </g>
       );
-    case "MAJ":
+    case "CDR":
       return (
         <path
           d="M20,4 C27,10 33,14 31,22 C30,28 25,30 22,31 L22,37 L18,37 L18,31 C15,30 10,28 9,22 C7,14 13,10 20,4 Z"

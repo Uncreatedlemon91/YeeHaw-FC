@@ -22,12 +22,16 @@ export const DOCTRINE = [
   { title: "Accountability", body: "Rank is earned through attendance, qualification and leadership. Every op ends in a debrief." },
 ];
 
-// Highest last. `abbr` is what goes in a member's Discord nickname.
+// Highest last. `abbr` is the rank's key: it's stored on each member and in
+// the Admin page's role mapping, so renaming one needs a data migration (see
+// prisma/migrations/*_command_ranks). `short` is what goes in front of the
+// member's name on Discord: "Pvt Viper".
 // `requires` is what it takes to be promoted *into* that rank: ops attended
 // (in total), days held at the rank below, and qualification slugs from the
 // vault. The dossier shows it as a checklist; Command still promotes by hand.
 export type RankDef = {
   abbr: string;
+  short: string;
   name: string;
   grade: string;
   tier: "enlisted" | "nco" | "officer";
@@ -35,18 +39,18 @@ export type RankDef = {
 };
 
 export const RANKS: readonly RankDef[] = [
-  { abbr: "RCT", name: "Recruit", grade: "E-1", tier: "enlisted" },
-  { abbr: "PVT", name: "Private", grade: "E-2", tier: "enlisted", requires: { ops: 2, days: 7, quals: ["basic-combat-training"] } },
-  { abbr: "PFC", name: "Private First Class", grade: "E-3", tier: "enlisted", requires: { ops: 6, days: 21 } },
-  { abbr: "SPC", name: "Specialist", grade: "E-4", tier: "enlisted", requires: { ops: 12, days: 30 } },
-  { abbr: "CPL", name: "Corporal", grade: "E-4", tier: "nco", requires: { ops: 20, days: 45, quals: ["team-leader-course"] } },
-  { abbr: "SGT", name: "Sergeant", grade: "E-5", tier: "nco", requires: { ops: 30, days: 60, quals: ["team-leader-course"] } },
-  { abbr: "SSG", name: "Staff Sergeant", grade: "E-6", tier: "nco", requires: { ops: 45, days: 90 } },
-  { abbr: "SFC", name: "Sergeant First Class", grade: "E-7", tier: "nco", requires: { ops: 60, days: 120 } },
-  { abbr: "2LT", name: "Second Lieutenant", grade: "O-1", tier: "officer", requires: { ops: 75, days: 120 } },
-  { abbr: "1LT", name: "First Lieutenant", grade: "O-2", tier: "officer", requires: { ops: 90, days: 150 } },
-  { abbr: "CPT", name: "Captain", grade: "O-3", tier: "officer", requires: { ops: 110, days: 180 } },
-  { abbr: "MAJ", name: "Major", grade: "O-4", tier: "officer", requires: { ops: 140, days: 240 } },
+  { abbr: "RCT", short: "Rct", name: "Recruit", grade: "E-1", tier: "enlisted" },
+  { abbr: "PVT", short: "Pvt", name: "Private", grade: "E-2", tier: "enlisted", requires: { ops: 2, days: 7, quals: ["basic-combat-training"] } },
+  { abbr: "PFC", short: "Pfc", name: "Private First Class", grade: "E-3", tier: "enlisted", requires: { ops: 6, days: 21 } },
+  { abbr: "SPC", short: "Spc", name: "Specialist", grade: "E-4", tier: "enlisted", requires: { ops: 12, days: 30 } },
+  { abbr: "CPL", short: "Cpl", name: "Corporal", grade: "E-4", tier: "nco", requires: { ops: 20, days: 45, quals: ["team-leader-course"] } },
+  { abbr: "SGT", short: "Sgt", name: "Sergeant", grade: "E-5", tier: "nco", requires: { ops: 30, days: 60, quals: ["team-leader-course"] } },
+  { abbr: "SSG", short: "SSgt", name: "Staff Sergeant", grade: "E-6", tier: "nco", requires: { ops: 45, days: 90 } },
+  { abbr: "SFC", short: "SFC", name: "Sergeant First Class", grade: "E-7", tier: "nco", requires: { ops: 60, days: 120 } },
+  { abbr: "2LT", short: "2Lt", name: "Second Lieutenant", grade: "O-1", tier: "officer", requires: { ops: 75, days: 120 } },
+  { abbr: "1LT", short: "1Lt", name: "First Lieutenant", grade: "O-2", tier: "officer", requires: { ops: 90, days: 150 } },
+  { abbr: "DCDR", short: "DCdr", name: "Deputy Commander", grade: "O-3", tier: "officer", requires: { ops: 110, days: 180 } },
+  { abbr: "CDR", short: "Cdr", name: "Commander", grade: "O-4", tier: "officer", requires: { ops: 140, days: 240 } },
 ];
 
 export const RECRUIT_RANK = RANKS[0].abbr;
@@ -134,9 +138,28 @@ export function rankName(abbr: string | null | undefined): string {
   return RANKS.find((r) => r.abbr === abbr)?.name ?? abbr ?? "Unranked";
 }
 
-// Discord caps nicknames at 32 characters.
-export function nickname(rank: string | null | undefined, callsign: string): string {
-  return (rank ? `[${rank}] ${callsign}` : callsign).slice(0, 32);
+export function rankShort(abbr: string | null | undefined): string | null {
+  return RANKS.find((r) => r.abbr === abbr)?.short ?? null;
+}
+
+/** The member's Discord nickname: "Pvt Viper". Discord caps it at 32. */
+export function nickname(rank: string | null | undefined, name: string): string {
+  const short = rankShort(rank);
+  return (short ? `${short} ${name}` : name).slice(0, 32);
+}
+
+/**
+ * A nickname with any rank prefix taken off: "Pvt Viper", "[PVT] Viper"
+ * (the older format) and "Viper" all give "Viper".
+ */
+export function stripRank(nick: string | null | undefined): string {
+  let n = (nick ?? "").trim().replace(/^\[[^\]]*\]\s*/, "");
+  for (const r of RANKS) {
+    for (const p of [r.short, r.abbr]) {
+      if (n.toLowerCase().startsWith(`${p.toLowerCase()} `)) return n.slice(p.length + 1).trim();
+    }
+  }
+  return n;
 }
 
 // The /apply questionnaire. Each answer is stored under its key in

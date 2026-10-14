@@ -4,12 +4,10 @@ import type { MemberStatus, ServiceRecordType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionState } from "@/components/action-form";
-import { MAX_SECONDARY_ROLES, nickname, RANKS, rankIndex, rankName, squadDef, SQUADS, UNIT_ROLES } from "@/config/unit";
+import { MAX_SECONDARY_ROLES, RANKS, rankIndex, rankName, squadDef, SQUADS, UNIT_ROLES } from "@/config/unit";
 import { assertPerm } from "@/lib/auth";
-import { explain, setNickname } from "@/lib/discord";
-import { env } from "@/lib/env";
 import { hasPerm } from "@/lib/permissions";
-import { billetFill, billetKey, heldRoles, recordTypesFor, syncUnitRoles } from "@/lib/personnel";
+import { applyNickname, billetFill, billetKey, heldRoles, recordTypesFor, syncUnitRoles } from "@/lib/personnel";
 import { prisma } from "@/lib/prisma";
 import { CALLSIGN_RE } from "@/lib/recruitment";
 
@@ -117,12 +115,10 @@ export async function updateProfile(_: ActionState, data: FormData): Promise<Act
       )),
     );
   }
-  if ((next.rank !== prev.rank || next.callsign !== prev.callsign) && next.callsign && env.botToken) {
-    try {
-      await setNickname(prev.discordId, nickname(next.rank, next.callsign), `Profile updated by ${me.name}`);
-    } catch (e) {
-      warnings.push(`Discord nickname: ${explain(e)}`);
-    }
+  // A new rank (or callsign) renames them on Discord: "Pvt Viper".
+  if ((next.rank !== prev.rank || next.callsign !== prev.callsign) && (next.rank || next.callsign)) {
+    const w = await applyNickname(prev.discordId, next.rank, next.callsign, `Profile updated by ${me.name}`);
+    if (w) warnings.push(w);
   }
   revalidatePath(`/roster/${userId}`);
   revalidatePath("/roster");

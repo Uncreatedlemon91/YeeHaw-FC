@@ -1,8 +1,9 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
-import { MAX_SECONDARY_ROLES, RANKS, rankName, ROLES, SQUADS } from "@/config/unit";
+import { MAX_SECONDARY_ROLES, RANKS, rankName, ROLES, SQUADS, stripRank } from "@/config/unit";
 import { getMember, listMembers, type GuildMember } from "./discord";
 import { permsFromRoles, type Perm } from "./permissions";
+import { applyNickname } from "./personnel";
 import { prisma } from "./prisma";
 import { CALLSIGN_RE } from "./recruitment";
 import { getRoleConfig, type RoleConfig } from "./role-config";
@@ -42,9 +43,9 @@ export function readRoles(m: GuildMember, cfg: RoleConfig): FromRoles {
   };
 }
 
-/** "[SGT] Viper" -> "Viper", if what's left is a valid callsign. */
+/** "Sgt Viper" or "[SGT] Viper" -> "Viper", if what's left is a valid callsign. */
 export function callsignFromNick(nick: string | null | undefined): string | null {
-  const c = (nick ?? "").replace(/^\[[^\]]*\]\s*/, "").trim();
+  const c = stripRank(nick);
   return CALLSIGN_RE.test(c) ? c : null;
 }
 
@@ -97,6 +98,7 @@ export async function importMember(m: GuildMember, cfg: RoleConfig, retried = fa
           },
         },
       });
+      if (read.rank) await applyNickname(u.id, read.rank, callsign, "Rank from Discord role");
       return "created";
     }
 
@@ -135,6 +137,8 @@ export async function importMember(m: GuildMember, cfg: RoleConfig, retried = fa
       };
     }
     await prisma.user.update({ where: { id: existing.id }, data });
+    // Given a rank just now: put it in front of their name on Discord.
+    if (!existing.rank && read.rank) await applyNickname(u.id, read.rank, existing.callsign ?? callsign, "Rank from Discord role");
     return filled.length ? "updated" : "unchanged";
   } catch (e) {
     // Signed in (or another event landed) between our read and write, or the

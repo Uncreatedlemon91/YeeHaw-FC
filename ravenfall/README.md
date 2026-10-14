@@ -17,7 +17,7 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
 - **Personnel files from Discord roles.** Anyone holding a mapped role
   (a permission, rank, squad, billet or Recruit) gets a personnel file
   without signing in: rank, squad and billets are read from their roles and
-  the callsign from their nickname (`[SGT] Viper` → Viper). The Admin page's
+  the callsign from their nickname (`Sgt Viper` → Viper). The Admin page's
   **Sync profiles from Discord** does the whole server at once, and with the
   bot online it happens on its own whenever someone joins or their roles
   change. Discord only fills blanks: once a file has a rank or squad, the
@@ -26,7 +26,7 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   button in #welcome) → `/apply` questionnaire → an embed on
   #recruitment-board with **Approve / Deny / View Web Application** →
   approving (on Discord or the website) sets the nickname to
-  `[RCT] Callsign`, adds the Recruit role, removes Candidate, creates the
+  `Rct Callsign`, adds the Recruit role, removes Candidate, creates the
   member's profile and writes their ENLISTMENT service record. The board
   post updates itself, whichever side the decision came from.
 - **Roster and personnel files.** Searchable by callsign, rank, squad, role
@@ -34,8 +34,10 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   number and rank insignia, a ribbon rack, and tabs for their file
   (statement, availability, deployment log), a filterable service record,
   career progress, billet and requests. Changing a member's rank, squad or
-  status writes the PROMOTION / TRANSFER / DISCHARGE entry for you and
-  renames them on Discord.
+  status writes the PROMOTION / TRANSFER / DISCHARGE entry for you. A new
+  rank renames them on Discord to the rank's short form and their callsign
+  (`Pvt Viper`, `Cdr Raven`; the short forms are in `unit.ts`). Without a
+  callsign their current Discord name is used.
 - **Billets and the ORBAT.** Every squad has slot caps per role, and every
   role lists the vault qualifications it needs (both in `unit.ts`). `/orbat`
   shows the unit tree with filled and vacant slots. A vacant slot the

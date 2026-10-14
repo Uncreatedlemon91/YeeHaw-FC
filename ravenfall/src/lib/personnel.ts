@@ -1,6 +1,6 @@
 import type { PersonnelRequest, Prisma, RequestType, ServiceRecordType, User } from "@prisma/client";
-import { MAX_SECONDARY_ROLES, nickname, roleDef, squadDef, UNIT_ROLES } from "@/config/unit";
-import { addRole, ButtonStyle, dm, editMessage, explain, linkButton, removeRole, row, sendMessage, setNickname } from "./discord";
+import { MAX_SECONDARY_ROLES, nickname, roleDef, squadDef, stripRank, UNIT_ROLES } from "@/config/unit";
+import { addRole, ButtonStyle, dm, editMessage, explain, getMember, linkButton, removeRole, row, sendMessage, setNickname } from "./discord";
 import { env } from "./env";
 import { hasPerm, type Perm } from "./permissions";
 import { prisma } from "./prisma";
@@ -277,6 +277,33 @@ export async function syncUnitRoles(discordId: string, prev: Held, next: Held, r
     await addRole(discordId, id, reason).catch((e) => warnings.push(`Add role: ${explain(e)}`));
   }
   return warnings;
+}
+
+/**
+ * Rename the member on Discord to "<rank> <name>", e.g. "Pvt Viper". The
+ * name is their callsign, or failing that their current Discord name with
+ * any old rank prefix removed. Returns a warning instead of throwing.
+ */
+export async function applyNickname(
+  discordId: string,
+  rank: string | null,
+  callsign: string | null,
+  reason: string,
+): Promise<string | null> {
+  if (!env.botToken) return null;
+  try {
+    let name = callsign;
+    if (!name) {
+      const m = await getMember(discordId);
+      if (!m) return null;
+      name = stripRank(m.nick) || m.user?.global_name || m.user?.username || null;
+    }
+    if (!name) return null;
+    await setNickname(discordId, nickname(rank, name), reason);
+    return null;
+  } catch (e) {
+    return `Discord nickname: ${explain(e)}`;
+  }
 }
 
 export const heldRoles = (u: Pick<User, "unitRole" | "secondaryRoles">) =>
