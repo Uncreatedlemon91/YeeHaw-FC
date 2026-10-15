@@ -23,7 +23,7 @@ export default async function Apply() {
   if (!user) {
     return (
       <Container className="max-w-xl py-20 text-center">
-        <PageHeader eyebrow="Recruitment" title={`Enlist with the ${UNIT.name}`} className="block border-0" />
+        <PageHeader eyebrow="Recruitment" title={`Enlist with ${UNIT.name}`} className="block border-0" />
         <p className="text-sm text-muted-foreground">
           Applications are tied to your Discord account, so sign in first. We only read your username and your roles on
           our server.

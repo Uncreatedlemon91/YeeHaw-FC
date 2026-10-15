@@ -43,10 +43,10 @@ export default async function Home() {
         <div className="pointer-events-none absolute -right-24 -top-24 size-[28rem] rounded-full bg-primary/10 blur-3xl" />
         <Container className="relative py-20 sm:py-28">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-accent">
-            <Logo className="size-5" /> {UNIT.org}
+            <Logo className="size-5" /> {UNIT.siteName}
           </div>
           <h1 className="mt-4 max-w-3xl text-5xl font-bold uppercase leading-[0.95] sm:text-7xl">
-            The <span className="text-accent">{UNIT.name}</span> are recruiting.
+            <span className="text-accent">{UNIT.name}</span> is recruiting.
           </h1>
           <p className="mt-6 max-w-xl text-lg text-muted-foreground">{UNIT.description}</p>
           <p className="mt-2 text-sm italic text-muted-foreground">“{UNIT.motto}”</p>

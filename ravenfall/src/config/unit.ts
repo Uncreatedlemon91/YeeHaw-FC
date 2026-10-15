@@ -2,7 +2,8 @@
 // secret, so it lives in code rather than .env.
 
 export const UNIT = {
-  name: "Wardogs",
+  // The community. Write it without "the": "Enlist with Ravenfall PMC".
+  name: "Ravenfall PMC",
   org: "Ravenfall PMC",
   siteName: "Ravenfall HQ",
   motto: "Loyal to the contract. Lethal to the rest.",
@@ -180,7 +181,7 @@ export const APPLICATION_QUESTIONS = [
   { key: "experience", label: "Milsim / tactical shooter experience", type: "textarea", required: true, max: 2000,
     help: "Previous units, games, roles you've played." },
   { key: "interest", label: "What role would you like to fill?", type: "text", required: false, max: 120 },
-  { key: "why", label: "Why do you want to join the Wardogs?", type: "textarea", required: true, max: 2000 },
+  { key: "why", label: "Why do you want to join Ravenfall PMC?", type: "textarea", required: true, max: 2000 },
   { key: "referral", label: "How did you find us?", type: "text", required: false, max: 200 },
 ] as const;
 

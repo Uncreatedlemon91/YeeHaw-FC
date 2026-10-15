@@ -69,7 +69,7 @@ export function boardMessage(
       {
         title: `Application: ${app.discordUsername}`,
         url: applicationUrl(app.id),
-        description: `<@${app.discordId}> applied to join the ${UNIT.name}.`,
+        description: `<@${app.discordId}> applied to join ${UNIT.name}.`,
         color: COLORS[app.status],
         fields,
         timestamp: app.createdAt.toISOString(),
@@ -172,7 +172,7 @@ export async function approveApplication(opts: {
     await step("Welcome DM", () =>
       dm(
         app.discordId,
-        `Welcome to the ${UNIT.name}, **${callsign}**. Your application was approved — check the operations calendar at ${env.siteUrl}/ops and your dossier at ${env.siteUrl}/roster/${app.userId}.`,
+        `Welcome to ${UNIT.name}, **${callsign}**. Your application was approved — check the operations calendar at ${env.siteUrl}/ops and your dossier at ${env.siteUrl}/roster/${app.userId}.`,
       ),
     );
   } else {

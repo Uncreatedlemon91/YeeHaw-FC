@@ -22,7 +22,7 @@ export async function postRecruitmentMessage(): Promise<ActionState> {
     await sendMessage(welcome, {
       embeds: [
         {
-          title: `Enlist with the ${UNIT.name}`,
+          title: `Enlist with ${UNIT.name}`,
           description: `${UNIT.description}\n\nHit **Enlist Now** to sign in with Discord and fill out a short application. Our recruiters are notified the moment you submit.`,
           color: 0xd4a017,
           footer: { text: UNIT.org },

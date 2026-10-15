@@ -23,7 +23,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Nav user={user} />
         <main className="flex-1">{children}</main>
         <footer className="border-t py-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
-          {UNIT.org} · {UNIT.name} · {new Date().getFullYear()}
+          {UNIT.name} · {new Date().getFullYear()}
         </footer>
       </body>
     </html>

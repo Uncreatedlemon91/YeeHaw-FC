@@ -164,7 +164,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
             Viewing clearance: <span className={clr.squad ? "text-accent" : ""}>{clr.label}</span>
           </span>
           <span>
-            {UNIT.org} · {UNIT.name} · S1 Personnel
+            {UNIT.name} · S1 Personnel
           </span>
         </div>
       </div>

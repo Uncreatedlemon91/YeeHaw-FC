@@ -1,7 +1,7 @@
 # Ravenfall HQ
 
-Operations portal and Discord companion for the **Wardogs** milsim unit
-(Ravenfall PMC), served at [ravenfallpmc.com](https://ravenfallpmc.com). It
+Operations portal and Discord companion for **Ravenfall PMC**, a milsim
+community, served at [ravenfallpmc.com](https://ravenfallpmc.com). It
 shares the droplet with YeeHaw FC but nothing else: its own user, directory,
 database, port and Discord application.
 

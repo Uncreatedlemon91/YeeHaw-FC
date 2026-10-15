@@ -73,7 +73,7 @@ async function command(i: Interaction) {
   switch (i.data?.name) {
     case "enlist":
       return reply(
-        `Ready to join the **${UNIT.name}**? Sign in with Discord and fill out the application — recruiters are notified as soon as you submit.`,
+        `Ready to join **${UNIT.name}**? Sign in with Discord and fill out the application — recruiters are notified as soon as you submit.`,
         { components: [row(linkButton("Enlist Now", `${env.siteUrl}/apply`))] },
       );
     case "ops": {
