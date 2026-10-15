@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Field, Select } from "@/components/ui/input";
 import { saveChannels } from "./actions";
@@ -21,30 +22,35 @@ export function ChannelForm({
   return (
     <ActionForm action={saveChannels}>
       <div className="grid gap-4 sm:grid-cols-2">
-        {targets.map((t) => {
-          const value = initial[t.key] ?? "";
-          return (
-            <Field key={t.key} label={t.label} help={t.help}>
-              <Select name={t.key} defaultValue={value}>
-                <option value="">— not posted —</option>
-                {value && !known.has(value) && <option value={value}>deleted or hidden channel ({value})</option>}
-                {groups.map((g) => (
-                  <optgroup key={g.category} label={g.category}>
-                    {g.channels.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        #{c.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </Select>
-            </Field>
-          );
-        })}
+        {targets.map((t) => (
+          <Field key={t.key} label={t.label} help={t.help}>
+            <ChannelSelect name={t.key} groups={groups} known={known} initial={initial[t.key] ?? ""} />
+          </Field>
+        ))}
       </div>
       <SubmitButton variant="accent" className="self-start" pendingText="Saving…">
         Save channels
       </SubmitButton>
     </ActionForm>
+  );
+}
+
+/** Controlled for the same reason as the role pickers: see role-mapping-form.tsx. */
+function ChannelSelect({ name, groups, known, initial }: { name: string; groups: ChannelGroup[]; known: Set<string>; initial: string }) {
+  const [value, setValue] = useState(initial);
+  return (
+    <Select name={name} value={value} onChange={(e) => setValue(e.target.value)} autoComplete="off">
+      <option value="">— not posted —</option>
+      {initial && !known.has(initial) && <option value={initial}>deleted or hidden channel ({initial})</option>}
+      {groups.map((g) => (
+        <optgroup key={g.category} label={g.category}>
+          {g.channels.map((c) => (
+            <option key={c.id} value={c.id}>
+              #{c.name}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </Select>
   );
 }

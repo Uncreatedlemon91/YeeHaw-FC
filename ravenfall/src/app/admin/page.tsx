@@ -160,6 +160,7 @@ export default async function Admin() {
             <p className="text-sm text-red-300">{channelsError}</p>
           ) : channelGroups.length ? (
             <ChannelForm
+              key={JSON.stringify(channels)}
               groups={channelGroups}
               initial={channels}
               targets={[
@@ -188,6 +189,7 @@ export default async function Admin() {
             <p className="text-sm text-red-300">{rolesError}</p>
           ) : roles.length ? (
             <RoleMappingForm
+              key={JSON.stringify(cfg)}
               roles={roles.map((r) => ({ id: r.id, name: r.name, color: r.color }))}
               perms={(Object.keys(PERM_LABELS) as Perm[]).map((p) => ({ key: p, label: PERM_LABELS[p], help: PERM_HELP[p] }))}
               initial={cfg}

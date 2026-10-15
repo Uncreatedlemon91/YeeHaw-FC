@@ -43,6 +43,7 @@ function MultiRolePicker({ name, roles, initial }: { name: string; roles: PickRo
         </div>
       )}
       <Select
+        autoComplete="off"
         value=""
         onChange={(e) => e.target.value && setPicked((p) => [...p, e.target.value])}
         disabled={!left.length}
@@ -59,11 +60,16 @@ function MultiRolePicker({ name, roles, initial }: { name: string; roles: PickRo
   );
 }
 
-/** At most one role for one target. */
+/**
+ * At most one role for one target. Controlled, and with browser autofill
+ * off: React resets uncontrolled fields after a form action, and the browser
+ * then restored that blank state on refresh, hiding the saved choice.
+ */
 function SingleRolePicker({ name, roles, initial }: { name: string; roles: PickRole[]; initial: string }) {
+  const [value, setValue] = useState(initial);
   const known = !initial || roles.some((r) => r.id === initial);
   return (
-    <Select name={name} defaultValue={initial}>
+    <Select name={name} value={value} onChange={(e) => setValue(e.target.value)} autoComplete="off">
       <option value="">— not synced —</option>
       {!known && <option value={initial}>deleted role ({initial})</option>}
       {roles.map((r) => (
