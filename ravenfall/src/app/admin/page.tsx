@@ -5,13 +5,15 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RANKS, ROLES, SQUADS } from "@/config/unit";
 import { requireUser } from "@/lib/auth";
-import { explain, listRoles, type Role } from "@/lib/discord";
+import { explain, listRoles, listTextChannels, type Role } from "@/lib/discord";
 import { env } from "@/lib/env";
 import { PERM_LABELS, type Perm } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { channelConfigIsSaved, getChannelConfig } from "@/lib/channel-config";
 import { getRoleConfig, roleConfigIsSaved } from "@/lib/role-config";
 import { fmt } from "@/lib/time";
 import { postRecruitmentMessage, registerCommands, syncProfiles } from "./actions";
+import { ChannelForm, type ChannelGroup } from "./channel-form";
 import { RoleMappingForm } from "./role-mapping-form";
 
 const PERM_HELP: Record<Perm, string> = {
@@ -32,13 +34,22 @@ export default async function Admin() {
 
   let roles: Role[] = [];
   let rolesError: string | null = null;
+  let channelGroups: ChannelGroup[] = [];
+  let channelsError: string | null = null;
   if (env.botToken && env.guildId) {
     try {
       roles = (await listRoles()).filter((r) => !r.managed && r.name !== "@everyone").sort((a, b) => b.position - a.position);
     } catch (e) {
       rolesError = explain(e);
     }
+    try {
+      channelGroups = await listTextChannels();
+    } catch (e) {
+      channelsError = explain(e);
+    }
   }
+  const channels = await getChannelConfig();
+  const channelsSaved = await channelConfigIsSaved();
   const cfg = await getRoleConfig();
   const saved = await roleConfigIsSaved();
   const gatewayRow = await prisma.setting.findUnique({ where: { key: "gateway" } });
@@ -50,10 +61,10 @@ export default async function Admin() {
     ["Bot token", !!env.botToken, "DISCORD_BOT_TOKEN"],
     ["Guild", !!env.guildId, "DISCORD_GUILD_ID"],
     ["Interactions endpoint", !!env.publicKey, "DISCORD_PUBLIC_KEY"],
-    ["Recruitment board", !!env.boardChannelId, "RECRUITMENT_BOARD_CHANNEL_ID"],
-    ["Welcome channel", !!env.welcomeChannelId, "WELCOME_CHANNEL_ID"],
-    ["Ops announcements (optional)", !!env.opsChannelId, "OPS_ANNOUNCE_CHANNEL_ID"],
-    ["Personnel board (optional)", !!env.personnelChannelId, "PERSONNEL_BOARD_CHANNEL_ID"],
+    ["Recruitment board", !!channels.board, "channels below"],
+    ["Welcome channel", !!channels.welcome, "channels below"],
+    ["Ops announcements (optional)", !!channels.ops, "channels below"],
+    ["Personnel board (optional)", !!channels.personnel, "channels below"],
     ["Recruit role", !!cfg.recruit, "role mapping below"],
     ["Candidate role", !!cfg.candidate, "role mapping below"],
   ];
@@ -65,7 +76,7 @@ export default async function Admin() {
         <Card>
           <CardHeader>
             <CardTitle>Configuration</CardTitle>
-            <CardDescription>Channels and credentials live in the server&apos;s .env; restart the site after changing it.</CardDescription>
+            <CardDescription>Credentials live in the server&apos;s .env (restart the site after changing it). Roles and channels are set below.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             {checks.map(([label, ok, key]) => (
@@ -114,7 +125,7 @@ export default async function Admin() {
           </CardHeader>
           <CardContent>
             <ActionForm action={postRecruitmentMessage}>
-              <SubmitButton variant="accent" className="self-start" disabled={!env.welcomeChannelId}>
+              <SubmitButton variant="accent" className="self-start" disabled={!channels.welcome}>
                 Post to welcome channel
               </SubmitButton>
             </ActionForm>
@@ -135,6 +146,34 @@ export default async function Admin() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Discord channels</CardTitle>
+          <CardDescription>
+            Where the bot posts. The bot needs View Channel, Send Messages and Embed Links in each one.
+            {!channelsSaved && " Not saved yet: showing the *_CHANNEL_ID values from .env. Once saved here, those .env lines are ignored."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {channelsError ? (
+            <p className="text-sm text-red-300">{channelsError}</p>
+          ) : channelGroups.length ? (
+            <ChannelForm
+              groups={channelGroups}
+              initial={channels}
+              targets={[
+                { key: "board", label: "Recruitment board", help: "New applications, with Approve / Deny. Recruiters only." },
+                { key: "welcome", label: "Welcome channel", help: "Where “Post to welcome channel” puts the Enlist Now message." },
+                { key: "ops", label: "Ops announcements", help: "New operations, if the scheduler ticks Announce." },
+                { key: "personnel", label: "Personnel board", help: "Billet, callsign and leave requests. Leadership only." },
+              ]}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">Set the bot token and guild ID to load the server&apos;s channels.</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="mt-6">
         <CardHeader>

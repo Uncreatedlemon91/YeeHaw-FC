@@ -14,6 +14,7 @@ import {
 } from "./discord";
 import { env } from "./env";
 import { prisma } from "./prisma";
+import { getChannelConfig } from "./channel-config";
 import { getRoleConfig } from "./role-config";
 
 // The approval pipeline lives here so the website dashboard and the Discord
@@ -81,10 +82,11 @@ export function boardMessage(
 }
 
 export async function postToBoard(appId: string): Promise<string | null> {
-  if (!env.boardChannelId || !env.botToken) return "Recruitment board isn't configured.";
+  const { board } = await getChannelConfig();
+  if (!board || !env.botToken) return "Recruitment board isn't configured.";
   const app = await prisma.recruitmentApplication.findUniqueOrThrow({ where: { id: appId } });
   try {
-    const msg = await sendMessage(env.boardChannelId, boardMessage(app));
+    const msg = await sendMessage(board, boardMessage(app));
     await prisma.recruitmentApplication.update({ where: { id: appId }, data: { boardMessageId: msg.id } });
     return null;
   } catch (e) {
@@ -93,8 +95,9 @@ export async function postToBoard(appId: string): Promise<string | null> {
 }
 
 async function refreshBoard(app: RecruitmentApplication, decision: Parameters<typeof boardMessage>[1]) {
-  if (!app.boardMessageId || !env.boardChannelId) return;
-  await editMessage(env.boardChannelId, app.boardMessageId, boardMessage(app, decision));
+  const { board } = await getChannelConfig();
+  if (!app.boardMessageId || !board) return;
+  await editMessage(board, app.boardMessageId, boardMessage(app, decision));
 }
 
 // --- Decisions ----------------------------------------------------------- //

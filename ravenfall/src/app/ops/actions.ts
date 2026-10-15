@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { ActionState } from "@/components/action-form";
 import { assertPerm } from "@/lib/auth";
 import { linkButton, row, sendMessage } from "@/lib/discord";
+import { getChannelConfig } from "@/lib/channel-config";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { discordTime, fromInput } from "@/lib/time";
@@ -38,10 +39,11 @@ function parseEvent(data: FormData) {
 }
 
 async function announce(id: string) {
-  if (!env.opsChannelId || !env.botToken) return;
+  const { ops: channel } = await getChannelConfig();
+  if (!channel || !env.botToken) return;
   const e = await prisma.event.findUniqueOrThrow({ where: { id } });
   const label: Record<EventType, string> = { OP: "Operation", TRAINING: "Training", BRIEFING: "Briefing" };
-  await sendMessage(env.opsChannelId, {
+  await sendMessage(channel, {
     embeds: [
       {
         title: `${label[e.type]}: ${e.title}`,

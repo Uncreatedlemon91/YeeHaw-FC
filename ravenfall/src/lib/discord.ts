@@ -95,6 +95,22 @@ export async function listMembers(): Promise<GuildMember[]> {
   }
 }
 
+export type Channel = { id: string; name: string; type: number; parent_id?: string | null; position: number };
+
+/** Text channels the bot can post to, grouped under their category name. */
+export async function listTextChannels(): Promise<{ category: string; channels: { id: string; name: string }[] }[]> {
+  const all = await discord<Channel[]>(`/guilds/${env.guildId}/channels`);
+  const byPos = (a: Channel, b: Channel) => a.position - b.position;
+  // 0 = text, 5 = announcement; 4 = category.
+  const text = all.filter((c) => c.type === 0 || c.type === 5).sort(byPos);
+  const cats = all.filter((c) => c.type === 4).sort(byPos);
+  const group = (parent: string | null) => text.filter((c) => (c.parent_id ?? null) === parent).map(({ id, name }) => ({ id, name }));
+  return [
+    { category: "No category", channels: group(null) },
+    ...cats.map((c) => ({ category: c.name, channels: group(c.id) })),
+  ].filter((g) => g.channels.length);
+}
+
 export function listRoles(): Promise<Role[]> {
   return discord<Role[]>(`/guilds/${env.guildId}/roles`);
 }

@@ -179,21 +179,24 @@ Don't reuse YeeHaw FC's: each app has exactly one interactions endpoint.
    Interactions Endpoint URL** to
    `https://ravenfallpmc.com/api/discord/interactions`. Discord checks it as
    you save, so the site has to be running first.
-7. Sign in, open **Admin**, and press **Register commands** and **Post to
-   welcome channel**. Pin the welcome message in Discord.
+7. Sign in, open **Admin**. Under **Discord channels**, pick the
+   recruitment board, welcome channel and (optionally) the ops and
+   personnel channels, and save. Give the bot View Channel, Send Messages
+   and Embed Links in each. Then press **Register commands** and **Post to
+   welcome channel**, and pin the welcome message in Discord.
 8. On **Admin → Discord role mapping**, pick which Discord roles grant each
    site permission, the Candidate and Recruit roles, and (optionally) the
    roles for each rank, squad and billet. Save, then press **Sync profiles
    from Discord** to open personnel files for everyone already in the unit.
    For any role the bot assigns, drag the bot's role above it first.
-9. Optional, for the S1 Desk: set `PERSONNEL_BOARD_CHANNEL_ID` to a
-   leadership-only channel.
+For the S1 Desk, make the personnel board a leadership-only channel.
 
-Channel and user IDs: enable Developer Mode (User Settings → Advanced),
+User IDs: enable Developer Mode (User Settings → Advanced),
 then right-click → Copy ID. For first setup, put your own user ID in
 `ADMIN_USER_IDS` so you can reach the Admin page before any role is mapped,
-and clear it once a Command Staff role is saved. The `ROLE_*` settings in
-`.env` still work, but only until the mapping is first saved on the Admin
+and clear it once a Command Staff role is saved. The `ROLE_*` and
+`*_CHANNEL_ID` settings in `.env` still work, but only until the mapping
+(or the channels) are first saved on the Admin
 page; after that the page is the one source.
 
 ---

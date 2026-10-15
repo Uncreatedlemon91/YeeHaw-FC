@@ -9,15 +9,17 @@ import { discord, explain, linkButton, row, sendMessage } from "@/lib/discord";
 import { env } from "@/lib/env";
 import { syncAllMembers } from "@/lib/member-sync";
 import { PERM_LABELS, type Perm } from "@/lib/permissions";
+import { CHANNEL_KEYS, getChannelConfig, saveChannelConfig, type ChannelConfig } from "@/lib/channel-config";
 import { getRoleConfig, saveRoleConfig, type RoleConfig } from "@/lib/role-config";
 
 export async function postRecruitmentMessage(): Promise<ActionState> {
   await assertPerm("ADMIN");
-  if (!env.welcomeChannelId) return { error: "Set WELCOME_CHANNEL_ID first." };
+  const { welcome } = await getChannelConfig();
+  if (!welcome) return { error: "Pick a welcome channel under Discord channels first." };
   try {
     // A link button needs no interaction handling and never expires, so
     // this message can stay pinned in #welcome indefinitely.
-    await sendMessage(env.welcomeChannelId, {
+    await sendMessage(welcome, {
       embeds: [
         {
           title: `Enlist with the ${UNIT.name}`,
@@ -98,4 +100,12 @@ export async function syncProfiles(): Promise<ActionState> {
         : msg,
     };
   }
+}
+
+export async function saveChannels(_: ActionState, data: FormData): Promise<ActionState> {
+  await assertPerm("ADMIN");
+  const cfg = Object.fromEntries(CHANNEL_KEYS.map((k) => [k, String(data.get(k) ?? "").trim()])) as ChannelConfig;
+  await saveChannelConfig(cfg);
+  revalidatePath("/admin");
+  return { ok: "Saved. New posts go to these channels; posts already made stay where they are." };
 }

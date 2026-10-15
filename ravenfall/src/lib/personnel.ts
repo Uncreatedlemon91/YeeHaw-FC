@@ -4,6 +4,7 @@ import { addRole, ButtonStyle, dm, editMessage, explain, getMember, linkButton, 
 import { env } from "./env";
 import { hasPerm, type Perm } from "./permissions";
 import { prisma } from "./prisma";
+import { getChannelConfig } from "./channel-config";
 import { getRoleConfig } from "./role-config";
 import { fmtDate } from "./time";
 
@@ -230,10 +231,11 @@ export function boardMessage(r: WithPeople, decidedBy?: string) {
 }
 
 export async function postRequest(id: string): Promise<string | null> {
-  if (!env.personnelChannelId || !env.botToken) return null;
+  const { personnel } = await getChannelConfig();
+  if (!personnel || !env.botToken) return null;
   const r = await prisma.personnelRequest.findUniqueOrThrow({ where: { id }, include: { user: true } });
   try {
-    const msg = await sendMessage(env.personnelChannelId, boardMessage(r));
+    const msg = await sendMessage(personnel, boardMessage(r));
     await prisma.personnelRequest.update({ where: { id }, data: { boardMessageId: msg.id } });
     return null;
   } catch (e) {
@@ -243,8 +245,9 @@ export async function postRequest(id: string): Promise<string | null> {
 
 export async function refreshBoard(id: string, decidedBy?: string) {
   const r = await prisma.personnelRequest.findUniqueOrThrow({ where: { id }, include: { user: true, reviewedBy: true } });
-  if (!r.boardMessageId || !env.personnelChannelId || !env.botToken) return;
-  await editMessage(env.personnelChannelId, r.boardMessageId, boardMessage(r, decidedBy));
+  const { personnel } = await getChannelConfig();
+  if (!r.boardMessageId || !personnel || !env.botToken) return;
+  await editMessage(personnel, r.boardMessageId, boardMessage(r, decidedBy));
 }
 
 // --- Discord role sync --------------------------------------------------- //
