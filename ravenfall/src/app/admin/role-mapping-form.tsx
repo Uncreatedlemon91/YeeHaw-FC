@@ -108,6 +108,7 @@ export function RoleMappingForm({
     perms: Record<string, string[]>;
     candidate: string;
     recruit: string;
+    approval: string[];
     ranks: Record<string, string>;
     squads: Record<string, string>;
     billets: Record<string, string>;
@@ -136,6 +137,9 @@ export function RoleMappingForm({
           </Field>
           <Field label="Recruit" help="Given on approval.">
             <SingleRolePicker name="recruit" roles={roles} initial={initial.recruit} />
+          </Field>
+          <Field label="Also given on approval" help="Any further roles a new member gets, e.g. a general member role.">
+            <MultiRolePicker name="approval" roles={roles} initial={initial.approval} />
           </Field>
         </div>
       </Section>

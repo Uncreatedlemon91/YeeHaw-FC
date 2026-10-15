@@ -53,7 +53,8 @@ export async function registerCommands(): Promise<ActionState> {
   }
 }
 
-// Field names: perm:ADMIN (repeatable), candidate, recruit, squad:<name>,
+// Field names: perm:ADMIN (repeatable), candidate, recruit, approval
+// (repeatable), squad:<name>,
 // billet:<name>, rank:<abbr>. See role-mapping-form.tsx.
 export async function saveRoleMapping(_: ActionState, data: FormData): Promise<ActionState> {
   await assertPerm("ADMIN");
@@ -67,6 +68,7 @@ export async function saveRoleMapping(_: ActionState, data: FormData): Promise<A
     perms,
     candidate: one("candidate"),
     recruit: one("recruit"),
+    approval: [...new Set(data.getAll("approval").map(String).filter(Boolean))],
     squads: map("squad", SQUADS.map((s) => s.name)),
     billets: map("billet", ROLES.map((r) => r.name)),
     ranks: map("rank", RANKS.map((r) => r.abbr)),
@@ -83,7 +85,7 @@ export async function syncProfiles(): Promise<ActionState> {
   await assertPerm("ADMIN");
   if (!env.botToken || !env.guildId) return { error: "Set DISCORD_BOT_TOKEN and DISCORD_GUILD_ID first." };
   const cfg = await getRoleConfig();
-  if (!Object.values(cfg.perms).some((v) => v.length) && !cfg.recruit && ![cfg.ranks, cfg.squads, cfg.billets].some((m) => Object.keys(m).length))
+  if (!Object.values(cfg.perms).some((v) => v.length) && !cfg.recruit && !cfg.approval.length && ![cfg.ranks, cfg.squads, cfg.billets].some((m) => Object.keys(m).length))
     return { error: "Map at least one Discord role above first: profiles are generated from mapped roles." };
   try {
     const r = await syncAllMembers();

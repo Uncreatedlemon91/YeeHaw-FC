@@ -39,7 +39,7 @@ export function readRoles(m: GuildMember, cfg: RoleConfig): FromRoles {
     squad,
     unitRole: ordered[0] ?? null,
     secondaryRoles: ordered.slice(1, 1 + MAX_SECONDARY_ROLES),
-    member: perms.length > 0 || !!rank || !!squad || billets.length > 0 || has(cfg.recruit),
+    member: perms.length > 0 || !!rank || !!squad || billets.length > 0 || has(cfg.recruit) || cfg.approval.some(has),
   };
 }
 

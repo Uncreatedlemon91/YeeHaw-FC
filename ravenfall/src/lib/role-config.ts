@@ -14,6 +14,8 @@ export type RoleConfig = {
   candidate: string;
   /** Given on approval. */
   recruit: string;
+  /** Further roles also given on approval (e.g. a general member role). */
+  approval: string[];
   /** Unit name -> role ID, for squads, billets and ranks (by abbreviation). */
   squads: Record<string, string>;
   billets: Record<string, string>;
@@ -34,6 +36,7 @@ export function roleConfigFromEnv(): RoleConfig {
     },
     candidate: env.candidateRoleId,
     recruit: env.recruitRoleId,
+    approval: [],
     squads: env.squadRoleIds,
     billets: env.billetRoleIds,
     ranks: {},
@@ -55,6 +58,7 @@ export function cleanRoleConfig(raw: unknown): RoleConfig {
     perms: { ADMIN: ids(perms.ADMIN), RECRUITER: ids(perms.RECRUITER), INSTRUCTOR: ids(perms.INSTRUCTOR), OPERATOR: ids(perms.OPERATOR) },
     candidate: id(r.candidate),
     recruit: id(r.recruit),
+    approval: ids(r.approval),
     squads: pick(r.squads, SQUADS.map((s) => s.name)),
     billets: pick(r.billets, ROLES.map((x) => x.name)),
     ranks: pick(r.ranks, RANKS.map((x) => x.abbr)),

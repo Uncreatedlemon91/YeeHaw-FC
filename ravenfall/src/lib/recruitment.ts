@@ -166,6 +166,9 @@ export async function approveApplication(opts: {
     await step("Nickname", () => setNickname(app.discordId, nickname(rank, callsign), reason));
     const roles = await getRoleConfig();
     if (roles.recruit) await step("Recruit role", () => addRole(app.discordId, roles.recruit, reason));
+    for (const id of roles.approval) {
+      if (id !== roles.recruit) await step(`Role ${id}`, () => addRole(app.discordId, id, reason));
+    }
     if (roles.candidate) await step("Candidate role", () => removeRole(app.discordId, roles.candidate, reason));
     if (roles.ranks[rank]) await step("Rank role", () => addRole(app.discordId, roles.ranks[rank], reason));
     await step("Board post", () => refreshBoard(updated, { by, callsign, note: opts.note }));
