@@ -7,7 +7,7 @@ import { env } from "./env";
 const API = "https://discord.com/api/v10";
 
 export class DiscordError extends Error {
-  constructor(public status: number, public body: string, route: string) {
+  constructor(public status: number, public body: string, public route: string) {
     super(`Discord ${status} on ${route}: ${body.slice(0, 300)}`);
   }
 }
@@ -148,12 +148,35 @@ export function followup(interactionToken: string, payload: object) {
   });
 }
 
-/** Turn a Discord failure into a sentence a recruiter can act on. */
+/** Discord's JSON error code (50001 Missing Access, 50013 Missing Permissions…). */
+function errorCode(e: DiscordError): number | null {
+  try {
+    const code = (JSON.parse(e.body) as { code?: unknown }).code;
+    return typeof code === "number" ? code : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Turn a Discord failure into a sentence the person can act on. */
 export function explain(e: unknown): string {
   if (e instanceof DiscordError) {
     if (e.status === 0) return e.body;
-    if (e.status === 403)
+    const code = errorCode(e);
+    const channel = e.route.match(/^\/channels\/(\d+)/)?.[1];
+    if (e.status === 403 && channel) {
+      // Posting or editing in a channel: it's the channel's permissions,
+      // not roles. 50001 = can't see the channel at all.
+      return code === 50001
+        ? `Discord refused (403): the bot can't see channel ${channel}. In that channel's settings → Permissions, add the bot's role (or the bot) with View Channel, Send Messages and Embed Links.`
+        : `Discord refused (403): the bot can see channel ${channel} but isn't allowed to post there. Give the bot's role Send Messages and Embed Links in that channel (check the channel's permission overrides, and its category's).`;
+    }
+    if (e.status === 403 && e.route.includes("/members"))
       return "Discord refused (403): the bot needs Manage Roles / Manage Nicknames, and its own role must sit above the roles it changes. It can never rename the server owner.";
+    if (e.status === 403 && e.route.includes("/commands"))
+      return "Discord refused (403): the bot wasn't invited with the applications.commands scope. Re-invite it with scopes bot + applications.commands.";
+    if (e.status === 403) return `Discord refused (403)${code === 50001 ? ": missing access" : ""}. Check the bot's permissions in the server.`;
+    if (e.status === 404 && channel) return `Discord couldn't find channel ${channel} (404). Check the channel ID in .env.`;
     if (e.status === 404) return "Discord couldn't find that member, role or channel (404). Have they left the server?";
     return `Discord returned ${e.status}.`;
   }
