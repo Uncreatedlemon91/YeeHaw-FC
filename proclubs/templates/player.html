@@ -298,6 +298,25 @@
         </section>
       {% endif %}
 
+      {% if can_fix_gamertag %}
+        <section class="panel">
+          <header class="panel-head panel-staff"><h2>Gamertag</h2></header>
+          <div class="panel-body">
+            <form method="post" action="/players/{{ player.discord_id }}/gamertag" class="stack-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+              <label class="visually-hidden" for="fix-gamertag">EA gamertag</label>
+              <input id="fix-gamertag" name="player_name" list="fix-gamertag-options" maxlength="64"
+                     autocomplete="off" value="{{ gamertag or '' }}" placeholder="As it shows in game" />
+              <datalist id="fix-gamertag-options">
+                {% for g in gamertag_options %}<option value="{{ g }}"></option>{% endfor %}
+              </datalist>
+              <div class="form-actions"><button type="submit" class="btn secondary">Save gamertag</button></div>
+            </form>
+            <p class="field-hint">If their matches have stopped showing up (renamed in game, or linked the wrong name), set the name EA shows now. Leave it blank to unlink.</p>
+          </div>
+        </section>
+      {% endif %}
+
       {% if see_private and moves %}
         <section class="panel">
           <header class="panel-head"><h2>History</h2></header>

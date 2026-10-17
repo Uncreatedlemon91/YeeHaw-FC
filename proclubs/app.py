@@ -2130,8 +2130,9 @@ def player_page(request: Request, discord_id: str):
         time_left=services.contract_time_left(contract, now) if contract else None,
         club_roles=roles.CLUB_ROLES, preferred_feet=services.PREFERRED_FEET,
         form_label=squad.form_label, weeks_label=discord_roster.weeks_label,
+        can_fix_gamertag=auth.is_management(user),
         gamertag_options=_gamertag_options(u["name"] for u in usage["players"].values())
-        if is_self and not gamertag else [],
+        if (is_self and not gamertag) or auth.is_management(user) else [],
     ))
 
 
@@ -2171,6 +2172,34 @@ def player_set_role(request: Request, discord_id: str, club_role: str = Form("")
         name, role = player.display_name, player.club_role
     _flash(request, f"{name} is now {role}." if role else f"{name} no longer holds a club role.")
     _sync_roles(request, discord_id)
+    return RedirectResponse(f"/players/{discord_id}", status_code=303)
+
+
+@app.post("/players/{discord_id}/gamertag")
+def player_set_gamertag(request: Request, discord_id: str, player_name: str = Form(""),
+                        csrf_token: str = Form(...), _staff=Depends(auth.require_management)):
+    """Management correcting anybody's gamertag link -- for when stats stop
+    showing up because the player renamed in game or linked the wrong name.
+    Members can only link once themselves, so this is the way to change it.
+    A gamertag somebody else has claimed is still refused; blank unlinks."""
+    _check_csrf(request, csrf_token)
+    if not discord_id.isdigit():
+        raise services.ServiceError("There's no player file for that person.")
+    with get_session() as session:
+        player = services.get_player(session, discord_id)
+        if player is None:
+            raise services.ServiceError("There's no player file for that person.")
+        name = player.display_name
+        try:
+            if player_name.strip():
+                services.set_player_link(session, discord_user_id=int(discord_id),
+                                         player_name=player_name)
+                _flash(request, f"{name} linked to {player_name.strip()}.")
+            else:
+                services.clear_player_link(session, int(discord_id))
+                _flash(request, f"{name}'s gamertag unlinked.")
+        except services.ServiceError as exc:
+            _flash(request, str(exc), "warn")
     return RedirectResponse(f"/players/{discord_id}", status_code=303)
 
 

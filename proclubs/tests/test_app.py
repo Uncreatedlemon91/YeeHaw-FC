@@ -2862,6 +2862,57 @@ def test_a_gamertag_already_claimed_is_refused_not_stolen(client, roster_ready):
         assert services.get_player_link(session, 42) is None
 
 
+def _fix_gamertag(client, discord_id, gamertag, follow=True):
+    token = _csrf(client, f"/players/{discord_id}")
+    return client.post(f"/players/{discord_id}/gamertag", data={
+        "player_name": gamertag, "csrf_token": token,
+    }, follow_redirects=follow)
+
+
+def test_management_can_change_a_linked_gamertag(client, roster_ready):
+    """Once linked, the squad screen and the player's own file stop
+    offering the form -- management fix it from the player file."""
+    _login_staff(client)
+    _record_contract(client, discord_id="42")
+    _link(client, "42", "Old_GT")
+    html = client.get("/players/42").text
+    assert 'action="/players/42/gamertag"' in html and 'value="Old_GT"' in html
+    r = _fix_gamertag(client, "42", "New_GT")
+    assert "linked to New_GT" in r.text
+    with database.get_session() as session:
+        assert services.get_player_link(session, 42).player_name == "New_GT"
+    r = _fix_gamertag(client, "42", "")
+    assert "gamertag unlinked" in r.text
+    with database.get_session() as session:
+        assert services.get_player_link(session, 42) is None
+
+
+def test_changing_a_gamertag_still_refuses_one_already_claimed(client, roster_ready):
+    _login_staff(client)
+    _record_contract(client, discord_id="42")
+    _link(client, "42", "Old_GT")
+    with database.get_session() as session:
+        services.set_player_link(session, discord_user_id=999, player_name="Taken_GT")
+    assert "already claimed" in _fix_gamertag(client, "42", "Taken_GT").text
+    with database.get_session() as session:
+        assert services.get_player_link(session, 42).player_name == "Old_GT"
+
+
+def test_only_management_can_change_a_gamertag(client, roster_ready):
+    _login_staff(client)
+    _record_contract(client, discord_id="42")
+    _link(client, "42", "Old_GT")
+    token = _csrf(client, "/players/42")
+    _login_fan(client)
+    assert 'action="/players/42/gamertag"' not in client.get("/players/42").text
+    r = client.post("/players/42/gamertag", data={
+        "player_name": "Hijack_GT", "csrf_token": token,
+    }, follow_redirects=False)
+    assert r.status_code == 403
+    with database.get_session() as session:
+        assert services.get_player_link(session, 42).player_name == "Old_GT"
+
+
 def test_linking_rejects_an_offsite_redirect(client, roster_ready):
     _login_staff(client)
     _record_contract(client, discord_id="42")
