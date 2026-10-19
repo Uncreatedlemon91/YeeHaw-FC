@@ -11,6 +11,7 @@ import { AttendanceBadge, ATTENDANCE_LABEL, MemberStatusBadge } from "@/componen
 import { Badge } from "@/components/ui/badge";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { MAX_SECONDARY_ROLES, RANKS, rankIndex, rankName, roleDef, ROLES, squadDef, SQUADS, UNIT, UNIT_ROLES, WEEKDAYS } from "@/config/unit";
+import { categoryLabel, CATEGORIES, RIBBON } from "@/components/vault-category";
 import { requireUser } from "@/lib/auth";
 import { career } from "@/lib/career";
 import { hasPerm } from "@/lib/permissions";
@@ -23,7 +24,7 @@ import { RequestCard } from "../../personnel/request-card";
 import { addRecord, awardQualification, revokeQualification, updateProfile } from "../actions";
 import { BilletPicker } from "./billet-picker";
 import { FileTabs } from "./file-tabs";
-import { RECORD_STYLE } from "./record-style";
+import { promotionRanks, RECORD_STYLE } from "./record-style";
 import { RecordTimeline } from "./record-timeline";
 import { RequestForm } from "./request-form";
 
@@ -80,6 +81,13 @@ export default async function Dossier({ params, searchParams }: { params: Promis
   const primary = roleDef(member.unitRole);
   const sn = serviceNumber(member);
   const name = member.callsign ?? member.discordUsername;
+  // Ribbon rack: grouped by category in a fixed order, capped at RACK_MAX with a "+M" for the rest.
+  const RACK_MAX = 10;
+  const shownRibbons = member.qualifications.slice(0, RACK_MAX);
+  const hiddenRibbons = member.qualifications.length - shownRibbons.length;
+  const rack = CATEGORIES
+    .map((cat) => [cat, shownRibbons.filter((q) => q.qualification.category === cat)] as const)
+    .filter(([, list]) => list.length > 0);
 
   // --- Header: the jacket's cover sheet ------------------------------------ //
   const header = (
@@ -113,7 +121,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
             <div className="barcode mt-2 h-6 w-full opacity-80" aria-hidden />
           </div>
 
-          <div className="flex flex-col gap-5">
+          <div className="flex min-w-0 flex-col gap-5">
             <div className="flex items-start gap-4 pr-0 sm:pr-32">
               <RankInsignia rank={member.rank} size={56} />
               <div>
@@ -147,17 +155,64 @@ export default async function Dossier({ params, searchParams }: { params: Promis
               <Typed label="Quals held" value={String(member.qualifications.length)} />
             </dl>
 
-            {/* Ribbon rack: one bar per qualification. */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              {member.qualifications.map((q) => (
-                <Link
-                  key={q.id}
-                  href={`/vault/${q.qualification.slug}`}
-                  title={`${q.qualification.title} — ${fmtDate(q.awardedAt)}`}
-                  className={cn("h-3 w-10 rounded-[2px] border border-black/40", RIBBON[q.qualification.category])}
+            {/* Meters: fill the right-hand column and link the numbers to the tabs. */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Meter
+                label="Attendance"
+                value={rate ?? 0}
+                max={100}
+                text={rate === null ? "No ops yet" : `${rate}% · ${attended} of ${total} ops`}
+                tone="success"
+              />
+              {clr.squad && path.next ? (
+                <Meter
+                  label={`Promotion to ${path.next.abbr}`}
+                  value={path.checks.filter((c) => c.ok).length}
+                  max={Math.max(1, path.checks.length)}
+                  text={`${path.checks.filter((c) => c.ok).length} of ${path.checks.length} criteria met`}
+                  tone="accent"
                 />
-              ))}
-              {!member.qualifications.length && <span className="text-xs text-muted-foreground">No ribbons awarded.</span>}
+              ) : (
+                <Meter label="Qualifications" value={member.qualifications.length} max={Math.max(1, allQuals.length)} text={`${member.qualifications.length} of ${allQuals.length} in the vault`} tone="info" />
+              )}
+            </div>
+
+            {/* Ribbon rack: one ribbon per qualification, grouped by category. */}
+            <div className="mt-auto">
+              <div className="field-label mb-2">Ribbon rack</div>
+              {member.qualifications.length ? (
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+                    {rack.map(([cat, list]) => (
+                      <div key={cat} role="group" aria-label={`${categoryLabel(cat)} ribbons`} className="flex flex-wrap gap-1">
+                        {list.map((q) => (
+                          <Link
+                            key={q.id}
+                            href={`/vault/${q.qualification.slug}`}
+                            title={`${q.qualification.title} — ${fmtDate(q.awardedAt)}`}
+                            aria-label={`${q.qualification.title}, ${categoryLabel(cat)} ribbon, awarded ${fmtDate(q.awardedAt)}`}
+                            className={cn("h-5 w-14 rounded-[2px] border border-black/50 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", RIBBON[cat])}
+                          />
+                        ))}
+                      </div>
+                    ))}
+                    {hiddenRibbons > 0 && (
+                      <span className="typed text-xs font-semibold text-muted-foreground" title={`${hiddenRibbons} more in the Qualifications list`}>
+                        +{hiddenRibbons}
+                      </span>
+                    )}
+                  </div>
+                  <ul className="flex flex-wrap gap-x-4 gap-y-1 text-micro uppercase tracking-wider text-muted-foreground" aria-label="Ribbon key">
+                    {rack.map(([cat]) => (
+                      <li key={cat} className="flex items-center gap-1.5">
+                        <span className={cn("inline-block h-2.5 w-5 rounded-[1px] border border-black/40", RIBBON[cat])} aria-hidden /> {categoryLabel(cat)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground">No ribbons awarded.</span>
+              )}
             </div>
           </div>
         </div>
@@ -220,14 +275,20 @@ export default async function Dossier({ params, searchParams }: { params: Promis
                     key={a.id}
                     href={`/ops/${a.eventId}`}
                     title={`${a.event.title} · ${fmtDate(a.event.startTime)} · ${ATTENDANCE_LABEL[a.status]}`}
-                    className={cn("size-5 rounded-[2px] border border-black/30", TILE[a.status])}
-                  />
+                    aria-label={`${a.event.title}, ${fmtDate(a.event.startTime)}: ${ATTENDANCE_LABEL[a.status]}`}
+                    className={cn("flex size-6 items-center justify-center rounded-[2px] border border-black/30 text-micro font-bold", TILE[a.status])}
+                  >
+                    {TILE_LETTER[a.status]}
+                  </Link>
                 ))}
               </div>
               <div className="flex flex-wrap gap-3 text-micro uppercase tracking-wider text-muted-foreground">
                 {(["ATTENDING", "EXCUSED", "ABSENT", "NOSHOW"] as const).map((s) => (
                   <span key={s} className="flex items-center gap-1.5">
-                    <span className={cn("size-2.5 rounded-[2px]", TILE[s])} /> {ATTENDANCE_LABEL[s]} {clr.squad || s === "ATTENDING" ? n(s) : ""}
+                    <span className={cn("flex size-4 items-center justify-center rounded-[2px] text-[0.625rem] font-bold", TILE[s])} aria-hidden>
+                      {TILE_LETTER[s]}
+                    </span>{" "}
+                    {ATTENDANCE_LABEL[s]} {clr.squad || s === "ATTENDING" ? n(s) : ""}
                   </span>
                 ))}
               </div>
@@ -343,6 +404,8 @@ export default async function Dossier({ params, searchParams }: { params: Promis
           title: r.title,
           description: r.description,
           date: fmtDate(r.createdAt),
+          iso: r.createdAt.toISOString(),
+          ...(r.type === "PROMOTION" ? promotionRanks(r.title, r.description) : {}),
           issuer: r.issuedBy ? (r.issuedBy.callsign ?? r.issuedBy.discordUsername) : null,
         }))}
       />
@@ -376,7 +439,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
   const careerPanel = (
     <div className="flex min-w-0 flex-col gap-8">
       <Section title="Rank progression">
-        <ol className="flex gap-1 overflow-x-auto pb-2">
+        <ol className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 lg:grid-cols-12">
           {RANKS.map((r, i) => {
             const at = rankIndex(member.rank);
             const state = i < at ? "past" : i === at ? "current" : i === at + 1 ? "next" : "future";
@@ -385,7 +448,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
                 key={r.abbr}
                 title={`${r.name} (${r.grade})`}
                 className={cn(
-                  "flex w-16 shrink-0 flex-col items-center gap-1 rounded-md border px-1 py-2",
+                  "flex min-w-0 flex-col items-center gap-1 rounded-md border px-1 py-2",
                   state === "current" && "border-accent bg-accent/10",
                   state === "next" && "border-dashed border-accent/60",
                   state === "future" && "opacity-35",
@@ -673,7 +736,7 @@ function Section({ title, restricted, children }: { title: string; restricted?: 
     <section>
       <h2 className="mb-3 flex items-center gap-2 border-b border-foreground/10 pb-2 text-sm font-semibold uppercase tracking-label">
         {title}
-        {restricted && <Lock className="size-3.5 text-muted-foreground" />}
+        {restricted && <Lock className="size-3.5 text-muted-foreground" aria-label="Restricted" />}
       </h2>
       {children}
     </section>
@@ -691,22 +754,35 @@ function Typed({ label, value }: { label: string; value: string }) {
   );
 }
 
+function Meter({ label, value, max, text, tone }: { label: string; value: number; max: number; text: string; tone: "success" | "accent" | "info" }) {
+  const pct = Math.min(100, Math.round((value / max) * 100));
+  const fill = { success: "bg-success", accent: "bg-accent", info: "bg-info" }[tone];
+  return (
+    <div className="min-w-0">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="field-label">{label}</span>
+        <span className="typed text-micro text-muted-foreground">{pct}%</span>
+      </div>
+      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-foreground/10" role="img" aria-label={`${label}: ${text}`}>
+        <div className={cn("h-full", fill)} style={{ width: `${pct}%` }} />
+      </div>
+      <div className="typed mt-1 truncate text-xs text-muted-foreground" title={text}>
+        {text}
+      </div>
+    </div>
+  );
+}
+
 function Empty({ children }: { children: React.ReactNode }) {
   return <p className="text-sm text-muted-foreground">{children}</p>;
 }
 
 const TILE: Record<string, string> = {
-  ATTENDING: "bg-success",
-  EXCUSED: "bg-accent/70",
-  ABSENT: "bg-foreground/25",
-  NOSHOW: "bg-destructive",
+  ATTENDING: "bg-success text-background",
+  EXCUSED: "bg-accent/80 text-background",
+  ABSENT: "bg-foreground/25 text-foreground",
+  NOSHOW: "bg-destructive text-destructive-foreground",
 };
+// A letter in every tile so the outcome never rides on colour alone.
+const TILE_LETTER: Record<string, string> = { ATTENDING: "A", EXCUSED: "E", NOSHOW: "N", ABSENT: "X" };
 
-// Ribbon colours per qualification category.
-const RIBBON: Record<string, string> = {
-  WEAPONS: "bg-[linear-gradient(90deg,#7a1f1f_0_30%,#c9a227_30%_40%,#7a1f1f_40%_60%,#c9a227_60%_70%,#7a1f1f_70%)]",
-  LEADERSHIP: "bg-[linear-gradient(90deg,#1f3a7a_0_35%,#e5e5e5_35%_45%,#1f3a7a_45%_55%,#e5e5e5_55%_65%,#1f3a7a_65%)]",
-  MEDICAL: "bg-[linear-gradient(90deg,#e5e5e5_0_40%,#a32020_40%_60%,#e5e5e5_60%)]",
-  PILOT: "bg-[linear-gradient(90deg,#3b6fb5_0_25%,#c9a227_25%_35%,#3b6fb5_35%_65%,#c9a227_65%_75%,#3b6fb5_75%)]",
-  GENERAL: "bg-[linear-gradient(90deg,#4f6b2f_0_40%,#d4b483_40%_60%,#4f6b2f_60%)]",
-};

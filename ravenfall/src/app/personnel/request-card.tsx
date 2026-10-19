@@ -25,22 +25,25 @@ export function RequestCard({
   own,
   showNotes,
   showMember,
+  flush,
 }: {
   r: Req;
   decidable?: boolean;
   own?: boolean;
   showNotes?: boolean;
   showMember?: boolean;
+  /** Borderless row for use inside a Card's divided list (avoids a card in a card). */
+  flush?: boolean;
 }) {
   const Icon = ICON[r.type];
   const now = new Date();
   const onLeaveNow = r.type === "LOA" && r.status === "APPROVED" && r.startDate! <= now && r.endDate! >= now;
   return (
-    <div className="rounded-md border bg-background/40 p-4">
+    <div className={flush ? "py-4 first:pt-0 last:pb-0" : "rounded-md border bg-background/40 p-4"}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <Icon className="mt-0.5 size-4 text-accent" />
-          <div>
+        <div className="flex min-w-0 items-start gap-3">
+          <Icon className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold">{REQUEST_LABEL[r.type]}</span>
               <Badge variant={VARIANT[r.status]}>{onLeaveNow ? "On leave" : r.status}</Badge>

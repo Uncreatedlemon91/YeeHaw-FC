@@ -59,7 +59,7 @@ export function FileTabs({ tabs, initial }: { tabs: FileTab[]; initial?: string 
           id={`panel-${t.id}`}
           aria-labelledby={`tab-${t.id}`}
           hidden={t.id !== active}
-          className="jacket min-w-0 overflow-x-hidden rounded-b-lg rounded-tr-lg border p-4 sm:p-6"
+          className="jacket min-w-0 overflow-x-clip rounded-b-lg rounded-tr-lg border p-4 sm:p-6"
         >
           {t.content}
         </div>
