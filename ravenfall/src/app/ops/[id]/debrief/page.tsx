@@ -3,8 +3,8 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Container } from "@/components/container";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, Select, Textarea } from "@/components/ui/input";
-import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { Field, Textarea } from "@/components/ui/input";
+import { DebriefAttendance } from "@/components/ops-debrief-attendance";
 import { rankIndex } from "@/config/unit";
 import { requireUser } from "@/lib/auth";
 import { onLeave } from "@/lib/personnel";
@@ -52,7 +52,7 @@ export default async function Debrief({ params }: { params: Promise<{ id: string
   );
 
   return (
-    <Container size="narrow">
+    <Container size="narrow" className="pb-0">
       <PageHeader eyebrow={`AAR · ${fmt(event.startTime, "d MMM yyyy")}`} title={event.title} />
       <ActionForm action={saveDebrief}>
         <input type="hidden" name="eventId" value={event.id} />
@@ -66,46 +66,21 @@ export default async function Debrief({ params }: { params: Promise<{ id: string
             </Field>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Attendance</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Pre-filled from RSVPs. Set what actually happened; leave a member blank to keep them off the record.
-            </p>
-          </CardHeader>
-          <Table>
-            <THead>
-              <TR>
-                <TH>Member</TH>
-                <TH>RSVP</TH>
-                <TH className="w-44">Final</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {people.map((p) => (
-                <TR key={p.id}>
-                  <TD>
-                    {p.rank && <span className="mr-2 text-xs text-muted-foreground">{p.rank}</span>}
-                    <span className="font-semibold">{p.callsign ?? p.discordUsername}</span>
-                  </TD>
-                  <TD className="text-xs text-muted-foreground">{marked.get(p.id) ?? (away.has(p.id) ? "On leave" : "—")}</TD>
-                  <TD>
-                    <Select name={`att:${p.id}`} defaultValue={marked.get(p.id) ?? (away.has(p.id) ? "EXCUSED" : "")} className="h-8">
-                      <option value="">—</option>
-                      <option value="ATTENDING">Attended</option>
-                      <option value="EXCUSED">Excused</option>
-                      <option value="ABSENT">Absent</option>
-                      <option value="NOSHOW">No-show</option>
-                    </Select>
-                  </TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
-        </Card>
-        <SubmitButton className="self-start">
-          File report
-        </SubmitButton>
+        <DebriefAttendance
+          rows={people.map((p) => ({
+            id: p.id,
+            name: p.callsign ?? p.discordUsername,
+            rank: p.rank,
+            rsvp: marked.get(p.id) ?? (away.has(p.id) ? "On leave" : null),
+            initial: marked.get(p.id) ?? (away.has(p.id) ? "EXCUSED" : ""),
+          }))}
+        />
+        <div className="sticky bottom-0 z-30 -mx-4 flex items-center justify-between gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur">
+          <span className="hidden text-xs text-muted-foreground sm:block">Filing replaces any earlier report and attendance marks.</span>
+          <SubmitButton pendingText="Filing…" className="w-full sm:w-auto">
+            File report
+          </SubmitButton>
+        </div>
       </ActionForm>
     </Container>
   );

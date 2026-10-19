@@ -1,6 +1,7 @@
 import type { Event } from "@prisma/client";
 import { ActionForm, type ActionState, SubmitButton } from "@/components/action-form";
-import { Field, Input, Select, Textarea } from "@/components/ui/input";
+import { BriefingField } from "@/components/ops-briefing-field";
+import { Field, Input, Select } from "@/components/ui/input";
 import { env } from "@/lib/env";
 import { toInput } from "@/lib/time";
 
@@ -37,20 +38,21 @@ export function EventForm({
           <Input id="endTime" name="endTime" type="datetime-local" defaultValue={toInput(event?.endTime)} />
         </Field>
       </div>
-      <Field label="Briefing (Markdown)" htmlFor="description" help="Situation, mission, execution, kit — whatever members need beforehand.">
-        <Textarea id="description" name="description" className="min-h-48 font-mono text-xs" defaultValue={event?.description} />
-      </Field>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="mandatory" defaultChecked={event?.mandatory} className="size-4 accent-[var(--accent)]" />
-        Mandatory attendance
-      </label>
-      {showAnnounce && (
+      <BriefingField defaultValue={event?.description} />
+      <fieldset className="flex flex-col gap-3 rounded-md border p-4">
+        <legend className="px-1 text-xs font-semibold uppercase tracking-label text-muted-foreground">Options</legend>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="announce" defaultChecked className="size-4 accent-[var(--accent)]" />
-          Announce on Discord
+          <input type="checkbox" name="mandatory" defaultChecked={event?.mandatory} className="size-4 accent-[var(--accent)]" />
+          Mandatory attendance
         </label>
-      )}
-      <SubmitButton className="self-start">{event ? "Save changes" : "Schedule"}</SubmitButton>
+        {showAnnounce && (
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="announce" defaultChecked className="size-4 accent-[var(--accent)]" />
+            Announce on Discord
+          </label>
+        )}
+      </fieldset>
+      <SubmitButton className="self-start" pendingText="Saving…">{event ? "Save changes" : "Schedule"}</SubmitButton>
     </ActionForm>
   );
 }
