@@ -1,15 +1,18 @@
 import Link from "next/link";
+import { ABOUT_PAGES, type AboutPage } from "@/config/about";
 import { UNIT } from "@/config/unit";
 import type { SessionUser } from "@/lib/auth";
 import { hasPerm, topLabel, type Perm } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { relDay } from "./ops-util";
 import { SignInButton, SignOutButton } from "./auth-buttons";
+import { AboutDropdown } from "./about-nav";
 import { Logo } from "./logo";
 import { NavMenu } from "./nav-menu";
 import { Button } from "./ui/button";
 
-type Item = { href: string; label: string; perm?: Perm; guestOnly?: boolean };
+// `children` makes an item a submenu: a dropdown on desktop, a labelled group in the mobile menu.
+type Item = { href: string; label: string; perm?: Perm; guestOnly?: boolean; children?: readonly AboutPage[] };
 
 const ITEMS: Item[] = [
   { href: "/dashboard", label: "Dashboard", perm: "OPERATOR" },
@@ -19,6 +22,7 @@ const ITEMS: Item[] = [
   { href: "/vault", label: "Vault", perm: "OPERATOR" },
   { href: "/recruitment", label: "Recruitment", perm: "RECRUITER" },
   { href: "/admin", label: "Admin", perm: "ADMIN" },
+  { href: "/about", label: "About", children: ABOUT_PAGES },
   { href: "/apply", label: "Enlist", guestOnly: true },
 ];
 
@@ -39,17 +43,30 @@ export async function Nav({ user }: { user: SessionUser | null }) {
   const items = ITEMS.filter((i) =>
     i.guestOnly ? !hasPerm(user?.perms, "OPERATOR") : !i.perm || hasPerm(user?.perms, i.perm),
   );
-  const links = items.map((i) =>
-    i.guestOnly ? (
+  const linkClass =
+    "whitespace-nowrap rounded px-3 py-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  const render = (mobile: boolean) => items.map((i) =>
+    i.children ? (
+      mobile ? (
+        <div key={i.href} role="group" aria-label={i.label} className="mt-1 flex flex-col border-t pt-1">
+          <Link href={i.href} className={linkClass}>
+            {i.label}
+          </Link>
+          {i.children.map((c) => (
+            <Link key={c.href} href={c.href} className={`${linkClass} pl-6`}>
+              {c.label}
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <AboutDropdown key={i.href} pages={i.children} />
+      )
+    ) : i.guestOnly ? (
       <Button key={i.href} asChild variant="accent" size="sm" className="mx-1 my-1 md:my-0">
         <Link href={i.href}>{i.label}</Link>
       </Button>
     ) : (
-      <Link
-        key={i.href}
-        href={i.href}
-        className="whitespace-nowrap rounded px-3 py-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
+      <Link key={i.href} href={i.href} className={linkClass}>
         {i.label}
       </Link>
     ),
@@ -64,7 +81,7 @@ export async function Nav({ user }: { user: SessionUser | null }) {
             {UNIT.siteName}
           </span>
         </Link>
-        <nav className="hidden flex-1 items-center gap-1 md:flex">{links}</nav>
+        <nav className="hidden flex-1 items-center gap-1 md:flex">{render(false)}</nav>
         <div className="ml-auto hidden items-center gap-3 md:flex">
           {user ? (
             <>
@@ -81,7 +98,7 @@ export async function Nav({ user }: { user: SessionUser | null }) {
         </div>
         {/* Mobile: a <details> disclosure (no-JS safe) that closes on navigation / outside click. */}
         <NavMenu>
-          {links}
+          {render(true)}
           {pill && <div className="px-3 py-2">{pill}</div>}
           <div className="mt-2 border-t pt-2">{user ? <SignOutButton className="w-full" /> : <SignInButton size="sm" className="w-full" />}</div>
         </NavMenu>

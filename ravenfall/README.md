@@ -29,6 +29,12 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   `Rct Callsign`, adds the Recruit role, removes Candidate, creates the
   member's profile and writes their ENLISTMENT service record. The board
   post updates itself, whichever side the decision came from.
+- **Public About pages.** `/about/ranks` (the rank ladder and what each
+  promotion needs) and `/about/billets` (squads, slots, roles and their
+  training), aimed at people thinking of joining and visible signed out.
+  Rank and billet content comes from `src/config/unit.ts`; qualification
+  titles come from the vault. Add a page by creating `app/about/<slug>/page.tsx`
+  and one line in `src/config/about.ts`.
 - **Roster and personnel files.** One page, two views: by element (the
   ORBAT, below) or a list searchable by callsign, rank, squad, role and
   status. Each member has a personnel jacket: an ID card with service

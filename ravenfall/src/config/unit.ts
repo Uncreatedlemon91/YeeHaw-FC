@@ -110,19 +110,20 @@ export const SQUADS: readonly SquadDef[] = [
 // hold to request it as primary or secondary. `leads` marks billets whose
 // holders act as leadership for their own squad: they see its restricted
 // files and decide its role and leave requests.
-export type RoleDef = { name: string; code: string; blurb: string; requires: string[]; leads?: boolean };
+// `about` is optional longer copy for the public About > Billets page.
+export type RoleDef = { name: string; code: string; blurb: string; requires: string[]; leads?: boolean; about?: string };
 
 export const ROLES: readonly RoleDef[] = [
-  { name: "Rifleman", code: "11B", blurb: "The backbone of the fireteam.", requires: ["basic-combat-training"] },
-  { name: "Automatic Rifleman", code: "11B-AR", blurb: "Suppressive fire with the team's LMG.", requires: ["basic-combat-training"] },
-  { name: "Grenadier", code: "11B-GR", blurb: "Indirect fire and smoke with the UGL.", requires: ["basic-combat-training"] },
-  { name: "Marksman", code: "11B-DM", blurb: "Precision fire at extended range.", requires: ["basic-combat-training", "marksman"] },
-  { name: "Combat Medic", code: "68W", blurb: "Casualty care under fire.", requires: ["basic-combat-training", "combat-lifesaver"] },
-  { name: "Radio Operator", code: "25C", blurb: "Keeps the element on the net.", requires: ["basic-combat-training"] },
-  { name: "Team Leader", code: "11B-TL", blurb: "Leads a fireteam of four.", requires: ["basic-combat-training", "team-leader-course"], leads: true },
-  { name: "Squad Leader", code: "11B-SL", blurb: "Leads the squad and its teams.", requires: ["basic-combat-training", "team-leader-course"], leads: true },
-  { name: "Pilot", code: "153A", blurb: "Rotary-wing aviator.", requires: ["rotary-wing-pilot"] },
-  { name: "Command", code: "HQ", blurb: "Unit command staff.", requires: ["team-leader-course"], leads: true },
+  { name: "Rifleman", code: "11B", blurb: "The backbone of the fireteam.", requires: ["basic-combat-training"], about: "You are the core of the fireteam: you move with your team, follow your team leader and learn the unit's drills by doing them." },
+  { name: "Automatic Rifleman", code: "11B-AR", blurb: "Suppressive fire with the team's LMG.", requires: ["basic-combat-training"], about: "You carry the team's LMG and put down the suppressive fire that lets the rest of the fireteam manoeuvre." },
+  { name: "Grenadier", code: "11B-GR", blurb: "Indirect fire and smoke with the UGL.", requires: ["basic-combat-training"], about: "You work the UGL, dropping indirect fire and smoke where the team needs it." },
+  { name: "Marksman", code: "11B-DM", blurb: "Precision fire at extended range.", requires: ["basic-combat-training", "marksman"], about: "You engage at extended range and give the element eyes on the ground." },
+  { name: "Combat Medic", code: "68W", blurb: "Casualty care under fire.", requires: ["basic-combat-training", "combat-lifesaver"], about: "You keep operators in the fight and get the wounded out." },
+  { name: "Radio Operator", code: "25C", blurb: "Keeps the element on the net.", requires: ["basic-combat-training"], about: "You keep your element on the net and relay between it and the rest of the unit." },
+  { name: "Team Leader", code: "11B-TL", blurb: "Leads a fireteam of four.", requires: ["basic-combat-training", "team-leader-course"], leads: true, about: "You lead a fireteam of four: you run the team in contact and answer to your squad leader. As a leadership billet it also gives you a say in your squad's role and leave requests." },
+  { name: "Squad Leader", code: "11B-SL", blurb: "Leads the squad and its teams.", requires: ["basic-combat-training", "team-leader-course"], leads: true, about: "You lead the squad and its teams, turning Command's plan into orders. As a leadership billet it also gives you a say in your squad's role and leave requests." },
+  { name: "Pilot", code: "153A", blurb: "Rotary-wing aviator.", requires: ["rotary-wing-pilot"], about: "You fly the unit's rotary-wing transport, CAS and medevac." },
+  { name: "Command", code: "HQ", blurb: "Unit command staff.", requires: ["team-leader-course"], leads: true, about: "You sit on the unit's command staff, planning missions and leading the unit. As a leadership billet it also gives you a say in role and leave requests." },
 ];
 
 export const UNIT_ROLES = ROLES.map((r) => r.name);
