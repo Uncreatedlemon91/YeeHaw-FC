@@ -48,7 +48,7 @@ export async function Nav({ user }: { user: SessionUser | null }) {
       <Link
         key={i.href}
         href={i.href}
-        className="rounded px-3 py-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="whitespace-nowrap rounded px-3 py-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {i.label}
       </Link>

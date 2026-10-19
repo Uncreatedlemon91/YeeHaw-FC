@@ -32,20 +32,34 @@ Who, what, when, where, why.
 export function BriefingField({ defaultValue }: { defaultValue?: string }) {
   const [value, setValue] = useState(defaultValue ?? "");
   const [preview, setPreview] = useState(false);
+  const [replacing, setReplacing] = useState(false);
+  const insert = () => {
+    setValue(SMEAC);
+    setPreview(false);
+    setReplacing(false);
+  };
   return (
     <Field label="Briefing (Markdown)" htmlFor="description" help="Situation, mission, execution, kit — whatever members need beforehand.">
       <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            if (!value.trim() || confirm("Replace the current briefing with the SMEAC template?")) setValue(SMEAC);
-            setPreview(false);
-          }}
-        >
-          <FilePlus2 /> Insert SMEAC template
-        </Button>
+        {replacing ? (
+          <span
+            role="group"
+            aria-label="Replace the current briefing?"
+            className="inline-flex items-center gap-1"
+            onKeyDown={(e) => e.key === "Escape" && setReplacing(false)}
+          >
+            <Button autoFocus type="button" variant="destructive" size="sm" onClick={insert}>
+              Replace briefing?
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setReplacing(false)}>
+              Cancel
+            </Button>
+          </span>
+        ) : (
+          <Button type="button" variant="outline" size="sm" onClick={() => (value.trim() ? setReplacing(true) : insert())}>
+            <FilePlus2 /> Insert SMEAC template
+          </Button>
+        )}
         <Button type="button" variant="ghost" size="sm" aria-pressed={preview} onClick={() => setPreview((p) => !p)}>
           {preview ? <Pencil /> : <Eye />} {preview ? "Edit" : "Preview"}
         </Button>

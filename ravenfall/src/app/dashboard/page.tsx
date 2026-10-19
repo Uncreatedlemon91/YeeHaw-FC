@@ -156,7 +156,7 @@ export default async function Dashboard() {
                 <RsvpForm
                   eventId={next.id}
                   status={next.attendances[0]?.status === "ATTENDING" || next.attendances[0]?.status === "ABSENT" ? next.attendances[0].status : null}
-                  className="grid flex-1 grid-cols-2 gap-2 sm:max-w-sm"
+                  className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-72 sm:flex-1 sm:max-w-sm"
                 />
                 <Link href={`/ops/${next.id}`} className="py-2 text-sm text-accent underline-offset-4 hover:underline">
                   Open briefing

@@ -42,17 +42,29 @@ export function Field({
   className?: string;
 }) {
   const errorId = htmlFor ? `${htmlFor}-error` : undefined;
-  // Wire the single control child to the message without every caller
-  // repeating aria-invalid / aria-describedby.
-  const control =
-    error && React.isValidElement<Record<string, unknown>>(children)
-      ? React.cloneElement(children, { "aria-invalid": true, "aria-describedby": errorId })
-      : children;
+  const helpId = htmlFor && help ? `${htmlFor}-help` : undefined;
+  // Wire the single control child to its messages without every caller
+  // repeating aria-invalid / aria-describedby. Help stays described when an
+  // error is showing; any describedby the caller set is preserved.
+  let control = children;
+  if (React.isValidElement<Record<string, unknown>>(children) && (error || helpId)) {
+    const own = children.props["aria-describedby"] as string | undefined;
+    const ids = [own, helpId, error ? errorId : undefined].filter(Boolean);
+    const unique = Array.from(new Set(ids.join(" ").split(" ").filter(Boolean))).join(" ") || undefined;
+    control = React.cloneElement(children, {
+      ...(error ? { "aria-invalid": true } : null),
+      "aria-describedby": unique,
+    });
+  }
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       <Label htmlFor={htmlFor}>{label}</Label>
       {control}
-      {help && <p className="text-xs text-muted-foreground">{help}</p>}
+      {help && (
+        <p id={helpId} className="text-xs text-muted-foreground">
+          {help}
+        </p>
+      )}
       {error && (
         <p id={errorId} role="alert" className="text-xs text-destructive-fg">
           {error}

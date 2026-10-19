@@ -12,11 +12,12 @@ import { approve, deny } from "../actions";
 // the page stops being PENDING, and a plain server-rendered form would
 // unmount before its result (and any Discord warnings) could be shown.
 export function DecisionPanel({ appId, pending, callsign }: { appId: string; pending: boolean; callsign: string }) {
-  // Either decision locks the other form while it is in flight.
+  // Either decision locks the other form while it is in flight. The flag is
+  // raised in onSubmit (urgent): state set inside an action is batched with
+  // the action's transition and would only land once it had finished.
   const [approving, setApproving] = useState(false);
   const [denying, setDenying] = useState(false);
   const [approved, approveAction] = useActionState(async (prev: ActionState, fd: FormData) => {
-    setApproving(true);
     try {
       return await approve(prev, fd);
     } finally {
@@ -24,7 +25,6 @@ export function DecisionPanel({ appId, pending, callsign }: { appId: string; pen
     }
   }, undefined);
   const [denied, denyAction] = useActionState(async (prev: ActionState, fd: FormData) => {
-    setDenying(true);
     try {
       return await deny(prev, fd);
     } finally {
@@ -52,7 +52,7 @@ export function DecisionPanel({ appId, pending, callsign }: { appId: string; pen
           <CardTitle>Approve</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={approveAction} className="flex flex-col gap-4">
+          <form action={approveAction} onSubmit={() => setApproving(true)} className="flex flex-col gap-4">
             <input type="hidden" name="appId" value={appId} />
             <Field label="Callsign" htmlFor="callsign">
               <Input id="callsign" name="callsign" defaultValue={callsign} required maxLength={24} />
@@ -82,7 +82,7 @@ export function DecisionPanel({ appId, pending, callsign }: { appId: string; pen
           <CardTitle className="text-destructive-fg">Deny</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={denyAction} className="flex flex-col gap-4">
+          <form action={denyAction} onSubmit={() => setDenying(true)} className="flex flex-col gap-4">
             <input type="hidden" name="appId" value={appId} />
             <Field label="Reason (recruiters only)" htmlFor="deny-note">
               <Textarea id="deny-note" name="note" className="min-h-16" maxLength={500} />

@@ -285,7 +285,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
               <div className="flex flex-wrap gap-3 text-micro uppercase tracking-wider text-muted-foreground">
                 {(["ATTENDING", "EXCUSED", "ABSENT", "NOSHOW"] as const).map((s) => (
                   <span key={s} className="flex items-center gap-1.5">
-                    <span className={cn("flex size-4 items-center justify-center rounded-[2px] text-[0.625rem] font-bold", TILE[s])} aria-hidden>
+                    <span className={cn("flex size-4 items-center justify-center rounded-[2px] text-micro font-bold", TILE[s])} aria-hidden>
                       {TILE_LETTER[s]}
                     </span>{" "}
                     {ATTENDANCE_LABEL[s]} {clr.squad || s === "ATTENDING" ? n(s) : ""}
