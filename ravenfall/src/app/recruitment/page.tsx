@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { Container } from "@/components/container";
 import { PageHeader } from "@/components/page-header";
+import { AppAge } from "@/components/recruit-age";
 import { AppStatusBadge } from "@/components/status-badge";
 import { TabLinks } from "@/components/tab-links";
 import { Card } from "@/components/ui/card";
@@ -43,7 +44,39 @@ export default async function Recruitment({ searchParams }: { searchParams: Prom
         label="Application status"
         items={TABS.map((t) => ({ href: `/recruitment?status=${t}`, label: t, count: count(t), active: t === status }))}
       />
-      <Card>
+      <ul className="flex flex-col gap-2 sm:hidden" aria-label={`${status.toLowerCase()} applications`}>
+        {apps.map((a) => {
+          const ans = answersOf(a);
+          return (
+            <li key={a.id} className="relative rounded-lg border bg-card p-3 transition-colors hover:bg-secondary/40">
+              <div className="flex items-center justify-between gap-2">
+                <Link
+                  href={`/recruitment/${a.id}`}
+                  className="flex min-w-0 items-center gap-2 font-semibold after:absolute after:inset-0 hover:text-accent"
+                >
+                  <Avatar discordId={a.discordId} avatar={a.user.avatar} name={a.discordUsername} size={24} />
+                  <span className="truncate">{a.discordUsername}</span>
+                </Link>
+                <AppStatusBadge status={a.status} />
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span className="truncate">
+                  {String(ans.callsign ?? "—")} · {String(ans.timezone ?? "—")}
+                </span>
+                <span title={fmt(a.createdAt)} className="shrink-0">
+                  <AppAge date={a.createdAt} pending={a.status === "PENDING"} />
+                </span>
+              </div>
+            </li>
+          );
+        })}
+        {!apps.length && (
+          <li className="rounded-lg border bg-card py-10 text-center text-sm text-muted-foreground">
+            No {status.toLowerCase()} applications.
+          </li>
+        )}
+      </ul>
+      <Card className="hidden sm:block">
         <Table>
           <THead>
             <TR>
@@ -59,16 +92,18 @@ export default async function Recruitment({ searchParams }: { searchParams: Prom
             {apps.map((a) => {
               const ans = answersOf(a);
               return (
-                <TR key={a.id}>
+                <TR key={a.id} className="relative">
                   <TD>
-                    <Link href={`/recruitment/${a.id}`} className="flex items-center gap-2 font-semibold hover:text-accent">
+                    <Link href={`/recruitment/${a.id}`} className="flex items-center gap-2 font-semibold after:absolute after:inset-0 hover:text-accent">
                       <Avatar discordId={a.discordId} avatar={a.user.avatar} name={a.discordUsername} size={24} />
                       {a.discordUsername}
                     </Link>
                   </TD>
                   <TD>{String(ans.callsign ?? "—")}</TD>
                   <TD className="hidden md:table-cell">{String(ans.timezone ?? "—")}</TD>
-                  <TD className="whitespace-nowrap text-muted-foreground">{fmt(a.createdAt, "d MMM, HH:mm")}</TD>
+                  <TD className="whitespace-nowrap" title={fmt(a.createdAt)}>
+                    <AppAge date={a.createdAt} pending={a.status === "PENDING"} />
+                  </TD>
                   <TD>
                     <AppStatusBadge status={a.status} />
                   </TD>

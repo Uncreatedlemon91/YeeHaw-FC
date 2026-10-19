@@ -1,12 +1,12 @@
 import { CheckCircle2, Clock, XCircle } from "lucide-react";
 import Link from "next/link";
-import { ActionForm, SubmitButton } from "@/components/action-form";
 import { SignInButton } from "@/components/auth-buttons";
 import { Container } from "@/components/container";
 import { PageHeader } from "@/components/page-header";
+import { ApplicationProgress, PipelineStepper } from "@/components/public-pipeline";
+import { ApplyForm, type ApplyGroup, type ApplyQuestion } from "@/components/recruit-apply-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Field, Input, Textarea } from "@/components/ui/input";
 import { APPLICATION_QUESTIONS, UNIT } from "@/config/unit";
 import { getSessionUser } from "@/lib/auth";
 import { hasPerm } from "@/lib/permissions";
@@ -17,18 +17,27 @@ import { REAPPLY_DAYS } from "./rules";
 
 export const metadata = { title: "Enlist" };
 
+// How the questionnaire is sectioned. Keys come from APPLICATION_QUESTIONS;
+// any question not listed here lands in a trailing "Other" section.
+const GROUPS: ApplyGroup[] = [
+  { legend: "About you", keys: ["callsign", "age", "timezone", "availability"] },
+  { legend: "Experience", keys: ["experience", "interest"] },
+  { legend: `Why ${UNIT.name}`, keys: ["why", "referral"] },
+];
+
 export default async function Apply() {
   const user = await getSessionUser();
 
   if (!user) {
     return (
-      <Container className="max-w-xl py-20 text-center">
+      <Container size="narrow" className="py-16 text-center">
         <PageHeader eyebrow="Recruitment" title={`Enlist with ${UNIT.name}`} className="block border-0" />
-        <p className="text-sm text-muted-foreground">
+        <PipelineStepper className="mt-2" />
+        <p className="mx-auto mt-8 max-w-xl text-sm text-muted-foreground">
           Applications are tied to your Discord account, so sign in first. We only read your username and your roles on
           our server.
         </p>
-        <SignInButton callbackUrl="/apply" size="lg" className="mt-8" />
+        <SignInButton callbackUrl="/apply" size="lg" className="mt-6" />
       </Container>
     );
   }
@@ -50,7 +59,7 @@ export default async function Apply() {
 
   if (latest?.status === "PENDING") {
     return (
-      <Status icon={<Clock className="size-10 text-accent" />} title="Application under review">
+      <Status icon={<Clock className="size-10 text-accent" />} title="Application under review" progress={<ApplicationProgress current={1} />}>
         <p className="text-sm text-muted-foreground">
           Submitted {fmt(latest.createdAt)}. Recruiters have been notified on Discord — you'll get a DM and new roles when
           a decision is made.
@@ -60,7 +69,7 @@ export default async function Apply() {
   }
   if (latest?.status === "APPROVED") {
     return (
-      <Status icon={<CheckCircle2 className="size-10 text-success-fg" />} title="Approved — welcome aboard">
+      <Status icon={<CheckCircle2 className="size-10 text-success-fg" />} title="Approved — welcome aboard" progress={<ApplicationProgress current={2} outcome="approved" />}>
         <p className="text-sm text-muted-foreground">
           Your roles may take up to five minutes to reach the site. Sign out and back in to pick them up immediately.
         </p>
@@ -70,13 +79,25 @@ export default async function Apply() {
   const reapplyAt = latest ? new Date(latest.updatedAt.getTime() + REAPPLY_DAYS * 864e5) : null;
   if (latest?.status === "DENIED" && reapplyAt && reapplyAt > new Date()) {
     return (
-      <Status icon={<XCircle className="size-10 text-destructive-fg" />} title="Application not accepted">
+      <Status icon={<XCircle className="size-10 text-destructive-fg" />} title="Application not accepted" progress={<ApplicationProgress current={2} outcome="denied" />}>
         <p className="text-sm text-muted-foreground">
           Thanks for your interest. You can apply again from {fmt(reapplyAt, "d MMM yyyy")}.
         </p>
       </Status>
     );
   }
+
+  const questions: ApplyQuestion[] = APPLICATION_QUESTIONS.map((q) => ({
+    key: q.key,
+    label: q.label,
+    type: q.type,
+    required: q.required,
+    max: "max" in q ? q.max : undefined,
+    help: "help" in q ? q.help : undefined,
+  }));
+  const grouped = new Set(GROUPS.flatMap((g) => g.keys));
+  const rest = questions.filter((q) => !grouped.has(q.key)).map((q) => q.key);
+  const groups = rest.length ? [...GROUPS, { legend: "Other", keys: rest }] : GROUPS;
 
   return (
     <Container size="narrow">
@@ -102,36 +123,27 @@ export default async function Apply() {
       )}
       <Card>
         <CardContent className="py-6">
-          <ActionForm action={submitApplication}>
-            {APPLICATION_QUESTIONS.map((q) => (
-              <Field
-                key={q.key}
-                label={q.label + (q.required ? "" : " (optional)")}
-                htmlFor={q.key}
-                help={"help" in q ? q.help : undefined}
-              >
-                {q.type === "textarea" ? (
-                  <Textarea id={q.key} name={q.key} required={q.required} maxLength={q.max} />
-                ) : q.type === "number" ? (
-                  <Input id={q.key} name={q.key} type="number" min={13} max={99} required={q.required} className="w-28" />
-                ) : (
-                  <Input id={q.key} name={q.key} required={q.required} maxLength={"max" in q ? q.max : undefined} />
-                )}
-              </Field>
-            ))}
-            <SubmitButton variant="accent" size="lg" pendingText="Submitting…" className="self-start">
-              Submit application
-            </SubmitButton>
-          </ActionForm>
+          <ApplyForm action={submitApplication} questions={questions} groups={groups} />
         </CardContent>
       </Card>
     </Container>
   );
 }
 
-function Status({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+function Status({
+  icon,
+  title,
+  progress,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  progress?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <Container className="flex max-w-lg flex-col items-center gap-4 py-24 text-center">
+      {progress && <div className="mb-4 w-full">{progress}</div>}
       {icon}
       <h1 className="text-2xl font-bold uppercase">{title}</h1>
       {children}
