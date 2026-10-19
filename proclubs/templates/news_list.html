@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}News{% endblock %}
 {% block content %}
+{% from "_crest.html" import crest %}
 <div class="page">
   <div class="page-head">
     <div>
@@ -10,27 +11,34 @@
     {% if is_staff %}<a class="btn" href="/news/new">New article</a>{% endif %}
   </div>
 
-  <div class="category-pills">
-    <a href="/news" class="pill {{ 'active' if not selected_category else '' }}">All</a>
+  <nav class="category-pills" aria-label="Filter by category">
+    <a href="/news" class="pill {{ 'active' if not selected_category else '' }}"{% if not selected_category %} aria-current="page"{% endif %}>All{% if not selected_category %} <span class="pill-count">{{ articles | length }}</span>{% endif %}</a>
     {% for c in ARTICLE_CATEGORIES %}
-      <a href="/news?category={{ c | urlencode }}" class="pill {{ 'active' if selected_category == c else '' }}">{{ c }}</a>
+      <a href="/news?category={{ c | urlencode }}" class="pill {{ 'active' if selected_category == c else '' }}"{% if selected_category == c %} aria-current="page"{% endif %}>{{ c }}{% if selected_category == c %} <span class="pill-count">{{ articles | length }}</span>{% endif %}</a>
     {% endfor %}
-  </div>
+  </nav>
 
   {% if articles %}
     <div class="card-grid">
       {% for a in articles %}
         <a class="card article-card" href="/news/{{ a.slug }}">
-          {% if a.has_cover %}
-            <div class="article-thumb">
+          <div class="article-thumb">
+            {% if a.has_cover %}
               <img class="cover" src="{{ media_url('article', a) }}" alt="" loading="lazy" decoding="async"
                    width="400" height="225" style="object-position: {{ focal_position(a) }};" />
               {% include "_engagement_badge.html" %}
-            </div>
-          {% endif %}
+            {% else %}
+              <div class="cover cover-fallback cat-{{ a.category | replace(' ', '-') | lower }}" aria-hidden="true">
+                {{ crest(initials(SITE_NAME, 3), 56, "nl" ~ loop.index) }}
+              </div>
+            {% endif %}
+          </div>
           <div class="body">
-            <span class="category-badge cat-{{ a.category | replace(' ', '-') | lower }}">{{ a.category }}</span>
-            <h3>{{ a.title }}{% if not a.published %} <span class="draft-pill">Draft</span>{% endif %}</h3>
+            <div class="article-tags">
+              <span class="category-badge cat-{{ a.category | replace(' ', '-') | lower }}">{{ a.category }}</span>
+              {% if not a.published %}<span class="draft-pill">Draft</span>{% endif %}
+            </div>
+            <h3>{{ a.title }}</h3>
             {% if a.summary %}<p>{{ a.summary }}</p>{% endif %}
             <div class="article-meta">{{ a.author_name }} &middot; {{ a.published_at.strftime('%b %-d, %Y') }}</div>
           </div>
@@ -38,7 +46,8 @@
       {% endfor %}
     </div>
   {% else %}
-    <div class="card empty-state">No articles {{ 'in ' ~ selected_category if selected_category else '' }} yet.</div>
+    {% from "_ui.html" import empty_state %}
+    {{ empty_state('file', 'No articles ' ~ ('in ' ~ selected_category ~ ' ' if selected_category else '') ~ 'yet', 'Match reports, transfer news and highlights will show up here.', '/news' if selected_category else None, 'See all news' if selected_category else None) }}
   {% endif %}
 </div>
 {% endblock %}

@@ -61,7 +61,7 @@
     </div>
 
     {# ------------------------------------------------------------------ #}
-    <div class="section-head accent-amber">
+    <div class="section-head">
       <h2>Depth · {{ formation }}</h2><a href="/tactics">Change formation →</a>
     </div>
     <div class="depth-grid">
@@ -100,7 +100,7 @@
 
     {# ------------------------------------------------------------------ #}
     <div class="section-head"><h2>Players</h2></div>
-    <div class="card league-table-card">
+    <div class="card league-table-card table-scroll">
       <table class="league-table squad-table">
         <thead>
           <tr>
@@ -137,7 +137,7 @@
                     {% else %}
                       <details class="squad-link">
                         <summary>Link gamertag</summary>
-                        <form method="post" action="/squad/gamertag">
+                        <form method="post" action="/squad/gamertag" data-loading="Linking…">
                           <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                           <input type="hidden" name="discord_id" value="{{ c.discord_id }}" />
                           <input name="player_name" list="gamertag-options" maxlength="64"
@@ -190,7 +190,7 @@
   {% endif %}
 
   {% if regulars %}
-    <div class="section-head accent-amber"><h2>Playing without a contract</h2></div>
+    <div class="section-head"><h2>Playing without a contract</h2></div>
     <p class="field-hint">
       These gamertags have played regularly but aren't linked to anybody under contract.
       Either record a contract for them on <a href="/roster">Moves &amp; contracts</a>, or link the

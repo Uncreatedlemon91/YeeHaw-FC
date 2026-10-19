@@ -1,4 +1,7 @@
 {% extends "base.html" %}
+{% from "_matchday.html" import scoreboard with context %}
+{% from "_ui.html" import empty_state, result_chip %}
+{% from "_icons.html" import icon %}
 {% block title %}Home{% endblock %}
 {% block content %}
 {# The club's home screen, laid out like a manager's dashboard: the next
@@ -15,85 +18,71 @@
     {% if is_staff %}<a class="btn secondary" href="/news/new">Write an article</a>{% endif %}
   </div>
 
-  <div class="dash-top">
-    {# --- Next match ----------------------------------------------------- #}
-    <section class="panel match-center">
-      <header class="panel-head">
-        <h2>{{ 'Next ' ~ next_event.event_type if next_event else 'Next match' }}</h2>
-        <a href="/events">Fixtures &rarr;</a>
-      </header>
-      <div class="panel-body">
-        {% if next_event %}
-          <div class="mc-matchup">
-            <div class="mc-team">
-              <span class="crest{{ ' crest-branded' if crest_colors and crest_colors.crest else '' }}"
-                    {% if crest_colors and crest_colors.crest %}style="background:{{ crest_colors.crest }};"{% endif %}>{{ initials(SITE_NAME) }}</span>
-              <span class="mc-team-name">{{ SITE_NAME }}</span>
-            </div>
-            <div class="mc-vs">
-              <span>{{ localtime(next_event.scheduled_at, 'daymonth') }}</span>
-              <span class="mc-vs-text">v</span>
-              <span>{{ localtime(next_event.scheduled_at, 'time') }}</span>
-            </div>
-            <div class="mc-team">
-              {% if next_event.opponent %}
-                <span class="crest">{{ initials(next_event.opponent) }}</span>
-                <span class="mc-team-name">{{ next_event.opponent }}</span>
-              {% else %}
-                <span class="crest">?</span>
-                <span class="mc-team-name">{{ next_event.title }}</span>
-              {% endif %}
+  {# --- Next match: the hero -------------------------------------------- #}
+  <section class="panel match-center mc-hero">
+    <header class="panel-head">
+      <h2>{{ 'Next ' ~ next_event.event_type if next_event else 'Next match' }}</h2>
+      <a href="/events">Fixtures &rarr;</a>
+    </header>
+    <div class="panel-body">
+      {% if next_event %}
+        <p class="mc-kicker">
+          <span class="event-type-badge">{{ next_event.event_type }}</span>
+          <span class="mc-comp">{{ next_event.title }}</span>
+        </p>
+        {{ scoreboard(next_event, crest_colors) }}
+        {% set going = next_counts.going if next_counts else 0 %}
+        <div class="mc-foot">
+          <div class="mc-clock">
+            <time class="mc-countdown" data-countdown="{{ next_event.scheduled_at.isoformat() }}Z"
+                  datetime="{{ next_event.scheduled_at.isoformat() }}Z" aria-label="Kick-off countdown">
+              <span class="cd-box" aria-hidden="true"><span class="cd-d">00</span><small>Days</small></span>
+              <span class="cd-box" aria-hidden="true"><span class="cd-h">00</span><small>Hrs</small></span>
+              <span class="cd-box" aria-hidden="true"><span class="cd-m">00</span><small>Min</small></span>
+              <span class="cd-box" aria-hidden="true"><span class="cd-s">00</span><small>Sec</small></span>
+            </time>
+            <p class="mc-kicked" data-kicked hidden>Kicked off</p>
+          </div>
+          <div class="mc-signup">
+            <div class="mc-signup-text"><strong>{{ going }}</strong> going of 11{% if next_counts and next_counts.maybe %} &middot; {{ next_counts.maybe }} maybe{% endif %}</div>
+            <div class="mc-progress" role="progressbar" aria-label="Players signed up" aria-valuemin="0" aria-valuemax="11" aria-valuenow="{{ [going, 11] | min }}">
+              <span style="width: {{ ([going, 11] | min) * 100 // 11 }}%;"></span>
             </div>
           </div>
-          <div class="mc-foot">
-            <div class="mc-countdown" data-countdown="{{ next_event.scheduled_at.isoformat() }}Z">
-              <div class="cd-box"><span class="cd-d">00</span><small>Days</small></div>
-              <div class="cd-box"><span class="cd-h">00</span><small>Hrs</small></div>
-              <div class="cd-box"><span class="cd-m">00</span><small>Min</small></div>
-              <div class="cd-box"><span class="cd-s">00</span><small>Sec</small></div>
-            </div>
-            <a class="btn mc-cta" href="/events/{{ next_event.id }}">Sign up</a>
-          </div>
-        {% else %}
-          <div class="mc-empty">
-            <p class="muted">No fixture scheduled yet.</p>
-            <a class="btn secondary mc-cta" href="/events">View schedule</a>
-          </div>
-        {% endif %}
-      </div>
-    </section>
+          <a class="btn mc-cta" href="/events/{{ next_event.id }}">Sign up</a>
+        </div>
+      {% else %}
+        {{ empty_state('matchday', 'No fixture scheduled yet', 'The next match will appear here as soon as it is booked.', '/events', 'View schedule') }}
+      {% endif %}
+    </div>
+  </section>
 
-    {# --- Club standing -------------------------------------------------- #}
-    <section class="panel">
-      <header class="panel-head panel-amber">
-        <h2>Club Standing</h2>
-        <a href="/stats">Full stats &rarr;</a>
-      </header>
-      <div class="panel-body">
-        {% if stats_teaser %}
-          {# Skill rating leads because it's the only standing figure EA
-             keeps current; the record and win rate beside it are live for
-             the same reason. No division: see app._standing_teaser. #}
-          <div class="standing-band">
-            <div class="standing-item standing-item--hero">
-              <div class="standing-value--hero"{% if stats_teaser.skillRating %} data-countup="{{ stats_teaser.skillRating }}"{% endif %}>{{ stats_teaser.skillRating or '—' }}</div>
-              <div class="standing-label">Skill Rating</div>
-            </div>
-            <div class="standing-item">
-              <div class="standing-value">{{ stats_teaser.record or '—' }}</div>
-              <div class="standing-label">Record{% if stats_teaser.played %} &middot; {{ stats_teaser.played }} played{% endif %}</div>
-            </div>
-            <div class="standing-item">
-              <div class="standing-value"{% if stats_teaser.winRate is not none %} data-countup="{{ stats_teaser.winRate }}" data-countup-suffix="%"{% endif %}>{{ stats_teaser.winRate ~ '%' if stats_teaser.winRate is not none else '—' }}</div>
-              <div class="standing-label">Win Rate</div>
-            </div>
-          </div>
-        {% else %}
-          <p class="muted panel-empty">Club figures appear once EA has answered.</p>
-        {% endif %}
-      </div>
-    </section>
-  </div>
+  {# --- Last result: score banner and form ------------------------------ #}
+  {% if last_result %}
+    {% set r = last_result.result | trim %}
+    {% set letter = r[:1] | upper if r[:1] | upper in ('W', 'D', 'L') else '' %}
+    {% set score = (r[1:] if letter else r) | trim | replace('-', '–') %}
+    <div class="result-bar">
+      <a class="result-bar-main" href="/events/{{ last_result.id }}/report">
+        <span class="kicker kicker-dim">Last result</span>
+        {% if letter %}{{ result_chip(letter, ('Win' if letter == 'W' else ('Draw' if letter == 'D' else 'Loss')) ~ ' ' ~ score ~ (' vs ' ~ last_result.opponent if last_result.opponent else '')) }}{% endif %}
+        <strong class="result-score">{{ score }}</strong>
+        <span class="result-opp">{{ ('vs ' ~ last_result.opponent) if last_result.opponent else last_result.title }}</span>
+        <span class="result-cta">Match report &rarr;</span>
+      </a>
+      {% if form_results | length > 1 %}
+        <div class="form-strip" role="group" aria-label="Last {{ form_results | length }} results">
+          <span class="kicker kicker-dim">Form</span>
+          <span class="form-strip-chips">
+            {% for e in form_results | reverse %}
+              {% set fl = (e.result | trim)[:1] | upper %}
+              <a href="/events/{{ e.id }}" class="form-link">{{ result_chip(fl, ('Win' if fl == 'W' else ('Draw' if fl == 'D' else ('Loss' if fl == 'L' else 'Result'))) ~ ' ' ~ (e.result | trim) ~ (' vs ' ~ e.opponent if e.opponent else '')) }}</a>
+            {% endfor %}
+          </span>
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
 
   <div class="dash-grid">
     <div class="dash-main">
@@ -124,14 +113,14 @@
               {% for a in articles %}
                 <li>
                   <a class="news-row" href="/news/{{ a.slug }}">
-                    {# No placeholder box for a story without a cover: an empty
-                       grey frame reads as a broken image. #}
-                    {% if a.has_cover %}
-                      <span class="news-thumb">
+                    {# A fixed thumbnail column keeps the titles aligned; a
+                       story with no cover gets a quiet placeholder tile. #}
+                    <span class="news-thumb{{ '' if a.has_cover else ' is-empty' }}">
+                      {% if a.has_cover %}
                         <img src="{{ media_url('article', a) }}" alt="" loading="lazy" decoding="async"
                              width="96" height="54" style="object-position: {{ focal_position(a) }};" />
-                      </span>
-                    {% endif %}
+                      {% else %}{{ icon('news') }}{% endif %}
+                    </span>
                     <span class="news-row-text">
                       <span class="news-row-title">{{ a.title }}</span>
                       <span class="article-meta">
@@ -233,15 +222,62 @@
     </div>
 
     <aside class="dash-side">
+  {# --- Club standing -------------------------------------------------- #}
+  <section class="panel club-standing{{ ' is-sparse' if not stats_teaser }}">
+    <header class="panel-head panel-amber">
+      <h2>Club Standing</h2>
+      <a href="/stats">Full stats &rarr;</a>
+    </header>
+    <div class="panel-body">
+      {% if stats_teaser %}
+        {# Skill rating leads because it's the only standing figure EA
+           keeps current; the record and win rate beside it are live for
+           the same reason. No division: see app._standing_teaser. #}
+        <div class="standing-band">
+          <div class="standing-item standing-item--hero">
+            <div class="standing-value--hero"{% if stats_teaser.skillRating %} data-countup="{{ stats_teaser.skillRating }}"{% endif %}>{{ stats_teaser.skillRating or '—' }}</div>
+            <div class="standing-label">Skill Rating</div>
+          </div>
+          <div class="standing-item">
+            <div class="standing-value">{{ stats_teaser.record or '—' }}</div>
+            <div class="standing-label">Record{% if stats_teaser.played %} &middot; {{ stats_teaser.played }} played{% endif %}</div>
+          </div>
+          <div class="standing-item">
+            <div class="standing-value"{% if stats_teaser.winRate is not none %} data-countup="{{ stats_teaser.winRate }}" data-countup-suffix="%"{% endif %}>{{ stats_teaser.winRate ~ '%' if stats_teaser.winRate is not none else '—' }}</div>
+            <div class="standing-label">Win Rate</div>
+          </div>
+        </div>
+      {% else %}
+        <p class="muted panel-empty">Club figures appear once EA has answered.</p>
+      {% endif %}
+    </div>
+  </section>
       {% if inbox is not none %}
+        {% set urgent = inbox | selectattr('level', 'equalto', 'warn') | list %}
+        {% set later = inbox | rejectattr('level', 'equalto', 'warn') | list %}
         <section class="panel inbox">
           <header class="panel-head panel-staff"><h2>Needs a decision</h2><span>{{ inbox | length or 'All clear' }}</span></header>
           {% if inbox %}
-            <ul class="inbox-list">
-              {% for item in inbox %}
-                <li class="inbox-item i-{{ item.level }}"><a href="{{ item.href }}">{{ item.text }}</a></li>
-              {% endfor %}
-            </ul>
+            {% if urgent %}
+              <h3 class="inbox-group">Needs doing soon <span class="inbox-count">{{ urgent | length }}</span></h3>
+              <ul class="inbox-list">
+                {% for item in urgent %}
+                  <li class="inbox-item i-{{ item.level }}"><a href="{{ item.href }}">{{ item.text }}</a></li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+            {% if later %}
+              {# Housekeeping folds away once there is something urgent to
+                 look at; with nothing urgent it is the list. #}
+              <details class="inbox-later"{{ '' if urgent else ' open' }}>
+                <summary class="inbox-group">Housekeeping <span class="inbox-count">{{ later | length }}</span></summary>
+                <ul class="inbox-list">
+                  {% for item in later %}
+                    <li class="inbox-item i-{{ item.level }}"><a href="{{ item.href }}">{{ item.text }}</a></li>
+                  {% endfor %}
+                </ul>
+              </details>
+            {% endif %}
           {% else %}
             <div class="panel-body"><p class="muted panel-empty">Nothing waiting on you.</p></div>
           {% endif %}
@@ -296,17 +332,17 @@
         </section>
       {% endif %}
 
-      {% if DISCORD_INVITE_URL %}
-        <section class="panel connect-band">
-          <header class="panel-head"><h2>Connect with us</h2></header>
-          <div class="panel-body">
-            <p>Join the {{ SITE_NAME }} Discord for match threads and clips, and to comment and like news posts.</p>
-            <a class="btn discord connect-band-cta" href="{{ DISCORD_INVITE_URL }}" target="_blank" rel="noopener noreferrer">Join our Discord</a>
-          </div>
-        </section>
-      {% endif %}
     </aside>
   </div>
+  {% if DISCORD_INVITE_URL %}
+    <section class="panel connect-band connect-wide">
+      <div class="connect-wide-text">
+        <h2 class="connect-wide-title">Connect with us</h2>
+        <p>Join the {{ SITE_NAME }} Discord for match threads and clips, and to comment and like news posts.</p>
+      </div>
+      <a class="btn discord connect-band-cta" href="{{ DISCORD_INVITE_URL }}" target="_blank" rel="noopener noreferrer">Join our Discord</a>
+    </section>
+  {% endif %}
 </div>
 {% endblock %}
 {% block scripts %}

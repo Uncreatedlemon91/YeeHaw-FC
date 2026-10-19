@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from "_matchday.html" import event_row with context %}
+{% from "_ui.html" import empty_state %}
 {% block title %}Events{% endblock %}
 {% block content %}
 <div class="page">
@@ -13,48 +15,17 @@
   <div class="section-head"><h2>Upcoming</h2></div>
   {% if upcoming %}
     {% for e in upcoming %}
-      <div class="event-row">
-        <div class="event-date">
-          <div class="month">{{ localtime(e.scheduled_at, 'month') }}</div>
-          <div class="day">{{ localtime(e.scheduled_at, 'day') }}</div>
-        </div>
-        {% if e.image %}<img class="event-thumb" src="{{ e.image }}" alt="" loading="lazy" decoding="async" />{% endif %}
-        <div class="event-info">
-          <span class="event-type-badge">{{ e.event_type }}</span>
-          <h3><a href="/events/{{ e.id }}">{{ e.title }}{% if e.opponent %} vs {{ e.opponent }}{% endif %}</a></h3>
-          <p>{{ localtime(e.scheduled_at, 'short') }}{% if e.description %} &middot; {{ e.description }}{% endif %}</p>
-        </div>
-        {% set c = signup_counts.get(e.id) %}
-        {% if c %}
-          <div class="event-signup-count">
-            <strong>{{ c.going }}</strong><span>going</span>
-            {% if c.maybe %}<em>{{ c.maybe }} maybe</em>{% endif %}
-          </div>
-        {% endif %}
-      </div>
+      {{ event_row(e, true, signup_counts.get(e.id), loop.first) }}
     {% endfor %}
   {% else %}
-    <div class="card empty-state">Nothing scheduled yet.{% if is_staff %} <a href="/events/new">Create one</a>.{% endif %}</div>
+    {{ empty_state('matchday', 'Nothing scheduled yet', 'Fixtures, scrims and community events will show up here.',
+                   '/events/new' if is_staff else None, 'Create an event' if is_staff else None) }}
   {% endif %}
 
   {% if past %}
     <div class="section-head"><h2>Past results</h2></div>
     {% for e in past %}
-      <div class="event-row">
-        <div class="event-date">
-          <div class="month">{{ localtime(e.scheduled_at, 'month') }}</div>
-          <div class="day">{{ localtime(e.scheduled_at, 'day') }}</div>
-        </div>
-        {% if e.image %}<img class="event-thumb" src="{{ e.image }}" alt="" loading="lazy" decoding="async" />{% endif %}
-        <div class="event-info">
-          <span class="event-type-badge">{{ e.event_type }}</span>
-          <h3><a href="/events/{{ e.id }}">{{ e.title }}{% if e.opponent %} vs {{ e.opponent }}{% endif %}</a></h3>
-          <p>{{ localtime(e.scheduled_at, 'date') }}</p>
-        </div>
-        {% if e.result %}
-          <div class="event-result {{ 'win' if e.result.startswith('W') else ('loss' if e.result.startswith('L') else '') }}">{{ e.result }}</div>
-        {% endif %}
-      </div>
+      {{ event_row(e, false) }}
     {% endfor %}
   {% endif %}
 </div>

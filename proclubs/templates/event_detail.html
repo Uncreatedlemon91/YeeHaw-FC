@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_matchday.html" import scoreboard, crest_tile with context %}
 {% block title %}{{ event.title }}{% endblock %}
 {% block content %}
 <div class="page">
@@ -9,7 +10,7 @@
       <h1>{{ event.title }}{% if event.opponent %} vs {{ event.opponent }}{% endif %}</h1>
       <p class="page-lede">
         {{ localtime(event.scheduled_at, 'full') }}
-        {% if event.result %} &middot; <strong>{{ event.result }}</strong>{% endif %}
+        {% if event.result and not (is_past and (event.result or event.opponent)) %} &middot; <strong>{{ event.result }}</strong>{% endif %}
       </p>
     </div>
     <div class="head-actions">
@@ -37,46 +38,8 @@
     </div>
   {% endif %}
 
-  {% if event.image %}<img class="event-hero" src="{{ event.image }}" alt="" />{% endif %}
-  {% if event.description %}<div class="card event-description">{{ event.description }}</div>{% endif %}
-
-  {% if is_session %}
-    <section class="panel session-panel" id="session-plan">
-      <header class="panel-head"><h2>Session plan</h2>
-        {% if is_staff %}<a href="/events/{{ event.id }}/plan">{{ 'Edit plan' if session_plan.objective or session_plan.plan else 'Write the plan' }} →</a>{% endif %}</header>
-      <div class="panel-body">
-        {% if session_plan.my_brief %}
-          <div class="my-brief">
-            <span class="kicker">Your brief · {{ session_plan.my_brief.label }}</span>
-            <p>{{ session_plan.my_brief.text }}</p>
-          </div>
-        {% elif session_plan.my_slot_label %}
-          <p class="field-hint">You're down as {{ session_plan.my_slot_label }}; there's no brief for it yet.</p>
-        {% endif %}
-        {% if session_plan.objective %}
-          <p class="kicker kicker-dim">Objective</p>
-          <p class="session-objective-big">{{ session_plan.objective }}</p>
-        {% endif %}
-        {% if session_plan.plan %}<div class="session-plan-text">{{ session_plan.plan }}</div>{% endif %}
-        {% if not session_plan.objective and not session_plan.plan %}
-          <p class="muted panel-empty">The coaches haven't written the plan yet.</p>
-        {% endif %}
-        {% if session_plan.briefs %}
-          <p class="kicker kicker-dim brief-head">Role briefs</p>
-          <ul class="brief-list">
-            {% for b in session_plan.briefs %}
-              <li class="{{ 'is-me' if b.mine }}"><span class="pitch-slot-pos">{{ b.label }}</span><span>{{ b.text }}</span></li>
-            {% endfor %}
-          </ul>
-        {% endif %}
-        {% if session_plan.review %}
-          <div class="session-review-block">
-            <p class="kicker kicker-dim">How it went{% if session_plan.reviewed_by %} · {{ session_plan.reviewed_by }}{% endif %}</p>
-            <div class="session-plan-text">{{ session_plan.review }}</div>
-          </div>
-        {% endif %}
-      </div>
-    </section>
+  {% if is_past and (event.result or event.opponent) %}
+    <div class="panel scoreboard-panel">{{ scoreboard(event, none, event.result) }}</div>
   {% endif %}
 
   {# ---- Your own sign-up ------------------------------------------------ #}
@@ -205,6 +168,60 @@
     {% endif %}
   {% endif %}
 
+  {# Past matches read as a scoreboard; the rest keep the cover (or, with no
+     image, a tile in the opponent's initials, as the home page does). #}
+  {% if is_past and (event.result or event.opponent) %}
+  {% elif event.image %}
+    <img class="event-hero" src="{{ event.image }}" alt="{{ event.title }}{{ ' vs ' ~ event.opponent if event.opponent }}" />
+  {% else %}
+    <div class="event-hero event-cover-tile" role="img" aria-label="{{ event.title }}">
+      {{ crest_tile(SITE_NAME, none, true) }}
+      <span class="cover-v">v</span>
+      {{ crest_tile(event.opponent or event.title) }}
+      <span class="cover-name">{{ event.opponent or event.title }}</span>
+    </div>
+  {% endif %}
+  {% if event.description %}<div class="card event-description">{{ event.description }}</div>{% endif %}
+
+  {% if is_session %}
+    <section class="panel session-panel" id="session-plan">
+      <header class="panel-head"><h2>Session plan</h2>
+        {% if is_staff %}<a href="/events/{{ event.id }}/plan">{{ 'Edit plan' if session_plan.objective or session_plan.plan else 'Write the plan' }} →</a>{% endif %}</header>
+      <div class="panel-body">
+        {% if session_plan.my_brief %}
+          <div class="my-brief">
+            <span class="kicker">Your brief · {{ session_plan.my_brief.label }}</span>
+            <p>{{ session_plan.my_brief.text }}</p>
+          </div>
+        {% elif session_plan.my_slot_label %}
+          <p class="field-hint">You're down as {{ session_plan.my_slot_label }}; there's no brief for it yet.</p>
+        {% endif %}
+        {% if session_plan.objective %}
+          <p class="kicker kicker-dim">Objective</p>
+          <p class="session-objective-big">{{ session_plan.objective }}</p>
+        {% endif %}
+        {% if session_plan.plan %}<div class="session-plan-text">{{ session_plan.plan }}</div>{% endif %}
+        {% if not session_plan.objective and not session_plan.plan %}
+          <p class="muted panel-empty">The coaches haven't written the plan yet.</p>
+        {% endif %}
+        {% if session_plan.briefs %}
+          <p class="kicker kicker-dim brief-head">Role briefs</p>
+          <ul class="brief-list">
+            {% for b in session_plan.briefs %}
+              <li class="{{ 'is-me' if b.mine }}"><span class="pitch-slot-pos">{{ b.label }}</span><span>{{ b.text }}</span></li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        {% if session_plan.review %}
+          <div class="session-review-block">
+            <p class="kicker kicker-dim">How it went{% if session_plan.reviewed_by %} · {{ session_plan.reviewed_by }}{% endif %}</p>
+            <div class="session-plan-text">{{ session_plan.review }}</div>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+  {% endif %}
+
   {% if published_sheet %}
     <div class="section-head"><h2>Team sheet</h2></div>
     <div class="card sheet-list">
@@ -220,6 +237,16 @@
           {% for p in bench %}<li class="{{ 'is-me' if user and p.id == user.id|string }}"><span class="pitch-slot-pos">{{ p.label }}</span><a href="/players/{{ p.id }}">{{ p.name }}</a></li>{% endfor %}
         </ol>
       {% endif %}
+    </div>
+  {% endif %}
+
+  {% if user and is_member and not is_past and event.signups_open %}
+    <div class="answer-bar" role="region" aria-label="Your sign-up">
+      <span class="answer-bar-text">
+        <strong>{{ counts.going }}</strong> going{% if counts.maybe %} &middot; {{ counts.maybe }} maybe{% endif %}
+        &middot; You: <em>{{ signup_labels[my_signup.status] if my_signup else 'not answered' }}</em>
+      </span>
+      <a class="btn btn-sm" href="#your-answer">{{ 'Change' if my_signup else 'Answer' }}</a>
     </div>
   {% endif %}
 

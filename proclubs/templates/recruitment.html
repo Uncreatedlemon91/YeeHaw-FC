@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Recruitment{% endblock %}
+{% from "_ui.html" import empty_state %}
 {% block content %}
 <div class="page page-wide">
   <div class="page-head">
@@ -60,6 +61,12 @@
     {% endif %}
   </section>
 
+  {% set stage_hints = {
+    'prospect': 'Start a file from a new member above, or add one by hand below.',
+    'trial': 'Move a prospect here once they are playing sessions with the club.',
+    'offered': 'Contracts waiting on an answer from the player show here.',
+    'signed': 'Players who accepted and joined the squad show here.',
+    'rejected': 'Prospects who passed, or were passed on, show here.'} %}
   <div class="pipeline">
     {% for stage in stages %}
       <section class="panel pipeline-col stage-{{ stage }}">
@@ -80,7 +87,7 @@
               {% endif %}
             </a></li>
           {% else %}
-            <li class="muted pipeline-empty">—</li>
+            <li class="pipeline-empty">{{ empty_state('', 'Nobody here', stage_hints.get(stage, 'Nobody at this stage yet.')) }}</li>
           {% endfor %}
         </ul>
       </section>
@@ -88,8 +95,8 @@
   </div>
 
   <section class="panel">
-    <header class="panel-head panel-staff"><h2>Add a prospect</h2></header>
-    <form method="post" action="/recruitment" class="panel-body stack-form">
+    <header class="panel-head"><h2>Add a prospect</h2></header>
+    <form method="post" action="/recruitment" class="panel-body stack-form" data-loading="Adding…">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <p class="field-hint">For somebody who isn't in the Discord server yet, or was missed above.</p>
       <div class="field-row">
@@ -104,7 +111,7 @@
           <select id="pr-sec" name="secondary"><option value="">—</option>{% for p in positions %}<option>{{ p }}</option>{% endfor %}</select></div>
         <div class="field"><label for="pr-src">Where from <span class="muted">(optional)</span></label><input id="pr-src" name="source" maxlength="120" placeholder="e.g. LFG post, a friend of Bo's" /></div>
       </div>
-      <div class="form-actions"><button type="submit" class="btn staff">Add to the pipeline</button></div>
+      <div class="form-actions"><button type="submit" class="btn">Add to the pipeline</button></div>
     </form>
   </section>
 </div>

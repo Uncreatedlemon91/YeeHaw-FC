@@ -11,7 +11,7 @@
     <a class="btn secondary" href="/welcome" target="_blank" rel="noopener">View public page</a>
   </div>
 
-  <form method="post" action="/club-profile" class="card stack-form club-profile-form">
+  <form method="post" action="/club-profile" class="card stack-form club-profile-form" data-loading="Saving…">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
     {% for key, (label, _default, limit) in fields.items() %}
       <div class="field">

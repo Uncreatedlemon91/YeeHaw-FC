@@ -46,6 +46,20 @@
 
   document.querySelectorAll('time[data-localtime]').forEach(render);
 
+  // "in 2 days" beside a time: <span data-relative="ISO-Z">. Empty without
+  // JS, which is fine -- it only repeats what the date already says.
+  document.querySelectorAll('[data-relative]').forEach(function (el) {
+    var when = new Date(el.dataset.relative);
+    if (isNaN(when.getTime()) || !window.Intl || !Intl.RelativeTimeFormat) return;
+    var mins = Math.round((when.getTime() - Date.now()) / 60000);
+    var abs = Math.abs(mins), unit = 'minute', n = mins;
+    if (abs >= 1440) { unit = 'day'; n = Math.round(mins / 1440); }
+    else if (abs >= 60) { unit = 'hour'; n = Math.round(mins / 60); }
+    try {
+      el.textContent = '\u00b7 ' + new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(n, unit);
+    } catch (e) { /* leave it blank */ }
+  });
+
   // --- The event form -----------------------------------------------------
   // <input type="datetime-local"> has no timezone: it hands the server the
   // wall-clock digits and nothing else. So the author types their own local

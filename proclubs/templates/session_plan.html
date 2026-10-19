@@ -10,7 +10,7 @@
     <a class="btn secondary" href="/events/{{ event.id }}">Back to the session</a>
   </div>
 
-  <form method="post" action="/events/{{ event.id }}/plan" class="card stack-form plan-form">
+  <form method="post" action="/events/{{ event.id }}/plan" class="card stack-form plan-form" data-loading="Saving…">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
     <div class="field">
       <label for="objective">Objective <span class="muted">(one line)</span></label>
@@ -43,7 +43,7 @@
   </form>
 
   {% if is_past %}
-    <form method="post" action="/events/{{ event.id }}/plan" class="card stack-form plan-form">
+    <form method="post" action="/events/{{ event.id }}/plan" class="card stack-form plan-form" data-loading="Saving…">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <h2 class="form-subhead">How it went</h2>
       <div class="field">

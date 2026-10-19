@@ -1,0 +1,88 @@
+{# Matchday macros, shared by the home hero, the fixtures list, the event
+   page and the match report. Import with context:
+     {% from "_matchday.html" import scoreboard, event_row with context %}
+
+   split_result('W 3-1') -> ('W', '3-1'); anything unparseable keeps the whole
+   string as the score and an empty letter, so odd hand-typed results still show. #}
+{% from "_ui.html" import result_chip %}
+{% from "_icons.html" import icon as _icon %}
+
+{% macro crest_tile(name, colors=none, mine=false) -%}
+  {%- if mine -%}
+    <span class="crest{{ ' crest-branded' if colors and colors.crest else '' }}"
+          {% if colors and colors.crest %}style="background:{{ colors.crest }};"{% endif %} aria-hidden="true">{{ initials(name) }}</span>
+  {%- else -%}
+    <span class="crest" aria-hidden="true">{{ initials(name) if name else '?' }}</span>
+  {%- endif -%}
+{%- endmacro %}
+
+{# Crest v crest. With a result it becomes a scoreboard: the figure in the
+   middle, the W/D/L chip beneath it. `result` is the stored text ("W 3-1"). #}
+{% macro scoreboard(event, colors=none, result=none, big=true) -%}
+  {%- set r = (result or '') | trim -%}
+  {%- set letter = r[:1] | upper if r[:1] | upper in ('W', 'D', 'L') else '' -%}
+  {%- set score = (r[1:] if letter else r) | trim | replace('-', '–') -%}
+  <div class="mc-matchup{{ ' mc-big' if big }}{{ ' mc-final' if r }}">
+    <div class="mc-team">
+      {{ crest_tile(SITE_NAME, colors, true) }}
+      <span class="mc-team-name">{{ SITE_NAME }}</span>
+    </div>
+    <div class="mc-vs">
+      {%- if r %}
+        <span class="mc-score" aria-label="Final score {{ score }}">{{ score }}</span>
+        {% if letter %}{{ result_chip(letter, 'Win' if letter == 'W' else ('Draw' if letter == 'D' else 'Loss')) }}{% endif %}
+      {%- else %}
+        <span>{{ localtime(event.scheduled_at, 'daymonth') }}</span>
+        <span class="mc-vs-text">v</span>
+        <span>{{ localtime(event.scheduled_at, 'time') }}</span>
+      {%- endif %}
+    </div>
+    <div class="mc-team">
+      {{ crest_tile(event.opponent or event.title) }}
+      <span class="mc-team-name">{{ event.opponent or event.title }}</span>
+    </div>
+  </div>
+{%- endmacro %}
+
+{# One fixture or result row. `upcoming` rows carry the sign-up count and may
+   be flagged is_next; past rows carry the result. #}
+{% macro event_row(e, upcoming=true, counts=none, is_next=false) -%}
+  {%- set r = (e.result or '') | trim -%}
+  {%- set letter = r[:1] | upper if r[:1] | upper in ('W', 'D', 'L') else '' -%}
+  {%- set score = (r[1:] if letter else r) | trim | replace('-', '–') -%}
+  <div class="event-row{{ ' is-next' if is_next }}">
+    <div class="event-date">
+      <div class="month">{{ localtime(e.scheduled_at, 'month') }}</div>
+      <div class="day">{{ localtime(e.scheduled_at, 'day') }}</div>
+    </div>
+    {% if e.image %}
+      <img class="event-thumb" src="{{ e.image }}" alt="{{ e.title }}{{ ' vs ' ~ e.opponent if e.opponent }}" loading="lazy" decoding="async" />
+    {% endif %}
+    <div class="event-info">
+      <div class="event-tags">
+        <span class="event-type-badge">{{ e.event_type }}</span>
+        {% if is_next %}<span class="next-pill">Next</span>{% endif %}
+      </div>
+      <h3><a href="/events/{{ e.id }}">{{ e.title }}{% if e.opponent %} vs {{ e.opponent }}{% endif %}</a></h3>
+      <p>
+        {{ localtime(e.scheduled_at, 'short' if upcoming else 'date') }}
+        {% if upcoming %}<span class="event-rel" data-relative="{{ e.scheduled_at.isoformat() }}Z"></span>{% endif %}
+        {% if e.description %}<span class="event-desc"> &middot; {{ e.description }}</span>{% endif %}
+      </p>
+    </div>
+    {% if upcoming %}
+      {% if counts %}
+        <div class="event-signup-count" title="{{ counts.going }} going{{ ', ' ~ counts.maybe ~ ' maybe' if counts.maybe }}">
+          {{ _icon('squad') }}
+          <strong>{{ counts.going }}</strong><span>going</span>
+          {% if counts.maybe %}<em>{{ counts.maybe }} maybe</em>{% endif %}
+        </div>
+      {% endif %}
+    {% elif r %}
+      <div class="event-result">
+        {% if letter %}{{ result_chip(letter, ('Win' if letter == 'W' else ('Draw' if letter == 'D' else 'Loss')) ~ ' ' ~ score) }}{% endif %}
+        <span class="event-score">{{ score }}</span>
+      </div>
+    {% endif %}
+  </div>
+{%- endmacro %}

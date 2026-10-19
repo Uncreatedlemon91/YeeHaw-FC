@@ -152,7 +152,11 @@
   </div>
 
   {# --- Club operations and live standing ---------------------------------- #}
-  <div class="ops-grid" id="the-club">
+  {% set facts = [('When we play', profile.match_nights), ('How we play', profile.play_style),
+                  ('Region', profile.region), ('Platform', profile.platform)] %}
+  {% set has_facts = (facts | selectattr(1) | list) | length > 0 %}
+  {% set show_standing = stats_teaser or has_facts %}
+  <div class="ops-grid{{ '' if show_standing else ' ops-grid-solo' }}" id="the-club">
     <section class="ops-panel">
       <div class="ops-head">
         <div>
@@ -219,6 +223,7 @@
       </div>
     </section>
 
+    {% if show_standing %}
     <section class="standing-panel">
       <div class="standing-panel-head">
         <h2>Club standing</h2>
@@ -231,6 +236,7 @@
           <span class="kicker kicker-dim">EA FC Pro Clubs · {{ platform_label }}</span>
         </div>
       </div>
+      {% if stats_teaser %}
       <div class="standing-figures">
         <div>
           <span class="ops-label">Skill rating</span>
@@ -250,15 +256,15 @@
         </div>
       </div>
 
-      {% set facts = [('When we play', profile.match_nights), ('How we play', profile.play_style),
-                      ('Region', profile.region), ('Platform', profile.platform)] %}
-      {% if facts | selectattr(1) | list %}
+      {% endif %}
+      {% if has_facts %}
         <dl class="kv standing-facts">
           {% for label, value in facts if value %}<div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>{% endfor %}
         </dl>
       {% endif %}
       <p class="standing-foot kicker kicker-dim">{{ icon('clock') }} Live from EA's Pro Clubs data</p>
     </section>
+    {% endif %}
   </div>
 
   {% if staff %}

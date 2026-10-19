@@ -476,6 +476,11 @@ def home(request: Request):
         like_counts = services.like_counts_for(session, thumbnail_article_ids)
         comment_counts = services.comment_counts_for(session, thumbnail_article_ids)
         upcoming = services.list_events(session, upcoming_only=True, limit=1)
+        next_counts = services.signup_counts(session, upcoming[0].id) if upcoming else None
+        # Played fixtures that have a result, newest first: the score banner
+        # and the last-five form strip on the home page.
+        results = [e for e in services.list_events(session, limit=40)
+                   if e.scheduled_at < datetime.utcnow() and (e.result or "").strip()][:5]
         # Confirmed signings and departures only -- see
         # services.public_roster_moves for what is deliberately left out.
         squad_moves = services.public_roster_moves(session, limit=6)
@@ -496,6 +501,9 @@ def home(request: Request):
             transfers=transfers,
             highlights=highlights,
             next_event=upcoming[0] if upcoming else None,
+            next_counts=next_counts,
+            last_result=results[0] if results else None,
+            form_results=results,
             squad_moves=squad_moves,
             featured_streamer=featured_streamer,
             featured_streamer_live=bool(featured_streamer and featured_streamer.twitch_login in live),

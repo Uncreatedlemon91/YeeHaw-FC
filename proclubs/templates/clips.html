@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_ui.html" import empty_state %}
 {% block title %}Clips{% endblock %}
 {% block content %}
 <div class="page">
@@ -10,14 +11,19 @@
   </div>
 
   {% if not clips_enabled %}
-    <div class="card empty-state">Clip syncing isn't configured on this deployment yet.</div>
+    <div class="card">
+      {{ empty_state('media', 'Clips aren\'t set up yet', 'Highlights will show up here once the club\'s Discord is connected.') }}
+      {% if is_staff %}<p class="config-hint">Staff: set the Discord bot token and clips channel in the environment to enable syncing.</p>{% endif %}
+    </div>
   {% elif not clips %}
-    <div class="card empty-state">No clips yet -- post a video in the configured Discord channel and it'll show up here.</div>
+    <div class="card">
+      {{ empty_state('media', 'No clips yet', 'Post a video in the clips channel on Discord and it will show up here.') }}
+    </div>
   {% else %}
     <div class="clip-grid">
       {% for c in clips %}
         <div class="card clip-card">
-          <video class="clip-video" controls preload="metadata" src="{{ c.video_url }}"></video>
+          <video class="clip-video" controls preload="none"{% if c.thumbnail_url is defined and c.thumbnail_url %} poster="{{ c.thumbnail_url }}"{% endif %} aria-label="{{ c.title or 'Clip' }}{% if c.author_name %} by {{ c.author_name }}{% endif %}" title="{{ c.title or 'Clip' }}" src="{{ c.video_url }}"></video>
           <div class="clip-info">
             {% if c.title %}<p class="clip-title">{{ c.title }}</p>{% endif %}
             <div class="article-meta">
