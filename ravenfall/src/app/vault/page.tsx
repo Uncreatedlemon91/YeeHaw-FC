@@ -47,7 +47,7 @@ export default async function Vault() {
           if (!list.length) return null;
           return (
             <section key={cat}>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.25em] text-accent">{cat}</h2>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-label text-accent">{cat}</h2>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {list.map((d) => (
                   <Link key={d.id} href={`/vault/${d.slug}`} className="group flex flex-col gap-2 rounded-lg border bg-card p-4 hover:border-accent/50">

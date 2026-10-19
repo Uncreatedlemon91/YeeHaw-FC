@@ -1,10 +1,10 @@
-import { Menu } from "lucide-react";
 import Link from "next/link";
 import { UNIT } from "@/config/unit";
 import type { SessionUser } from "@/lib/auth";
 import { hasPerm, topLabel, type Perm } from "@/lib/permissions";
 import { SignInButton, SignOutButton } from "./auth-buttons";
 import { Logo } from "./logo";
+import { NavMenu } from "./nav-menu";
 import { Button } from "./ui/button";
 
 type Item = { href: string; label: string; perm?: Perm; guestOnly?: boolean };
@@ -24,22 +24,28 @@ export function Nav({ user }: { user: SessionUser | null }) {
   const items = ITEMS.filter((i) =>
     i.guestOnly ? !hasPerm(user?.perms, "OPERATOR") : !i.perm || hasPerm(user?.perms, i.perm),
   );
-  const links = items.map((i) => (
-    <Link
-      key={i.href}
-      href={i.href}
-      className="rounded px-3 py-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground hover:bg-secondary hover:text-foreground"
-    >
-      {i.label}
-    </Link>
-  ));
+  const links = items.map((i) =>
+    i.guestOnly ? (
+      <Button key={i.href} asChild variant="accent" size="sm" className="mx-1 my-1 md:my-0">
+        <Link href={i.href}>{i.label}</Link>
+      </Button>
+    ) : (
+      <Link
+        key={i.href}
+        href={i.href}
+        className="rounded px-3 py-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {i.label}
+      </Link>
+    ),
+  );
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4">
-        <Link href="/" className="flex items-center gap-2 text-accent">
+        <Link href="/" className="flex items-center gap-2 rounded text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Logo />
-          <span className="font-display text-lg font-bold uppercase tracking-[0.15em] text-foreground">
+          <span className="font-display text-lg font-bold uppercase tracking-display text-foreground">
             {UNIT.siteName}
           </span>
         </Link>
@@ -49,7 +55,7 @@ export function Nav({ user }: { user: SessionUser | null }) {
             <>
               <div className="text-right leading-tight">
                 <div className="text-sm font-semibold">{user.name}</div>
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{topLabel(user.perms)}</div>
+                <div className="text-micro uppercase tracking-wider text-muted-foreground">{topLabel(user.perms)}</div>
               </div>
               <SignOutButton />
             </>
@@ -57,20 +63,11 @@ export function Nav({ user }: { user: SessionUser | null }) {
             <SignInButton size="sm" />
           )}
         </div>
-        {/* Mobile: a no-JS disclosure menu. */}
-        <details className="relative ml-auto md:hidden">
-          <summary className="list-none">
-            <Button asChild variant="ghost" size="icon">
-              <span aria-label="Menu">
-                <Menu />
-              </span>
-            </Button>
-          </summary>
-          <div className="absolute right-0 mt-2 flex w-56 flex-col rounded-md border bg-card p-2 shadow-lg">
-            {links}
-            <div className="mt-2 border-t pt-2">{user ? <SignOutButton className="w-full" /> : <SignInButton size="sm" className="w-full" />}</div>
-          </div>
-        </details>
+        {/* Mobile: a <details> disclosure (no-JS safe) that closes on navigation / outside click. */}
+        <NavMenu>
+          {links}
+          <div className="mt-2 border-t pt-2">{user ? <SignOutButton className="w-full" /> : <SignInButton size="sm" className="w-full" />}</div>
+        </NavMenu>
       </div>
     </header>
   );

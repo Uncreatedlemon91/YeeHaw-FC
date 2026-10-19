@@ -26,7 +26,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
         roles there.
       </p>
       {error && (
-        <p className="mt-6 w-full rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-red-300">
+        <p className="mt-6 w-full rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive-fg">
           Sign-in failed ({error}). Try again, and make sure you approve the Discord prompt.
         </p>
       )}

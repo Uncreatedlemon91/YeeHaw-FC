@@ -36,7 +36,7 @@ export function RecordTimeline({ records, canDelete }: { records: RecordRow[]; c
             aria-pressed={filter === t}
             onClick={() => setFilter(t)}
             className={cn(
-              "rounded-sm border px-2 py-1 text-[11px] font-semibold uppercase tracking-wider",
+              "rounded-sm border px-2 py-1 text-micro font-semibold uppercase tracking-wider",
               filter === t ? "border-accent bg-accent/15 text-accent" : "text-muted-foreground hover:text-foreground",
             )}
           >
@@ -56,9 +56,9 @@ export function RecordTimeline({ records, canDelete }: { records: RecordRow[]; c
               </span>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="typed text-[11px] uppercase text-muted-foreground">
+                  <div className="typed text-micro uppercase text-muted-foreground">
                     {r.date} · {s.label}
-                    {RESTRICTED.includes(r.type) && <span className="ml-2 text-red-400">[Restricted]</span>}
+                    {RESTRICTED.includes(r.type) && <span className="ml-2 text-destructive-fg">[Restricted]</span>}
                   </div>
                   <div className="font-semibold">{r.title}</div>
                   {r.description && <p className="mt-0.5 whitespace-pre-wrap text-sm text-muted-foreground">{r.description}</p>}

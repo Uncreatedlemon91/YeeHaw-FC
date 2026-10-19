@@ -10,7 +10,7 @@ export const metadata = { title: "New document" };
 export default async function NewDoc() {
   await requireUser("INSTRUCTOR", "/vault/new");
   return (
-    <Container className="max-w-4xl">
+    <Container size="narrow">
       <PageHeader eyebrow="Vault" title="New document" />
       <Card>
         <CardContent className="py-6">

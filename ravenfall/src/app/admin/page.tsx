@@ -70,7 +70,7 @@ export default async function Admin() {
   ];
 
   return (
-    <Container className="max-w-5xl">
+    <Container>
       <PageHeader eyebrow="Command" title="Admin" description="Discord integration status and one-off setup actions." />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -82,7 +82,7 @@ export default async function Admin() {
             {checks.map(([label, ok, key]) => (
               <div key={label} className="flex items-center justify-between gap-3 text-sm">
                 <span className="flex items-center gap-2">
-                  {ok ? <CheckCircle2 className="size-4 text-green-400" /> : <XCircle className="size-4 text-red-400" />}
+                  {ok ? <CheckCircle2 className="size-4 text-success-fg" /> : <XCircle className="size-4 text-destructive-fg" />}
                   {label}
                 </span>
                 <code className="text-xs text-muted-foreground">{key}</code>
@@ -98,7 +98,7 @@ export default async function Admin() {
           </CardHeader>
           <CardContent className="flex flex-col gap-2 text-sm">
             <span className="flex items-center gap-2">
-              {gatewayOnline ? <CheckCircle2 className="size-4 text-green-400" /> : <XCircle className="size-4 text-red-400" />}
+              {gatewayOnline ? <CheckCircle2 className="size-4 text-success-fg" /> : <XCircle className="size-4 text-destructive-fg" />}
               {gatewayOnline ? `Online as ${gateway!.tag}` : "Offline"}
             </span>
             {gateway && (
@@ -125,7 +125,7 @@ export default async function Admin() {
           </CardHeader>
           <CardContent>
             <ActionForm action={postRecruitmentMessage}>
-              <SubmitButton variant="accent" className="self-start" disabled={!channels.welcome}>
+              <SubmitButton className="self-start" disabled={!channels.welcome}>
                 Post to welcome channel
               </SubmitButton>
             </ActionForm>
@@ -157,7 +157,7 @@ export default async function Admin() {
         </CardHeader>
         <CardContent>
           {channelsError ? (
-            <p className="text-sm text-red-300">{channelsError}</p>
+            <p className="text-sm text-destructive-fg">{channelsError}</p>
           ) : channelGroups.length ? (
             <ChannelForm
               key={JSON.stringify(channels)}
@@ -186,7 +186,7 @@ export default async function Admin() {
         </CardHeader>
         <CardContent>
           {rolesError ? (
-            <p className="text-sm text-red-300">{rolesError}</p>
+            <p className="text-sm text-destructive-fg">{rolesError}</p>
           ) : roles.length ? (
             <RoleMappingForm
               key={JSON.stringify(cfg)}

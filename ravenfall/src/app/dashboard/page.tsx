@@ -126,7 +126,7 @@ export default async function Dashboard() {
             <CardContent className="flex flex-col gap-3">
               {feed.map((r) => (
                 <Link key={r.id} href={`/roster/${r.userId}`} className="flex items-center gap-3 text-sm hover:text-accent">
-                  <Avatar discordId={r.user.discordId} avatar={r.user.avatar} size={24} />
+                  <Avatar discordId={r.user.discordId} avatar={r.user.avatar} name={r.user.callsign ?? r.user.discordUsername} size={24} />
                   <span>
                     <span className="font-semibold">{r.user.callsign ?? r.user.discordUsername}</span>{" "}
                     <span className="text-muted-foreground">— {r.title}</span>
@@ -141,7 +141,7 @@ export default async function Dashboard() {
 
         <Card className="self-start">
           <CardContent className="flex flex-col items-center gap-3 py-6 text-center">
-            <Avatar discordId={profile.discordId} avatar={profile.avatar} size={72} className="rounded-md" />
+            <Avatar discordId={profile.discordId} avatar={profile.avatar} name={profile.callsign ?? profile.discordUsername} size={72} className="rounded-md" />
             <div>
               <div className="text-xs uppercase tracking-widest text-accent">{profile.rank ? rankName(profile.rank) : "Unranked"}</div>
               <div className="font-display text-2xl font-bold uppercase">{profile.callsign ?? profile.discordUsername}</div>

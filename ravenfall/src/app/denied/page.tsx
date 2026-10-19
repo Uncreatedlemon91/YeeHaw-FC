@@ -9,7 +9,7 @@ export default async function Denied() {
   const user = await getSessionUser();
   return (
     <Container className="max-w-lg py-24 text-center">
-      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-destructive">Restricted</p>
+      <p className="text-xs font-semibold uppercase tracking-label text-destructive-fg">Restricted</p>
       <h1 className="mt-2 text-3xl font-bold uppercase">Access denied</h1>
       <p className="mt-4 text-sm text-muted-foreground">
         {user?.inGuild === false

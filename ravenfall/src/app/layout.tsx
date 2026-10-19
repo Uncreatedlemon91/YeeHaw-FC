@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   return (
-    <html lang="en" className={`dark ${body.variable} ${heading.variable}`}>
+    <html lang="en" className={`${body.variable} ${heading.variable}`}>
       <body className="flex min-h-screen flex-col font-sans">
         <Nav user={user} />
         <main className="flex-1">{children}</main>

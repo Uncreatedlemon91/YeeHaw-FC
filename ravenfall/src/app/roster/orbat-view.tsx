@@ -47,7 +47,7 @@ export async function OrbatView({ me }: { me: { id: string } }) {
             <header className="flex items-start justify-between gap-3 border-b border-foreground/10 px-4 py-3">
               <div>
                 <h2 className="text-lg font-bold uppercase tracking-wider">{s.name}</h2>
-                <p className="typed text-[11px] uppercase text-accent">“{s.callsign}”</p>
+                <p className="typed text-micro uppercase text-accent">“{s.callsign}”</p>
                 <p className="mt-1 text-xs text-muted-foreground">{s.blurb}</p>
               </div>
               <div className="text-right">
@@ -66,7 +66,7 @@ export async function OrbatView({ me }: { me: { id: string } }) {
                   <div key={b.role}>
                     <div className="mb-1.5 flex items-center justify-between">
                       <span className="text-xs font-semibold uppercase tracking-wider">{b.role}</span>
-                      <span className="typed text-[10px] text-muted-foreground">
+                      <span className="typed text-micro text-muted-foreground">
                         {role?.code} · {b.holders.length}/{b.cap}
                       </span>
                     </div>
@@ -93,7 +93,7 @@ export async function OrbatView({ me }: { me: { id: string } }) {
                           <Link
                             key={`v${i}`}
                             href={`/roster/${me.id}?tab=billet&squad=${encodeURIComponent(s.name)}&role=${encodeURIComponent(b.role)}`}
-                            className="flex items-center gap-1.5 rounded-sm border border-dashed border-success/50 px-2 py-1.5 text-xs uppercase tracking-wider text-green-300/80 hover:bg-success/10"
+                            className="flex items-center gap-1.5 rounded-sm border border-dashed border-success/50 px-2 py-1.5 text-xs uppercase tracking-wider text-success-fg hover:bg-success/10"
                           >
                             <Plus className="size-3" /> Vacant · request
                           </Link>
@@ -114,7 +114,7 @@ export async function OrbatView({ me }: { me: { id: string } }) {
 
       {pool.length > 0 && (
         <section className="mt-6 rounded-lg border p-4">
-          <h2 className="mb-1 text-sm font-semibold uppercase tracking-[0.2em]">Replacement pool</h2>
+          <h2 className="mb-1 text-sm font-semibold uppercase tracking-label">Replacement pool</h2>
           <p className="mb-3 text-xs text-muted-foreground">Members with no billet, or a role their element has no slot for.</p>
           <div className="flex flex-wrap gap-1.5">
             {pool.map((m) => (

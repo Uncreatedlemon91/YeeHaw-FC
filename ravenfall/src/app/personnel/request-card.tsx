@@ -47,7 +47,7 @@ export function RequestCard({
             </div>
             {showMember && r.user && (
               <Link href={`/roster/${r.user.id}?tab=requests`} className="mt-1 flex items-center gap-2 text-sm hover:text-accent">
-                <Avatar discordId={r.user.discordId} avatar={r.user.avatar} size={18} />
+                <Avatar discordId={r.user.discordId} avatar={r.user.avatar} name={r.user.callsign ?? r.user.discordUsername} size={18} />
                 {r.user.rank && <span className="text-muted-foreground">{r.user.rank}</span>}
                 <span className="font-semibold">{r.user.callsign ?? r.user.discordUsername}</span>
                 <span className="text-muted-foreground">{[r.user.squad, r.user.unitRole].filter(Boolean).join(" · ")}</span>
@@ -55,7 +55,7 @@ export function RequestCard({
             )}
             <div className="typed mt-1 text-sm">{describe(r)}</div>
             {showNotes && r.reason && <p className="mt-1 text-sm text-muted-foreground">“{r.reason}”</p>}
-            <div className="typed mt-1 text-[11px] uppercase text-muted-foreground">
+            <div className="typed mt-1 text-micro uppercase text-muted-foreground">
               Filed {fmtDate(r.createdAt)}
               {r.decidedAt && r.status !== "CANCELLED" && (
                 <> · Decided {fmtDate(r.decidedAt)}{r.reviewedBy && ` by ${r.reviewedBy.callsign ?? r.reviewedBy.discordUsername}`}</>

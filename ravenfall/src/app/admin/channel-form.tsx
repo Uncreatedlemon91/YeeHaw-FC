@@ -28,7 +28,7 @@ export function ChannelForm({
           </Field>
         ))}
       </div>
-      <SubmitButton variant="accent" className="self-start" pendingText="Saving…">
+      <SubmitButton className="self-start" pendingText="Saving…">
         Save channels
       </SubmitButton>
     </ActionForm>

@@ -1,5 +1,11 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+// Teach twMerge our custom tokens (globals.css), or it mistakes text-micro for
+// a text colour and drops it when merged with e.g. text-success-fg.
+const twMerge = extendTailwindMerge({
+  extend: { classGroups: { "font-size": [{ text: ["micro"] }], tracking: [{ tracking: ["label", "display"] }] } },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

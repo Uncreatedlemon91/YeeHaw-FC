@@ -39,7 +39,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
   const groups = ORDER.map((s) => ({ status: s, list: event.attendances.filter((a) => a.status === s) })).filter((g) => g.list.length);
 
   return (
-    <Container className="max-w-5xl">
+    <Container>
       <PageHeader
         eyebrow={fmt(event.startTime, "EEEE d MMMM yyyy")}
         title={event.title}
@@ -52,7 +52,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
                 </Link>
               </Button>
               {started && (
-                <Button asChild size="sm" variant="accent">
+                <Button asChild size="sm">
                   <Link href={`/ops/${event.id}/debrief`}>
                     <ClipboardList /> {event.debrief ? "Revise AAR" : "File AAR"}
                   </Link>
@@ -150,7 +150,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
                     <div className="flex flex-col gap-1.5">
                       {g.list.map((a) => (
                         <Link key={a.id} href={`/roster/${a.userId}`} className="flex items-center gap-2 text-sm hover:text-accent">
-                          <Avatar discordId={a.user.discordId} avatar={a.user.avatar} size={20} />
+                          <Avatar discordId={a.user.discordId} avatar={a.user.avatar} name={a.user.callsign ?? a.user.discordUsername} size={20} />
                           {a.user.rank && <span className="text-xs text-muted-foreground">{a.user.rank}</span>}
                           {a.user.callsign ?? a.user.discordUsername}
                         </Link>

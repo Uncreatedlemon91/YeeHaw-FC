@@ -26,7 +26,7 @@ export default async function Doc({ params }: { params: Promise<{ slug: string }
   const mine = doc.holders.find((h) => h.userId === me.id);
 
   return (
-    <Container className="max-w-5xl">
+    <Container>
       <PageHeader
         eyebrow={`${doc.category} · v${doc.version}`}
         title={doc.title}
@@ -64,7 +64,7 @@ export default async function Doc({ params }: { params: Promise<{ slug: string }
             <CardContent className="flex flex-col gap-1.5">
               {doc.holders.map((h) => (
                 <Link key={h.id} href={`/roster/${h.userId}`} className="flex items-center gap-2 text-sm hover:text-accent">
-                  <Avatar discordId={h.user.discordId} avatar={h.user.avatar} size={20} />
+                  <Avatar discordId={h.user.discordId} avatar={h.user.avatar} name={h.user.callsign ?? h.user.discordUsername} size={20} />
                   {h.user.rank && <span className="text-xs text-muted-foreground">{h.user.rank}</span>}
                   {h.user.callsign ?? h.user.discordUsername}
                 </Link>

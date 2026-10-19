@@ -166,7 +166,7 @@ export function RoleMappingForm({
         </Section>
       ))}
 
-      <SubmitButton variant="accent" className="self-start" pendingText="Saving…">
+      <SubmitButton className="self-start" pendingText="Saving…">
         Save role mapping
       </SubmitButton>
     </ActionForm>

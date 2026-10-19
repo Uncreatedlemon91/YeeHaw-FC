@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Container } from "@/components/container";
 import { PageHeader } from "@/components/page-header";
 import { AttendanceBadge, EventTypeBadge } from "@/components/status-badge";
+import { TabLinks } from "@/components/tab-links";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -40,18 +41,6 @@ export default async function Ops({ searchParams }: { searchParams: Promise<{ vi
     events = await prisma.event.findMany({ where: { startTime: { gte: now } }, orderBy: { startTime: "asc" }, take: 50, include });
   }
 
-  const tab = (v: string, label: string, Icon: typeof List) => (
-    <Link
-      href={`/ops?view=${v}`}
-      className={cn(
-        "flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wider",
-        view === v ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground",
-      )}
-    >
-      <Icon className="size-3.5" /> {label}
-    </Link>
-  );
-
   return (
     <Container>
       <PageHeader
@@ -68,11 +57,14 @@ export default async function Ops({ searchParams }: { searchParams: Promise<{ vi
           )
         }
       />
-      <div className="mb-4 flex gap-1">
-        {tab("upcoming", "Upcoming", List)}
-        {tab("calendar", "Calendar", CalendarDays)}
-        {tab("past", "Past & AARs", List)}
-      </div>
+      <TabLinks
+        label="Operations view"
+        items={[
+          { href: "/ops?view=upcoming", label: "Upcoming", icon: <List className="size-3.5" />, active: view === "upcoming" },
+          { href: "/ops?view=calendar", label: "Calendar", icon: <CalendarDays className="size-3.5" />, active: view === "calendar" },
+          { href: "/ops?view=past", label: "Past & AARs", icon: <List className="size-3.5" />, active: view === "past" },
+        ]}
+      />
 
       {view === "calendar" ? (
         <MonthGrid month={month} events={events} />
@@ -96,9 +88,9 @@ function EventRow({ e, past }: { e: Row; past: boolean }) {
   return (
     <Link href={`/ops/${e.id}`} className="group flex items-stretch overflow-hidden rounded-lg border bg-card hover:border-accent/50">
       <div className="flex w-20 shrink-0 flex-col items-center justify-center border-r bg-background/40 py-3">
-        <span className="text-[11px] font-semibold uppercase tracking-widest text-accent">{fmt(e.startTime, "MMM")}</span>
+        <span className="text-micro font-semibold uppercase tracking-widest text-accent">{fmt(e.startTime, "MMM")}</span>
         <span className="font-display text-3xl font-bold leading-none">{fmt(e.startTime, "d")}</span>
-        <span className="text-[11px] uppercase text-muted-foreground">{fmt(e.startTime, "EEE")}</span>
+        <span className="text-micro uppercase text-muted-foreground">{fmt(e.startTime, "EEE")}</span>
       </div>
       <div className="flex flex-1 flex-col justify-center gap-1 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -153,7 +145,7 @@ function MonthGrid({ month, events }: { month: string; events: Row[] }) {
           </Link>
         </Button>
       </div>
-      <div className="grid grid-cols-7 border-b bg-background/40 text-center text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <div className="grid grid-cols-7 border-b bg-background/40 text-center text-micro font-semibold uppercase tracking-widest text-muted-foreground">
         {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
           <div key={d} className="py-2">
             {d}
@@ -176,7 +168,7 @@ function MonthGrid({ month, events }: { month: string; events: Row[] }) {
                         href={`/ops/${e.id}`}
                         title={`${e.title} — ${fmt(e.startTime, "HH:mm")}`}
                         className={cn(
-                          "truncate rounded-sm border-l-2 bg-secondary px-1 py-0.5 text-[11px] hover:bg-secondary/60",
+                          "truncate rounded-sm border-l-2 bg-secondary px-1 py-0.5 text-micro hover:bg-secondary/60",
                           e.type === "OP" ? "border-destructive" : e.type === "TRAINING" ? "border-primary" : "border-accent",
                         )}
                       >

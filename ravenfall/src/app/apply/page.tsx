@@ -35,7 +35,7 @@ export default async function Apply() {
 
   if (hasPerm(user.perms, "OPERATOR")) {
     return (
-      <Status icon={<CheckCircle2 className="size-10 text-green-400" />} title="You're already enlisted">
+      <Status icon={<CheckCircle2 className="size-10 text-success-fg" />} title="You're already enlisted">
         <Button asChild>
           <Link href="/dashboard">Go to dashboard</Link>
         </Button>
@@ -60,7 +60,7 @@ export default async function Apply() {
   }
   if (latest?.status === "APPROVED") {
     return (
-      <Status icon={<CheckCircle2 className="size-10 text-green-400" />} title="Approved — welcome aboard">
+      <Status icon={<CheckCircle2 className="size-10 text-success-fg" />} title="Approved — welcome aboard">
         <p className="text-sm text-muted-foreground">
           Your roles may take up to five minutes to reach the site. Sign out and back in to pick them up immediately.
         </p>
@@ -70,7 +70,7 @@ export default async function Apply() {
   const reapplyAt = latest ? new Date(latest.updatedAt.getTime() + REAPPLY_DAYS * 864e5) : null;
   if (latest?.status === "DENIED" && reapplyAt && reapplyAt > new Date()) {
     return (
-      <Status icon={<XCircle className="size-10 text-red-400" />} title="Application not accepted">
+      <Status icon={<XCircle className="size-10 text-destructive-fg" />} title="Application not accepted">
         <p className="text-sm text-muted-foreground">
           Thanks for your interest. You can apply again from {fmt(reapplyAt, "d MMM yyyy")}.
         </p>
@@ -79,7 +79,7 @@ export default async function Apply() {
   }
 
   return (
-    <Container className="max-w-2xl">
+    <Container size="narrow">
       <PageHeader
         eyebrow="Recruitment"
         title="Application"

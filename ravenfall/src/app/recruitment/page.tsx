@@ -4,13 +4,13 @@ import { Avatar } from "@/components/avatar";
 import { Container } from "@/components/container";
 import { PageHeader } from "@/components/page-header";
 import { AppStatusBadge } from "@/components/status-badge";
+import { TabLinks } from "@/components/tab-links";
 import { Card } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { answersOf } from "@/lib/recruitment";
 import { fmt } from "@/lib/time";
-import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Recruitment" };
 
@@ -39,20 +39,10 @@ export default async function Recruitment({ searchParams }: { searchParams: Prom
         title="Recruitment"
         description="Applications from /apply. Decisions here and on the Discord board stay in sync."
       />
-      <div className="mb-4 flex gap-1">
-        {TABS.map((t) => (
-          <Link
-            key={t}
-            href={`/recruitment?status=${t}`}
-            className={cn(
-              "rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wider",
-              t === status ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {t} <span className="ml-1 text-muted-foreground">{count(t)}</span>
-          </Link>
-        ))}
-      </div>
+      <TabLinks
+        label="Application status"
+        items={TABS.map((t) => ({ href: `/recruitment?status=${t}`, label: t, count: count(t), active: t === status }))}
+      />
       <Card>
         <Table>
           <THead>
@@ -72,7 +62,7 @@ export default async function Recruitment({ searchParams }: { searchParams: Prom
                 <TR key={a.id}>
                   <TD>
                     <Link href={`/recruitment/${a.id}`} className="flex items-center gap-2 font-semibold hover:text-accent">
-                      <Avatar discordId={a.discordId} avatar={a.user.avatar} size={24} />
+                      <Avatar discordId={a.discordId} avatar={a.user.avatar} name={a.discordUsername} size={24} />
                       {a.discordUsername}
                     </Link>
                   </TD>

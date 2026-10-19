@@ -42,7 +42,7 @@ export default async function Home() {
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-background/40 to-background" />
         <div className="pointer-events-none absolute -right-24 -top-24 size-[28rem] rounded-full bg-primary/10 blur-3xl" />
         <Container className="relative py-20 sm:py-28">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-accent">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-label text-accent">
             <Logo className="size-5" /> {UNIT.siteName}
           </div>
           <h1 className="mt-4 max-w-3xl text-5xl font-bold uppercase leading-[0.95] sm:text-7xl">
@@ -65,7 +65,7 @@ export default async function Home() {
           {s.nextOp && (
             <div className="mt-10 inline-flex items-center gap-3 rounded-md border bg-card/70 px-4 py-2 text-sm">
               <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-75" />
+                <span className="absolute inline-flex size-full animate-ping rounded-full motion-reduce:animate-none bg-accent opacity-75" />
                 <span className="relative inline-flex size-2 rounded-full bg-accent" />
               </span>
               <span className="text-muted-foreground">Next deployment:</span>
@@ -84,7 +84,7 @@ export default async function Home() {
           ].map(([label, n]) => (
             <div key={label as string}>
               <div className="font-display text-3xl font-bold text-accent sm:text-4xl">{n}</div>
-              <div className="mt-1 text-[11px] uppercase tracking-widest text-muted-foreground">{label}</div>
+              <div className="mt-1 text-micro uppercase tracking-widest text-muted-foreground">{label}</div>
             </div>
           ))}
         </Container>
@@ -112,7 +112,7 @@ export default async function Home() {
           <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-3">
             {SQUADS.map((sq) => (
               <div key={sq.name} className="bg-card p-6">
-                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">{sq.name}</div>
+                <div className="text-xs font-semibold uppercase tracking-label text-accent">{sq.name}</div>
                 <p className="mt-2 text-sm text-muted-foreground">{sq.blurb}</p>
               </div>
             ))}
@@ -169,7 +169,7 @@ export default async function Home() {
 function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
     <div className="mb-8">
-      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-accent">{eyebrow}</p>
+      <p className="text-xs font-semibold uppercase tracking-label text-accent">{eyebrow}</p>
       <h2 className="mt-1 text-3xl font-bold uppercase">{title}</h2>
     </div>
   );

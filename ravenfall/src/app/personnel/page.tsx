@@ -4,6 +4,7 @@ import { Avatar } from "@/components/avatar";
 import { Container } from "@/components/container";
 import { RankInsignia } from "@/components/insignia";
 import { PageHeader } from "@/components/page-header";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { rankIndex } from "@/config/unit";
 import { requireUser } from "@/lib/auth";
@@ -114,7 +115,7 @@ export default async function S1Desk() {
             <Card>
               <CardHeader>
                 <CardTitle>
-                  In-tray {pending > 0 && <span className="ml-2 rounded-sm bg-accent px-1.5 text-xs text-accent-foreground">{pending}</span>}
+                  In-tray {pending > 0 && <Badge variant="accent" className="ml-2">{pending}</Badge>}
                 </CardTitle>
                 <CardDescription>
                   {command
@@ -189,7 +190,7 @@ export default async function S1Desk() {
                   const current = l.startDate! <= now;
                   return (
                     <Link key={l.id} href={`/roster/${l.userId}?tab=requests`} className="flex items-center gap-3 text-sm hover:text-accent">
-                      <Avatar discordId={l.user.discordId} avatar={l.user.avatar} size={24} />
+                      <Avatar discordId={l.user.discordId} avatar={l.user.avatar} name={l.user.callsign ?? l.user.discordUsername} size={24} />
                       <span className="flex-1">
                         <span className="font-semibold">{l.user.callsign ?? l.user.discordUsername}</span>
                         <span className="typed block text-xs text-muted-foreground">

@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { Container } from "@/components/container";
+import { TabLinks } from "@/components/tab-links";
 import { PageHeader } from "@/components/page-header";
 import { requireUser } from "@/lib/auth";
-import { cn } from "@/lib/utils";
 import { ListView, type ListQuery } from "./list-view";
 import { OrbatView } from "./orbat-view";
 
@@ -32,21 +31,11 @@ export default async function Roster({ searchParams }: { searchParams: Promise<Q
         title="Roster"
         description="Every member by element and billet, or as a searchable list."
       />
-      <nav aria-label="Roster view" className="mb-5 flex gap-1 border-b px-1">
-        {VIEWS.map((v) => (
-          <Link
-            key={v.id}
-            href={v.href}
-            aria-current={v.id === view ? "page" : undefined}
-            className={cn(
-              "-mb-px rounded-t-md border border-b-0 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition-colors",
-              v.id === view ? "jacket border-border text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {v.label}
-          </Link>
-        ))}
-      </nav>
+      <TabLinks
+        label="Roster view"
+        variant="folder"
+        items={VIEWS.map((v) => ({ href: v.href, label: v.label, active: v.id === view }))}
+      />
       {view === "list" ? <ListView sp={sp} /> : <OrbatView me={me} />}
     </Container>
   );

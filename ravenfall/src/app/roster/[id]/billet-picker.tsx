@@ -3,6 +3,7 @@
 import { Check, Lock } from "lucide-react";
 import { useState } from "react";
 import { SubmitButton } from "@/components/action-form";
+import { ChipCheckbox } from "@/components/chip";
 import { Field, Textarea } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { requestRole } from "../../personnel/actions";
@@ -111,7 +112,7 @@ export function BilletPicker({
               >
                 <div className="flex w-full items-center justify-between gap-2">
                   <span className="font-semibold">{b.role}</span>
-                  <span className="typed text-[11px] text-muted-foreground">{r?.code}</span>
+                  <span className="typed text-micro text-muted-foreground">{r?.code}</span>
                 </div>
                 {/* Slot pips: filled, open. */}
                 <div className="flex gap-1" aria-label={`${b.filled} of ${b.cap} filled`}>
@@ -119,9 +120,9 @@ export function BilletPicker({
                     <span key={i} className={cn("h-1.5 w-4 rounded-[1px]", i < b.filled ? "bg-foreground/60" : "border border-foreground/30")} />
                   ))}
                 </div>
-                <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                <span className="text-micro uppercase tracking-wider text-muted-foreground">
                   {mine ? (
-                    <span className="text-green-300">Your billet</span>
+                    <span className="text-success-fg">Your billet</span>
                   ) : locked ? (
                     <span className="flex items-center gap-1">
                       <Lock className="size-3" /> Needs {r!.missing.join(", ")}
@@ -149,21 +150,18 @@ export function BilletPicker({
               const on = secondary.includes(r.name);
               const locked = r.missing.length > 0;
               return (
-                <button
+                <ChipCheckbox
                   key={r.name}
-                  type="button"
+                  tone="info"
+                  checked={on}
                   disabled={locked || (!on && secondary.filter((s) => s !== primary).length >= maxSecondary)}
-                  onClick={() => toggleSecondary(r.name)}
-                  aria-pressed={on}
+                  onChange={() => toggleSecondary(r.name)}
                   title={locked ? `Needs ${r.missing.join(", ")}` : r.blurb}
-                  className={cn(
-                    "flex items-center gap-1 rounded-sm border px-2 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-45",
-                    on ? "border-sky-400/60 bg-sky-400/10 text-sky-300" : "text-muted-foreground hover:text-foreground",
-                  )}
+                  chipClassName="flex items-center gap-1 peer-disabled:cursor-not-allowed peer-disabled:opacity-45"
                 >
                   {on ? <Check className="size-3" /> : locked ? <Lock className="size-3" /> : null}
                   {r.name}
-                </button>
+                </ChipCheckbox>
               );
             })}
         </div>
@@ -172,7 +170,7 @@ export function BilletPicker({
       <Field label="4 · Justification (optional)" htmlFor="reason">
         <Textarea id="reason" name="reason" maxLength={500} className="min-h-16" placeholder="Why this billet? Relevant experience, availability…" />
       </Field>
-      <SubmitButton variant="accent" size="sm" className="self-start" disabled={!primary}>
+      <SubmitButton size="sm" className="self-start" disabled={!primary}>
         Submit billet request
       </SubmitButton>
     </RequestForm>

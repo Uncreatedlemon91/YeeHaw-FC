@@ -107,7 +107,7 @@ export async function ListView({ sp }: { sp: ListQuery }) {
                 <TD>{m.rank ? <Badge variant="accent">{m.rank}</Badge> : <span className="text-muted-foreground">—</span>}</TD>
                 <TD>
                   <Link href={`/roster/${m.id}`} className="flex items-center gap-2 font-semibold hover:text-accent">
-                    <Avatar discordId={m.discordId} avatar={m.avatar} size={24} />
+                    <Avatar discordId={m.discordId} avatar={m.avatar} name={m.callsign ?? m.discordUsername} size={24} />
                     <span>
                       {m.callsign ?? m.discordUsername}
                       {m.callsign && <span className="ml-2 text-xs font-normal text-muted-foreground">@{m.discordUsername}</span>}
@@ -117,7 +117,7 @@ export async function ListView({ sp }: { sp: ListQuery }) {
                 <TD className="hidden sm:table-cell">{m.squad ?? "—"}</TD>
                 <TD className="hidden md:table-cell">
                   {m.unitRole ?? "—"}
-                  {m.unitRole && <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">{roleDef(m.unitRole)?.code}</span>}
+                  {m.unitRole && <span className="ml-1.5 font-mono text-micro text-muted-foreground">{roleDef(m.unitRole)?.code}</span>}
                 </TD>
                 <TD className="hidden md:table-cell">{m._count.attendances}</TD>
                 <TD className="hidden md:table-cell">{m._count.qualifications}</TD>

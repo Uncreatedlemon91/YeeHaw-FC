@@ -52,7 +52,7 @@ export default async function Debrief({ params }: { params: Promise<{ id: string
   );
 
   return (
-    <Container className="max-w-4xl">
+    <Container size="narrow">
       <PageHeader eyebrow={`AAR · ${fmt(event.startTime, "d MMM yyyy")}`} title={event.title} />
       <ActionForm action={saveDebrief}>
         <input type="hidden" name="eventId" value={event.id} />
@@ -103,7 +103,7 @@ export default async function Debrief({ params }: { params: Promise<{ id: string
             </TBody>
           </Table>
         </Card>
-        <SubmitButton variant="accent" className="self-start">
+        <SubmitButton className="self-start">
           File report
         </SubmitButton>
       </ActionForm>
