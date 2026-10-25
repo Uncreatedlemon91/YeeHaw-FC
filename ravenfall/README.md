@@ -60,9 +60,10 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   and the AAR form pre-marks them Excused. The desk also has a promotion
   board (members meeting the next rank's criteria) and a leave roster.
 - **Career progression.** Per-rank criteria live in `unit.ts`: events
-  attended, days in the PMC (up to Corporal) or days in the current rank
-  (Sergeant up), optional qualifications, and leadership approval from
-  Sergeant up, plus the usual total time as guidance. The career tab shows
+  attended, days in the PMC, days in the current rank (Private First Class
+  up), optional qualifications, and leadership approval from Corporal up,
+  plus the usual total time as guidance. They are paced for a long-term
+  unit: Corporal takes about six months, Staff Sergeant about a year. The career tab shows
   the checklist with an Eligible (or, where approval is needed, Ready for
   review) stamp, and the S1 Desk's promotion board lists who's there.
   Command still promotes by hand.
@@ -87,7 +88,7 @@ RECRUITER and INSTRUCTOR each include OPERATOR; one person can hold both.
 
 **Squad leadership** isn't a Discord role. It comes from the billet: an
 active member whose primary role has `leads: true` in `unit.ts` (Team
-Leader, Squad Leader) leads their own squad, and a Command billet leads
+Leader, Assistant Team Leader) leads their own squad, and a Command billet leads
 every squad. Personnel files have three clearance tiers:
 
 | Clearance | Who | Sees |

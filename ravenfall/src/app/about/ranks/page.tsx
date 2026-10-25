@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 };
 
 const TIERS: { key: RankDef["tier"]; label: string; blurb: string }[] = [
-  { key: "enlisted", label: "Enlisted", blurb: "Where everyone starts. Turn up, train and learn the drills." },
-  { key: "nco", label: "Non-commissioned officers", blurb: "From Sergeant up, leadership has to sign off on each step." },
+  { key: "enlisted", label: "Enlisted", blurb: "Where everyone starts. Turn up, train and learn the drills. Each step takes months, not weeks." },
+  { key: "nco", label: "Non-commissioned officers", blurb: "From Corporal up, leadership has to sign off on each step." },
   { key: "officer", label: "Officers", blurb: "The same steps carry on, and the time between them keeps growing." },
 ];
 
@@ -40,7 +40,7 @@ export default async function RanksPage() {
             makes the call from your personnel file.
           </li>
           <li>
-            <span className="font-semibold text-foreground">Leadership signs off from Sergeant up.</span> Ranks marked as needing approval also need leadership to
+            <span className="font-semibold text-foreground">Leadership signs off from Corporal up.</span> Ranks marked as needing approval also need leadership to
             agree.
           </li>
         </ul>
