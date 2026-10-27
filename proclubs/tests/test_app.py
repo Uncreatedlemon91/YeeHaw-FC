@@ -1274,7 +1274,7 @@ def test_duplicate_streamer_is_rejected(client):
 
 def test_nav_says_live_not_streamers(client):
     _login_fan(client)
-    # "Live" is a tab in the Media section now, so it's on Media's pages.
+    # "Live" is a view of the Media page, so it is in its switcher.
     page = client.get("/clips")
     assert ">Live</a>" in page.text
     assert ">Streamers</a>" not in page.text

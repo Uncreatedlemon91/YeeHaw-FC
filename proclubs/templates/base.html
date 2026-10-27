@@ -31,7 +31,9 @@
   {% from "_icons.html" import icon %}
   {% from "_crest.html" import crest %}
   {% set here_section, here_tab = nav_locate(request.url.path) %}
-  {% set here_label = (here_tab.label if here_tab else (here_section.label if here_section else '')) %}
+  {# /news is Home's archive: it has no tab, but says "News" rather than "Home". #}
+  {% set on_news = here_section and here_section.key == 'home' and request.url.path != '/' %}
+  {% set here_label = (here_tab.label if here_tab else ('News' if on_news else (here_section.label if here_section else ''))) %}
   <div class="app-shell">
     {# The sidebar: sections, not pages. A section with tabs shows them in
        the strip above the content (see navigation.py). On a phone it folds
@@ -95,6 +97,8 @@
             {% else %}
               <span>{{ here_section.label }}</span>
             {% endif %}
+          {% elif on_news %}
+            <span aria-hidden="true">/</span><span>News</span>
           {% endif %}
         </nav>
         <div class="topbar-end">

@@ -3,24 +3,31 @@ section's tab bar, the section shortcut URLs and the tests all read.
 
 Grouped by what people come to do rather than by data source:
 
-  Home
-  News
-  Matchday   Fixtures · Training · Availability · Tactics   -- getting ready for a match
-  Squad      Players · Overview · Moves & contracts   -- the people
-  Club       Stats · League table · Club profile      -- how the club is doing
-  Media      Clips · Live                       -- watching
+  Home       the news feed lives here; /news and /news/<slug> are its archive
+  Matchday   Fixtures · Training · Tactics    -- getting ready for a match
+  Squad      Players · Squad hub · Recruitment   -- the people
+  Club       Stats · League table             -- how the club is doing
+  Media      one page: clips, with a "Live now" strip when someone is on air
+  Admin      Club profile · Moves & contracts · Discord roles   -- management
+
+Some tabs hold more than one page. Availability is a view of Fixtures, Set
+pieces a mode of Tactics, and the Squad hub's Overview and Planner are two
+views of one place: the extra pages are listed as prefixes of their tab (so
+/availability lights up Fixtures) and the pages themselves carry a view
+switcher (templates/_subnav.html). Likewise /streamers is part of Media and
+/news part of Home.
 
 Each tab says the access level it needs (roles.py): every member sees the
-players and their stats, staff see the squad overview, management see
-contracts and the club profile. A section shows only the tabs its viewer
-can open, and disappears when that's none of them.
+players and their stats, staff see the squad hub, management see the Admin
+section. A section shows only the tabs its viewer can open, and disappears
+when that's none of them.
 
 Every tab keeps its own URL (/events, /tactics, /stats, ...). The section
 is one place in the navigation, with the same header and tab bar on every
 tab, but each tab is still a real address: links people have shared keep
 working, the back button behaves, and a page only loads the scripts it
 needs (the tactics board and the stats dashboard are both script-heavy and
-have nothing to share). /matchday, /club and /media are shortcuts to a
+have nothing to share). /matchday, /club, /media and /admin are shortcuts to a
 section's first tab.
 """
 from __future__ import annotations
@@ -69,31 +76,27 @@ class Section:
 
 
 SECTIONS: tuple[Section, ...] = (
-    Section("home", "Home", "home", href="/", level=roles.GUEST),
-    Section("news", "News", "news", href="/news", prefixes=("/news",)),
+    Section("home", "Home", "home", href="/", prefixes=("/news",), level=roles.GUEST),
     Section("matchday", "Matchday", "matchday", shortcut="/matchday", tabs=(
-        Tab("Fixtures & sign-ups", "/events", ("/events",)),
+        Tab("Fixtures", "/events", ("/events", "/availability")),
         Tab("Training", "/training", ("/training",)),
-        Tab("Availability", "/availability", ("/availability",)),
-        Tab("Tactics", "/tactics", ("/tactics",)),
-        Tab("Set pieces", "/set-pieces", ("/set-pieces",)),
+        Tab("Tactics", "/tactics", ("/tactics", "/set-pieces")),
     )),
     Section("squad", "Squad", "squad", tabs=(
         Tab("Players", "/players", ("/players",)),
-        Tab("Overview", "/squad", ("/squad",), level=roles.STAFF),
-        Tab("Planner", "/squad/planner", ("/squad/planner",), level=roles.STAFF),
+        Tab("Squad hub", "/squad", ("/squad",), level=roles.STAFF),
         Tab("Recruitment", "/recruitment", ("/recruitment",), level=roles.STAFF),
-        Tab("Moves & contracts", "/roster", ("/roster",), level=roles.MANAGEMENT),
-        Tab("Discord roles", "/discord-roles", ("/discord-roles",), level=roles.MANAGEMENT),
     )),
     Section("club", "Club", "club", shortcut="/club", tabs=(
         Tab("Stats", "/stats", ("/stats",)),
         Tab("League table", "/league", ("/league",)),
-        Tab("Club profile", "/club-profile", ("/club-profile",), level=roles.MANAGEMENT),
     )),
-    Section("media", "Media", "media", shortcut="/media", tabs=(
-        Tab("Clips", "/clips", ("/clips",)),
-        Tab("Live", "/streamers", ("/streamers",)),
+    Section("media", "Media", "media", shortcut="/media",
+            href="/clips", prefixes=("/clips", "/streamers")),
+    Section("admin", "Admin", "shield", shortcut="/admin", tabs=(
+        Tab("Club profile", "/club-profile", ("/club-profile",), level=roles.MANAGEMENT),
+        Tab("Moves & contracts", "/roster", ("/roster",), level=roles.MANAGEMENT),
+        Tab("Discord roles", "/discord-roles", ("/discord-roles",), level=roles.MANAGEMENT),
     )),
 )
 

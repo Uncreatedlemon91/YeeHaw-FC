@@ -32,33 +32,40 @@ def _login(client, *, staff):
 
 
 # --- The registry ------------------------------------------------------------ #
-def test_the_five_sections_group_what_they_should():
+def test_the_sections_group_what_they_should():
     tabs = {s.key: [t.href for t in s.tabs] for s in navigation.SECTIONS}
-    assert tabs["matchday"] == ["/events", "/training", "/availability", "/tactics", "/set-pieces"]
-    assert tabs["club"] == ["/stats", "/league", "/club-profile"]
-    assert tabs["media"] == ["/clips", "/streamers"]
-    assert tabs["squad"] == ["/players", "/squad", "/squad/planner", "/recruitment", "/roster", "/discord-roles"]
+    assert [s.key for s in navigation.SECTIONS] == ["home", "matchday", "squad", "club", "media", "admin"]
+    assert tabs["matchday"] == ["/events", "/training", "/tactics"]
+    assert tabs["squad"] == ["/players", "/squad", "/recruitment"]
+    assert tabs["club"] == ["/stats", "/league"]
+    assert tabs["admin"] == ["/club-profile", "/roster", "/discord-roles"]
+    # Home and Media are single pages, so they have no tab bar.
+    assert tabs["home"] == [] and tabs["media"] == []
 
 
 @pytest.mark.parametrize("path, section, tab", [
     ("/", "home", None),
-    ("/news", "news", None),
-    ("/news/some-story", "news", None),
+    ("/news", "home", None),
+    ("/news/some-story", "home", None),
+    ("/news/new", "home", None),
     ("/events", "matchday", "/events"),
     ("/events/12", "matchday", "/events"),
     ("/events/new", "matchday", "/events"),
+    ("/availability", "matchday", "/events"),
     ("/tactics", "matchday", "/tactics"),
+    ("/set-pieces", "matchday", "/tactics"),
     ("/stats", "club", "/stats"),
     ("/league", "club", "/league"),
-    ("/clips", "media", "/clips"),
-    ("/streamers", "media", "/streamers"),
+    ("/clips", "media", None),
+    ("/streamers", "media", None),
     ("/players", "squad", "/players"),
     ("/players/42", "squad", "/players"),
     ("/squad", "squad", "/squad"),
-    ("/squad/planner", "squad", "/squad/planner"),
+    ("/squad/planner", "squad", "/squad"),
     ("/recruitment/3", "squad", "/recruitment"),
-    ("/set-pieces", "matchday", "/set-pieces"),
-    ("/roster", "squad", "/roster"),
+    ("/roster", "admin", "/roster"),
+    ("/discord-roles", "admin", "/discord-roles"),
+    ("/club-profile", "admin", "/club-profile"),
 ])
 def test_every_page_belongs_to_its_section_and_tab(path, section, tab):
     s, t = navigation.locate(path)
@@ -78,12 +85,20 @@ def test_guests_see_only_home_in_the_sidebar():
 
 @pytest.mark.parametrize("level, tabs", [
     (roles.MEMBER, ["/players"]),
-    (roles.STAFF, ["/players", "/squad", "/squad/planner", "/recruitment"]),
-    (roles.MANAGEMENT, ["/players", "/squad", "/squad/planner", "/recruitment", "/roster", "/discord-roles"]),
+    (roles.STAFF, ["/players", "/squad", "/recruitment"]),
+    (roles.MANAGEMENT, ["/players", "/squad", "/recruitment"]),
 ])
 def test_squad_tabs_follow_access_level(level, tabs):
     squad = next(s for s in navigation.SECTIONS if s.key == "squad")
     assert [t.href for t in squad.tabs_for(level)] == tabs
+
+
+def test_admin_is_for_management_only():
+    admin = next(s for s in navigation.SECTIONS if s.key == "admin")
+    assert admin not in navigation.visible(roles.STAFF)
+    assert admin in navigation.visible(roles.MANAGEMENT)
+    assert [t.href for t in admin.tabs_for(roles.STAFF)] == []
+    assert [t.href for t in admin.tabs_for(roles.MANAGEMENT)] == ["/club-profile", "/roster", "/discord-roles"]
 
 
 def test_every_tab_route_exists(client):
@@ -108,11 +123,63 @@ def test_the_sidebar_marks_the_current_section(client):
 
 def test_sections_without_tabs_show_no_tab_bar(client):
     _login(client, staff=False)
-    assert 'class="tab-bar"' not in client.get("/news").text
+    for path in ["/news", "/clips", "/streamers"]:
+        assert 'class="tab-bar"' not in client.get(path).text, path
+
+
+def test_news_is_no_longer_in_the_sidebar_but_lights_up_home(client):
+    _login(client, staff=False)
+    html = client.get("/news").text
+    assert 'aria-label="Sections"' in html
+    assert 'href="/news" class="side-link' not in html
+    assert 'href="/" class="side-link active"' in html
+
+
+@pytest.mark.parametrize("path, switcher_has", [
+    ("/events", ["/availability"]),
+    ("/availability", ["/events"]),
+    ("/tactics", ["/set-pieces"]),
+    ("/set-pieces", ["/tactics"]),
+    ("/clips", ["/streamers"]),
+    ("/streamers", ["/clips"]),
+])
+def test_tabs_with_two_pages_show_a_view_switcher(client, path, switcher_has):
+    _login(client, staff=False)
+    html = client.get(path).text
+    assert 'class="category-pills view-switch"' in html
+    for href in switcher_has:
+        assert f'href="{href}" class="pill' in html
+
+
+def test_squad_hub_switches_between_overview_and_planner(client):
+    _login(client, staff=True)
+    for path in ["/squad", "/squad/planner"]:
+        html = client.get(path).text
+        assert 'href="/squad" class="pill' in html and 'href="/squad/planner" class="pill' in html
+        # One tab is lit for both: the Squad hub.
+        assert 'href="/squad" class="tab active" aria-current="page"' in html
+
+
+def test_availability_lights_up_fixtures_and_set_pieces_lights_up_tactics(client):
+    _login(client, staff=False)
+    assert 'href="/events" class="tab active" aria-current="page"' in client.get("/availability").text
+    assert 'href="/tactics" class="tab active" aria-current="page"' in client.get("/set-pieces").text
+
+
+def test_media_page_shows_live_strip_only_when_someone_is_live(client, monkeypatch):
+    _login(client, staff=False)
+    assert "Live Now" not in client.get("/clips").text
+    with appmod.get_session() as session:
+        appmod.services.create_streamer(session, display_name="Rowdy", twitch_login="rowdy",
+                                          avatar=None, author_name="Coach")
+    monkeypatch.setattr(appmod.twitch_client, "live_streams", lambda logins: {
+        l: {"url": f"https://twitch.tv/{l}", "viewer_count": 3, "title": "t", "thumbnail_url": ""} for l in logins})
+    assert "Live Now" in client.get("/clips").text
 
 
 @pytest.mark.parametrize("shortcut, target", [
     ("/matchday", "/events"), ("/club", "/stats"), ("/media", "/clips"),
+    ("/admin", "/club-profile"),
 ])
 def test_section_shortcuts_land_on_the_first_tab(client, shortcut, target):
     _login(client, staff=False)
@@ -123,7 +190,8 @@ def test_section_shortcuts_land_on_the_first_tab(client, shortcut, target):
 def test_old_page_addresses_still_work(client):
     """Grouping pages into sections must not break a link anybody saved."""
     _login(client, staff=False)
-    for path in ["/events", "/tactics", "/stats", "/league", "/clips", "/streamers", "/news"]:
+    for path in ["/events", "/availability", "/tactics", "/set-pieces", "/stats", "/league",
+                 "/clips", "/streamers", "/news"]:
         r = client.get(path, follow_redirects=False)
         assert r.status_code == 200, path
 
@@ -139,5 +207,5 @@ def test_every_page_title_wears_its_kicker(client):
     """The "YFC / FIXTURES & SIGN-UPS" line above each title comes from
     the shell, so no template has to repeat it."""
     _login(client, staff=False)
-    assert "--kicker: 'YFC / Fixtures &amp; sign-ups';" in client.get("/events").text
+    assert "--kicker: 'YFC / Fixtures';" in client.get("/events").text
     assert "--kicker: 'YFC / News';" in client.get("/news").text

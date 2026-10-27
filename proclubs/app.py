@@ -459,6 +459,22 @@ def welcome(request: Request):
     return _welcome(request)
 
 
+def _live_now(session) -> dict:
+    """What the "Live now" panel (templates/_live_now.html) needs: who is
+    streaming right now. Shared by the home page and the Media page."""
+    streamers = services.list_streamers(session)
+    live = twitch_client.live_streams([s.twitch_login for s in streamers])
+    featured_streamer = services.get_featured_streamer(session)
+    return dict(
+        featured_streamer=featured_streamer,
+        featured_streamer_live=bool(featured_streamer and featured_streamer.twitch_login in live),
+        other_live_streamers=[
+            s for s in streamers if s.twitch_login in live and (not featured_streamer or s.id != featured_streamer.id)
+        ],
+        live=live,
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     """Members get the club dashboard; everybody else the splash page."""
@@ -484,12 +500,7 @@ def home(request: Request):
         # Confirmed signings and departures only -- see
         # services.public_roster_moves for what is deliberately left out.
         squad_moves = services.public_roster_moves(session, limit=6)
-        streamers = services.list_streamers(session)
-        live = twitch_client.live_streams([s.twitch_login for s in streamers])
-        featured_streamer = services.get_featured_streamer(session)
-        other_live_streamers = [
-            s for s in streamers if s.twitch_login in live and (not featured_streamer or s.id != featured_streamer.id)
-        ]
+        live_now = _live_now(session)
         stats_teaser, crest_colors = _club_standing()
         user = auth.current_user(request)
         inbox = (staff_tools.action_items(session, management=auth.is_management(user))
@@ -505,10 +516,7 @@ def home(request: Request):
             last_result=results[0] if results else None,
             form_results=results,
             squad_moves=squad_moves,
-            featured_streamer=featured_streamer,
-            featured_streamer_live=bool(featured_streamer and featured_streamer.twitch_login in live),
-            other_live_streamers=other_live_streamers,
-            live=live,
+            **live_now,
             stats_teaser=stats_teaser,
             crest_colors=crest_colors,
             like_counts=like_counts,
@@ -1339,6 +1347,7 @@ def clips_list(request: Request):
         clips = services.list_clips(session)
         return templates.TemplateResponse(request, "clips.html", _ctx(
             request, clips=clips, clips_enabled=config.CLIPS_SYNC_ENABLED,
+            **_live_now(session),
         ))
 
 

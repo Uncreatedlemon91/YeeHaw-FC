@@ -14,6 +14,12 @@
      ("Win" by default; pass "Win 3-1 vs Rovers" for more). Colour is never
      the only signal: the letter shows too.
 
+   view_switch(label, views, current)
+     The switcher for a tab that holds more than one page (Fixtures and
+     Availability, Tactics and Set pieces, ...). `views` is a list of
+     (href, text) pairs, `current` the href of the page being shown. It is
+     plain links, so each view keeps its own URL; drop it under .page-head.
+
    Related, in static/js/shell.js:
      <form data-loading="Saving...">  on submit, its submit buttons are
      disabled, get .is-loading and show that text -- no double submits.
@@ -31,6 +37,14 @@
   <a class="btn" href="{{ action_url }}">{{ action_label }}</a>
   {%- endif %}
 </div>
+{%- endmacro %}
+
+{% macro view_switch(label, views, current) -%}
+<nav class="category-pills view-switch" aria-label="{{ label }}">
+  {%- for href, text in views %}
+  <a href="{{ href }}" class="pill{{ ' active' if href == current }}"{% if href == current %} aria-current="page"{% endif %}>{{ text }}</a>
+  {%- endfor %}
+</nav>
 {%- endmacro %}
 
 {% macro result_chip(result, title=None) -%}

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_views.html" import media_views %}
 {% from "_ui.html" import empty_state %}
 {% block title %}Clips{% endblock %}
 {% block content %}
@@ -9,6 +10,10 @@
       <p class="page-lede">Highlights and moments from the squad, straight from Discord.</p>
     </div>
   </div>
+  {{ media_views('/clips') }}
+
+  {# A strip on top, only while somebody is on air. #}
+  {% include "_live_now.html" %}
 
   {% if not clips_enabled %}
     <div class="card">

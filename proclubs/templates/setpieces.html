@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_views.html" import tactics_views %}
 {% from "_ui.html" import empty_state %}
 {% block title %}Set pieces{% endblock %}
 {% block content %}
@@ -28,6 +29,7 @@
       <p class="page-lede">The club's routines: who takes them, what happens, and where everyone goes.</p>
     </div>
   </div>
+  {{ tactics_views('/set-pieces') }}
 
   {% if not total %}
     <div class="card">{{ empty_state('target', 'No routines yet', 'Corners, free kicks and throw-ins the club has worked out will be listed here.' ~ (' Add the first one below.' if is_staff else '')) }}</div>

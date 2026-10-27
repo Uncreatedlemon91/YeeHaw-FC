@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_views.html" import fixtures_views %}
 {% from "_matchday.html" import event_row with context %}
 {% from "_ui.html" import empty_state %}
 {% block title %}Events{% endblock %}
@@ -11,6 +12,7 @@
     </div>
     {% if is_staff %}<a class="btn" href="/events/new">New event</a>{% endif %}
   </div>
+  {{ fixtures_views('/events') }}
 
   <div class="section-head"><h2>Upcoming</h2></div>
   {% if upcoming %}

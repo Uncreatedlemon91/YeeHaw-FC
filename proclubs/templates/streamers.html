@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_views.html" import media_views %}
 {% from "_ui.html" import empty_state %}
 {% block title %}Live{% endblock %}
 {% block content %}
@@ -9,6 +10,7 @@
       <p class="page-lede">Catch the squad live on Twitch.</p>
     </div>
   </div>
+  {{ media_views('/streamers') }}
 
   {% if not twitch_enabled %}
     <p class="notice-line">Live status isn't available right now, so channels show as offline.{% if is_staff %} <span class="config-hint-inline">Staff: Twitch credentials aren't configured.</span>{% endif %}</p>

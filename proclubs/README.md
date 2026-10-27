@@ -22,15 +22,21 @@ URLs and the tests all read that one list:
 
 | Section | Tabs | Shortcut |
 |---|---|---|
-| Home | -- | `/` |
-| News | -- | `/news` |
-| Matchday | Fixtures & sign-ups (`/events`) · Training (`/training`) · Availability (`/availability`) · Tactics (`/tactics`) · Set pieces (`/set-pieces`) | `/matchday` |
-| Squad | Players (`/players`) · Overview (`/squad`, staff) · Planner (`/squad/planner`, staff) · Recruitment (`/recruitment`, staff) · Moves & contracts (`/roster`, management) | -- |
-| Club | Stats (`/stats`) · League table (`/league`) · Club profile (`/club-profile`, management) | `/club` |
-| Media | Clips (`/clips`) · Live (`/streamers`) | `/media` |
+| Home | -- (the news feed; `/news` and `/news/<slug>` are its archive) | `/` |
+| Matchday | Fixtures (`/events`, with Availability `/availability` as a view) · Training (`/training`) · Tactics (`/tactics`, with Set pieces `/set-pieces` as a mode) | `/matchday` |
+| Squad | Players (`/players`) · Squad hub (`/squad` Overview and `/squad/planner` Planner, staff) · Recruitment (`/recruitment`, staff) | -- |
+| Club | Stats (`/stats`) · League table (`/league`) | `/club` |
+| Media | -- (`/clips`, with a "Live now" strip while someone is streaming; `/streamers` is its Live view) | `/media` |
+| Admin | Club profile (`/club-profile`) · Moves & contracts (`/roster`) · Discord roles (`/discord-roles`), all management | `/admin` |
+
+Where a tab holds more than one page, the extra pages are listed as
+`prefixes` of the tab in `navigation.py` (so `/availability` lights up
+Fixtures) and the pages carry a view switcher, `templates/_views.html`
+(built on `view_switch` in `_ui.html`). Each view keeps its own URL and
+scripts. Home and Media are single pages, so they show no tab bar.
 
 A section is one place in the navigation, with the same header and tab bar
-on every tab, but **each tab keeps its own URL**. Links people have saved
+on every tab, but **each page keeps its own URL**. Links people have saved
 keep working, the back button behaves, and a page loads only its own
 scripts: the tactics board and the stats dashboard are both script-heavy
 and have nothing to share. The shortcuts redirect (302, not 301, since

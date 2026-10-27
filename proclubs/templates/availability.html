@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_views.html" import fixtures_views %}
 {% block title %}Availability{% endblock %}
 {% block content %}
 {% set marks = {'free': ('✓', 'Free'), 'going': ('✓', 'Going'), 'maybe': ('?', 'Maybe'),
@@ -12,6 +13,7 @@
         add any dates you're away; a fixture's own answers override both.</p>
     </div>
   </div>
+  {{ fixtures_views('/availability') }}
 
   <div class="avail-layout">
     <section class="panel">
