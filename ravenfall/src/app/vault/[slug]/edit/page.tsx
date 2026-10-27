@@ -17,7 +17,7 @@ export default async function EditDoc({ params }: { params: Promise<{ slug: stri
   const doc = await prisma.qualification.findUnique({ where: { slug } });
   if (!doc) notFound();
   return (
-    <Container className="max-w-4xl">
+    <Container size="narrow">
       <PageHeader
         eyebrow={`Vault · v${doc.version}`}
         title={`Edit: ${doc.title}`}

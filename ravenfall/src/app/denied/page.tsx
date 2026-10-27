@@ -1,5 +1,6 @@
+import { Lock } from "lucide-react";
 import Link from "next/link";
-import { Container } from "@/components/container";
+import { PublicFrame } from "@/components/public-frame";
 import { Button } from "@/components/ui/button";
 import { getSessionUser } from "@/lib/auth";
 
@@ -8,9 +9,16 @@ export const metadata = { title: "Restricted" };
 export default async function Denied() {
   const user = await getSessionUser();
   return (
-    <Container className="max-w-lg py-24 text-center">
-      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-destructive">Restricted</p>
-      <h1 className="mt-2 text-3xl font-bold uppercase">Access denied</h1>
+    <PublicFrame
+      tab="Restricted"
+      stamp="Denied"
+      icon={
+        <span className="flex size-14 items-center justify-center rounded-full border border-destructive/50 bg-destructive/10">
+          <Lock className="size-6 text-destructive-fg" aria-hidden />
+        </span>
+      }
+    >
+      <h1 className="mt-5 text-3xl font-bold uppercase">Access denied</h1>
       <p className="mt-4 text-sm text-muted-foreground">
         {user?.inGuild === false
           ? "You aren't in the unit's Discord server, so the site can't see any of your roles. Join the server, then sign in again."
@@ -26,6 +34,6 @@ export default async function Denied() {
           </Button>
         )}
       </div>
-    </Container>
+    </PublicFrame>
   );
 }

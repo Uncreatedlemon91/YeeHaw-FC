@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ player.display_name }}{% endblock %}
 {% from "_window_picker.html" import window_picker, span_text, coverage_note %}
+{% from "_positions.html" import pos_key, pos_chip %}
+{% from "_ui.html" import result_chip %}
 {% block content %}
 <div class="page page-wide player-page">
   {# --- Who they are: the file's cover sheet --------------------------------- #}
@@ -9,7 +11,8 @@
     {% if photo %}
       <img class="file-photo" src="{{ photo }}" alt="" width="168" height="196" decoding="async" />
     {% else %}
-      <span class="file-photo move-avatar-fallback" aria-hidden="true">{{ initials(player.display_name) }}</span>
+      {% set pk = pos_key(contract.position if contract else '') | trim %}
+      <span class="file-photo move-avatar-fallback{{ ' pos-' ~ pk if pk }}" aria-hidden="true">{{ initials(player.display_name) }}</span>
     {% endif %}
     <div class="file-id">
       <p class="kicker">{{ SITE_NAME }} / player file</p>
@@ -33,10 +36,9 @@
       </dl>
     </div>
     <div class="file-side">
-      <p class="kicker">Squad status</p>
-      <span class="file-side-value">{{ status_label(contract.squad_status) if contract else (player.club_role or 'Free agent') }}</span>
-      {% if contract and contract.position %}<span class="file-side-sub">{{ contract.position }}{% if contract.secondary_position %} · {{ contract.secondary_position }}{% endif %}</span>{% endif %}
-      {% if player.created_at %}<span class="file-side-sub">On file since {{ localtime(player.created_at, 'date') }}</span>{% endif %}
+      {% if player.created_at %}<p class="kicker">On file since</p>
+      <span class="file-side-value">{{ localtime(player.created_at, 'date') }}</span>{% endif %}
+      {% if see_private and contract %}<span class="file-side-sub">Contract: {{ time_left }}</span>{% endif %}
     </div>
   </section>
 
@@ -63,8 +65,10 @@
           {% if is_self %}
             <details class="profile-edit"{% if not player.bio %} open{% endif %}>
               <summary>Edit your profile</summary>
-              <form method="post" action="/players/{{ player.discord_id }}/profile" class="stack-form">
+              <form method="post" action="/players/{{ player.discord_id }}/profile" class="stack-form" data-loading="Saving…">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <fieldset class="field-group">
+                <legend>Playing style</legend>
                 <div class="field-row">
                   <div class="field">
                     <label for="preferred-foot">Preferred foot</label>
@@ -78,15 +82,19 @@
                     <input id="archetype" name="archetype" maxlength="40" value="{{ player.archetype or '' }}" placeholder="e.g. Box-to-box" />
                   </div>
                 </div>
+                </fieldset>
+                <fieldset class="field-group">
+                <legend>About you</legend>
                 <div class="field">
-                  <label for="bio">About you</label>
+                  <label class="visually-hidden" for="bio">About you</label>
                   <textarea id="bio" name="bio" rows="3" maxlength="500" placeholder="Where you like to play, what you're working on.">{{ player.bio or '' }}</textarea>
                 </div>
+                </fieldset>
                 <div class="form-actions"><button type="submit" class="btn">Save profile</button></div>
               </form>
             </details>
             {% if not gamertag %}
-              <form method="post" action="/me/gamertag" class="inline-form profile-gamertag">
+              <form method="post" action="/me/gamertag" class="inline-form profile-gamertag" data-loading="Linking…">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                 <input type="hidden" name="redirect_to" value="/players/{{ player.discord_id }}" />
                 <label for="my-gamertag">EA gamertag</label>
@@ -110,15 +118,28 @@
           {{ window_picker('/players/' ~ player.discord_id, usage_meta, windows, '#season') }}
           {{ coverage_note(usage_meta) }}
           {% if usage %}
-            <div class="tile-row">
-              <div class="tile"><span class="tile-value">{{ usage.apps_window }}{% if window %}<small>/{{ window }}</small>{% endif %}</span><span class="tile-label">Played</span></div>
-              <div class="tile"><span class="tile-value">{{ form_label(usage.form) }}</span><span class="tile-label">Form</span></div>
+            <div class="tile-row tile-row--hero">
               <div class="tile"><span class="tile-value">{{ usage.goals }}</span><span class="tile-label">Goals</span></div>
               <div class="tile"><span class="tile-value">{{ usage.assists }}</span><span class="tile-label">Assists</span></div>
+              <div class="tile"><span class="tile-value">{{ form_label(usage.form) }}</span><span class="tile-label">Rating</span></div>
+            </div>
+            <div class="tile-row tile-row--small">
+              <div class="tile"><span class="tile-value">{{ usage.apps_window }}{% if window %}<small>/{{ window }}</small>{% endif %}</span><span class="tile-label">Played</span></div>
               <div class="tile"><span class="tile-value">{{ usage.mom }}</span><span class="tile-label">EA MOTM</span></div>
               <div class="tile"><span class="tile-value">{{ motm_total }}</span><span class="tile-label">Squad's MOTM</span></div>
               <div class="tile"><span class="tile-value">{{ usage.apps_total }}</span><span class="tile-label">Apps</span></div>
             </div>
+            {% if recent %}
+              <div class="recent-form" role="group" aria-label="Recent results">
+                <span class="recent-form-label">Last {{ [recent | length, 5] | min }}</span>
+                <span class="form-chips">
+                  {% for m in recent[:5] if m.us_score is not none and m.opp_score is not none %}
+                    {% set res = 'W' if m.us_score > m.opp_score else ('L' if m.us_score < m.opp_score else 'D') %}
+                    {{ result_chip(res, ('Win' if res == 'W' else 'Loss' if res == 'L' else 'Draw') ~ ' ' ~ m.us_score ~ '-' ~ m.opp_score ~ ' vs ' ~ (m.opp_name or 'opponent')) }}
+                  {% endfor %}
+                </span>
+              </div>
+            {% endif %}
             {% set d = usage.detail %}
             {% if d and (d.passes is not none or d.tackles is not none or d.shots is not none or d.shot_success is not none) %}
               <h3 class="form-subhead">Passing, defending and shooting
@@ -162,7 +183,7 @@
                     <td>{% if m.played %}{{ localtime(m.played, 'daymonth') }}{% else %}—{% endif %}</td>
                     <td>{{ m.opp_name or '—' }}{% if m.mom %} <span class="role-pill">MOTM</span>{% endif %}</td>
                     <td class="lt-num">{% if m.us_score is not none %}{{ m.us_score }}–{{ m.opp_score }}{% else %}—{% endif %}</td>
-                    <td>{{ m.pos or '—' }}</td>
+                    <td>{{ pos_chip(m.pos) if m.pos else '—' }}</td>
                     <td class="lt-num"><span class="lt-rating">{{ '%.1f' % m.rating if m.rating is not none else '—' }}</span></td>
                     <td class="lt-num">{{ m.goals or 0 }}</td>
                     <td class="lt-num">{{ m.assists or 0 }}</td>
@@ -184,7 +205,7 @@
           <div class="panel-body">
             <p class="field-hint">Only the Club President, Head Coach and Coaches can see these, never {{ player.display_name }}.
               {% if coach_notes_discord %}Every note is also posted to the staff channel on Discord, and deleting it here deletes it there.{% endif %}</p>
-            <form method="post" action="/players/{{ player.discord_id }}/notes" class="stack-form">
+            <form method="post" action="/players/{{ player.discord_id }}/notes" class="stack-form" data-loading="Saving…">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
               <label class="visually-hidden" for="note-body">New note</label>
               <textarea id="note-body" name="body" rows="3" maxlength="2000" required placeholder="Training focus, a conversation you had, what to watch for…"></textarea>
@@ -284,7 +305,7 @@
         <section class="panel">
           <header class="panel-head panel-staff"><h2>Club role</h2></header>
           <div class="panel-body">
-            <form method="post" action="/players/{{ player.discord_id }}/role" class="stack-form">
+            <form method="post" action="/players/{{ player.discord_id }}/role" class="stack-form" data-loading="Saving…">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
               <label class="visually-hidden" for="club-role">Club role</label>
               <select id="club-role" name="club_role">
@@ -298,11 +319,12 @@
         </section>
       {% endif %}
 
-      {% if can_fix_gamertag %}
+      {# On your own file the About panel already asks for the gamertag. #}
+      {% if can_fix_gamertag and not (is_self and not gamertag) %}
         <section class="panel">
           <header class="panel-head panel-staff"><h2>Gamertag</h2></header>
           <div class="panel-body">
-            <form method="post" action="/players/{{ player.discord_id }}/gamertag" class="stack-form">
+            <form method="post" action="/players/{{ player.discord_id }}/gamertag" class="stack-form" data-loading="Saving…">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
               <label class="visually-hidden" for="fix-gamertag">EA gamertag</label>
               <input id="fix-gamertag" name="player_name" list="fix-gamertag-options" maxlength="64"

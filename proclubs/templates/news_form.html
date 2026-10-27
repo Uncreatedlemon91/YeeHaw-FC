@@ -7,10 +7,12 @@
 <div class="page narrow">
   <div class="page-head"><h1>{{ 'Edit article' if article else 'New article' }}</h1></div>
 
-  <form class="card" id="article-form" method="post" enctype="multipart/form-data"
+  <form class="card" id="article-form" data-loading="Saving…" method="post" enctype="multipart/form-data"
         action="{{ '/news/' ~ article.slug ~ '/edit' if article else '/news/new' }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
 
+    <fieldset class="form-group">
+    <legend>Details</legend>
     <div class="field-row">
       <div class="field">
         <label for="title">Title</label>
@@ -30,7 +32,10 @@
       <label for="summary">Summary</label>
       <input id="summary" name="summary" placeholder="One line shown in article lists" value="{{ (article.summary if article else '') or '' }}" />
     </div>
+    </fieldset>
 
+    <fieldset class="form-group">
+    <legend>Cover image</legend>
     {% set fx = article.cover_focal_x if article and article.cover_focal_x is not none else 50 %}
     {% set fy = article.cover_focal_y if article and article.cover_focal_y is not none else 50 %}
     <div class="field">
@@ -48,9 +53,12 @@
         current image. Max 2MB.
       </p>
     </div>
+    </fieldset>
 
+    <fieldset class="form-group">
+    <legend>Article</legend>
     <div class="field">
-      <label>Body</label>
+      <label id="body-label">Body</label>
       {% if CLIPS_SYNC_ENABLED %}
         <div class="clip-picker-wrap">
           <button type="button" id="insert-clip-btn" class="btn secondary">Insert Clip</button>
@@ -66,6 +74,7 @@
       <input type="checkbox" name="published" value="1" {% if not article or article.published %}checked{% endif %} />
       Published (uncheck to save as a draft)
     </label>
+    </fieldset>
 
     <div class="form-actions">
       <button type="submit">{{ 'Save changes' if article else 'Publish' }}</button>

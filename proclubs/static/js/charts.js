@@ -66,6 +66,66 @@ const Charts = (() => {
     });
   }
 
+  // --- Accessibility helpers ------------------------------------------------
+  // Every chart gets role="img" + an aria-label summary, a native <title> on
+  // each mark (hover tooltip for mouse, readable by AT), a short axis note,
+  // and a "View as table" disclosure holding the same numbers.
+  function describe(svg, label) {
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', label);
+  }
+
+  function addTitle(el, text) {
+    const t = svgEl('title');
+    t.textContent = text;
+    el.insertBefore(t, el.firstChild);
+  }
+
+  function axisNote(container, text) {
+    const p = document.createElement('p');
+    p.className = 'chart-axis';
+    p.textContent = text;
+    container.appendChild(p);
+  }
+
+  // cols: ['Match', 'Shots']; rows: [['vs Rovers', '4'], ...]
+  function tableView(container, caption, cols, rows) {
+    if (!rows.length) return;
+    const details = document.createElement('details');
+    details.className = 'chart-table-view';
+    const summary = document.createElement('summary');
+    summary.textContent = 'View as table';
+    const wrap = document.createElement('div');
+    wrap.className = 'table-scroll';
+    const table = document.createElement('table');
+    const cap = document.createElement('caption');
+    cap.className = 'visually-hidden';
+    cap.textContent = caption;
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    cols.forEach((c) => {
+      const th = document.createElement('th');
+      th.scope = 'col';
+      th.textContent = c;
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    const tbody = document.createElement('tbody');
+    rows.forEach((r) => {
+      const tr = document.createElement('tr');
+      r.forEach((v) => {
+        const td = document.createElement('td');
+        td.textContent = v;
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.append(cap, thead, tbody);
+    wrap.appendChild(table);
+    details.append(summary, wrap);
+    container.appendChild(details);
+  }
+
   function emptyState(container, message = 'No data available.') {
     container.innerHTML = `<p class="chart-empty">${message}</p>`;
   }
@@ -88,7 +148,7 @@ const Charts = (() => {
 
   // Horizontal bar chart -- for ranked lists with text labels (top scorers,
   // top assists). Single hue: "1-3 series, color alone is comfortable".
-  function hBarChart(container, { data, color, unit = '' }) {
+  function hBarChart(container, { data, color = 'var(--series-1)', unit = '', title = 'Ranking' }) {
     container.innerHTML = '';
     if (!data.length) return emptyState(container);
 
@@ -101,7 +161,30 @@ const Charts = (() => {
     const width = labelW + chartW + valueW;
     const height = data.length * (rowH + gap);
 
-    const svg = svgEl('svg', { viewBox: `0 0 ${width} ${height}`, width: '100%', height });
+    const svg = svgEl('svg', { viewBox: `0 0 ${width} ${height}`, width: '100%', height, class: 'chart-hbar-svg' });
+    describe(svg, `${title}: ${data.map((d) => `${d.label} ${d.value}${unit}`).join(', ')}`);
+
+    // Below 480px the SVG text would shrink illegibly, so CSS swaps it for
+    // this list of bars (same data, real text at body size).
+    const list = document.createElement('ul');
+    list.className = 'chart-hlist';
+    data.forEach((d) => {
+      const li = document.createElement('li');
+      const name = document.createElement('span');
+      name.className = 'chart-hlist-label';
+      name.textContent = d.label;
+      const val = document.createElement('strong');
+      val.className = 'chart-hlist-value';
+      val.textContent = `${d.value}${unit}`;
+      const track = document.createElement('span');
+      track.className = 'chart-hlist-track';
+      const fill = document.createElement('i');
+      fill.style.width = `${Math.max((d.value / max) * 100, 2)}%`;
+      fill.style.background = color;
+      track.appendChild(fill);
+      li.append(name, val, track);
+      list.appendChild(li);
+    });
 
     data.forEach((d, i) => {
       const y = i * (rowH + gap);
@@ -124,6 +207,7 @@ const Charts = (() => {
         class: 'chart-bar',
       });
       rect.style.fill = color;
+      addTitle(rect, `${d.label}: ${d.value}${unit}`);
 
       const value = svgEl('text', {
         x: labelW + barW + 6,
@@ -137,12 +221,13 @@ const Charts = (() => {
       svg.append(label, rect, value);
     });
 
-    container.appendChild(svg);
+    container.append(svg, list);
+    tableView(container, title, ['Name', unit ? `Value (${unit})` : 'Value'], data.map((d) => [d.label, `${d.value}${unit}`]));
   }
 
   // Vertical column chart -- for a handful of directly comparable totals
   // (goals for/against, promotions/relegations).
-  function vBarChart(container, { data, unit = '' }) {
+  function vBarChart(container, { data, unit = '', title = 'Comparison' }) {
     container.innerHTML = '';
     if (!data.length) return emptyState(container);
 
@@ -154,6 +239,7 @@ const Charts = (() => {
     const height = chartH + 40;
 
     const svg = svgEl('svg', { viewBox: `0 0 ${width} ${height}`, width: '100%', height });
+    describe(svg, `${title}: ${data.map((d) => `${d.label} ${d.value}${unit}`).join(', ')}`);
     svg.appendChild(
       svgEl('line', { x1: 0, y1: chartH, x2: width, y2: chartH, class: 'chart-baseline' })
     );
@@ -165,6 +251,7 @@ const Charts = (() => {
 
       const rect = svgEl('rect', { x, y, width: barW, height: h, rx: 4, class: 'chart-bar' });
       rect.style.fill = d.color;
+      addTitle(rect, `${d.label}: ${d.value}${unit}`);
 
       const label = svgEl('text', {
         x: x + barW / 2,
@@ -188,12 +275,13 @@ const Charts = (() => {
     });
 
     container.appendChild(svg);
+    tableView(container, title, ['Name', 'Value'], data.map((d) => [d.label, `${d.value}${unit}`]));
   }
 
   // Trend bar chart -- a magnitude per match across many matches (shots,
   // pass accuracy, %), narrow bars so 10-30 points still fit comfortably.
   // Single hue: one series, no legend needed.
-  function trendBarChart(container, { data, color, unit = '' }) {
+  function trendBarChart(container, { data, color = 'var(--series-1)', unit = '', title = 'Per-match trend' }) {
     container.innerHTML = '';
     if (!data.length) return emptyState(container);
 
@@ -204,6 +292,7 @@ const Charts = (() => {
     const width = data.length * (barW + gap) + gap;
 
     const svg = svgEl('svg', { viewBox: `0 0 ${width} ${chartH}`, width: '100%', height: chartH });
+    describe(svg, `${title}: ${data.length} matches, from ${data[0].value}${unit} to ${data[data.length - 1].value}${unit}, highest ${max}${unit}`);
     svg.appendChild(svgEl('line', { x1: 0, y1: chartH, x2: width, y2: chartH, class: 'chart-baseline' }));
 
     data.forEach((d, i) => {
@@ -213,6 +302,7 @@ const Charts = (() => {
 
       const rect = svgEl('rect', { x, y, width: barW, height: h, rx: 3, class: 'chart-bar' });
       rect.style.fill = color;
+      addTitle(rect, `${d.label}: ${d.value}${unit}`);
 
       attachHover(rect, () => [{ label: d.label, value: `${d.value}${unit}`, color }]);
 
@@ -220,11 +310,13 @@ const Charts = (() => {
     });
 
     container.appendChild(svg);
+    axisNote(container, `One bar per match, oldest to newest. Scale: 0 to ${max}${unit}.`);
+    tableView(container, title, ['Match', unit ? `Value (${unit})` : 'Value'], data.map((d) => [d.label, `${d.value}${unit}`]));
   }
 
   // Diverging bar chart -- goal differential per match, centered on a zero
   // baseline. blue = positive, red = negative (the palette's diverging pair).
-  function divergingBarChart(container, { data, unit = '', positiveColor, negativeColor }) {
+  function divergingBarChart(container, { data, unit = '', positiveColor = 'var(--status-good)', negativeColor = 'var(--status-critical)', title = 'Goal difference per match' }) {
     container.innerHTML = '';
     if (!data.length) return emptyState(container);
 
@@ -236,6 +328,7 @@ const Charts = (() => {
     const width = data.length * (barW + gap) + gap;
 
     const svg = svgEl('svg', { viewBox: `0 0 ${width} ${chartH}`, width: '100%', height: chartH });
+    describe(svg, `${title}: ${data.length} matches, ${data.filter((d) => d.value > 0).length} positive, ${data.filter((d) => d.value < 0).length} negative`);
     svg.appendChild(svgEl('line', { x1: 0, y1: midY, x2: width, y2: midY, class: 'chart-baseline' }));
 
     data.forEach((d, i) => {
@@ -249,17 +342,20 @@ const Charts = (() => {
       rect.style.fill = color;
 
       const signed = d.value > 0 ? `+${d.value}` : `${d.value}`;
+      addTitle(rect, `${d.label}: ${signed}${unit}`);
       attachHover(rect, () => [{ label: d.label, value: `${signed}${unit}`, color }]);
 
       svg.appendChild(rect);
     });
 
     container.appendChild(svg);
+    axisNote(container, `One bar per match, oldest to newest. Above the line is a win margin, below is a loss. Scale: +/-${max}${unit}.`);
+    tableView(container, title, ['Match', 'Difference'], data.map((d) => [d.label, `${d.value > 0 ? '+' : ''}${d.value}${unit}`]));
   }
 
   // Donut chart -- part-to-whole for a small number of categories (position
   // mix, win/draw/loss share). 2px surface gap between segments.
-  function donutChart(container, { data, showLegend = true }) {
+  function donutChart(container, { data, showLegend = true, title = 'Breakdown' }) {
     container.innerHTML = '';
     const total = data.reduce((s, d) => s + d.value, 0);
     if (!total) return emptyState(container);
@@ -272,6 +368,7 @@ const Charts = (() => {
     const circumference = 2 * Math.PI * r;
 
     const svg = svgEl('svg', { viewBox: `0 0 ${size} ${size}`, width: size, height: size });
+    describe(svg, `${title}: ${data.filter((d) => d.value > 0).map((d) => `${d.label} ${d.value} (${Math.round((d.value / total) * 100)}%)`).join(', ')}`);
     const group = svgEl('g', { transform: `rotate(-90 ${cx} ${cy})` });
 
     let cumulative = 0;
@@ -292,6 +389,7 @@ const Charts = (() => {
         class: 'chart-donut-seg',
       });
       circle.style.stroke = d.color;
+      addTitle(circle, `${d.label}: ${d.value} (${Math.round(frac * 100)}%)`);
 
       attachHover(circle, () => [
         { label: d.label, value: `${d.value} (${Math.round(frac * 100)}%)`, color: d.color },
@@ -310,11 +408,12 @@ const Charts = (() => {
         data.map((d) => ({ label: `${d.label} (${d.value})`, color: d.color }))
       );
     }
+    tableView(container, title, ['Category', 'Count', 'Share'], data.map((d) => [d.label, String(d.value), `${Math.round((d.value / total) * 100)}%`]));
   }
 
   // Sparkline -- a compact per-point trend (e.g. a player's goals across
   // their last N matches). One hue, small hit targets, no axis.
-  function sparkline(container, { values, color, labels, formatValue }) {
+  function sparkline(container, { values, color = 'var(--series-1)', labels, formatValue, title = 'Recent matches' }) {
     container.innerHTML = '';
     if (!values.length) return emptyState(container, 'No recent match data.');
 
@@ -326,6 +425,7 @@ const Charts = (() => {
     const width = values.length * (barW + gap);
 
     const svg = svgEl('svg', { viewBox: `0 0 ${width} ${height}`, width: '100%', height });
+    describe(svg, `${title}: ${values.map((v) => fmt(v)).join(', ')}, oldest to newest`);
 
     values.forEach((v, i) => {
       const x = i * (barW + gap);
@@ -334,6 +434,7 @@ const Charts = (() => {
       const rect = svgEl('rect', { x, y, width: barW, height: h, rx: 2, class: 'chart-bar' });
       rect.style.fill = color;
       const label = (labels && labels[i]) || `Match ${i + 1}`;
+      addTitle(rect, `${label}: ${fmt(v)}`);
       attachHover(rect, () => [{ label, value: fmt(v), color }]);
       svg.appendChild(rect);
     });
@@ -348,7 +449,7 @@ const Charts = (() => {
   // "1-3 series, color alone is comfortable" rule the rest of this file
   // follows -- the fill is the same color as the line, just faded via a
   // gradient into transparency rather than a second hue.
-  function areaChart(container, { data, color, unit = '', zeroBaseline = false }) {
+  function areaChart(container, { data, color = 'var(--accent)', unit = '', zeroBaseline = false, title = 'Trend' }) {
     container.innerHTML = '';
     if (!data.length) return emptyState(container);
 
@@ -388,6 +489,7 @@ const Charts = (() => {
     const yFor = (v) => padTop + usableH - ((v - min) / range) * usableH;
 
     const svg = svgEl('svg', { viewBox: `0 0 ${chartW} ${chartH}`, width: '100%', height: chartH });
+    describe(svg, `${title}: ${data.length} points, from ${data[0].value}${unit} (${data[0].label}) to ${data[data.length - 1].value}${unit} (${data[data.length - 1].label}), range ${Math.min(...values)}${unit} to ${Math.max(...values)}${unit}`);
     svg.appendChild(svgEl('line', { x1: 0, y1: chartH, x2: chartW, y2: chartH, class: 'chart-baseline' }));
 
     // A unique gradient id per chart instance -- multiple area charts can
@@ -429,6 +531,7 @@ const Charts = (() => {
         if (data[i].hint) rows.push({ label: data[i].hint, value: '' });
         return rows;
       });
+      addTitle(hit, `${data[i].label}: ${data[i].value}${unit}${data[i].hint ? ` (${data[i].hint})` : ''}`);
       svg.appendChild(hit);
 
       const dot = svgEl('circle', { cx: x, cy: y, r: 2.5, class: 'chart-area-point' });
@@ -437,6 +540,8 @@ const Charts = (() => {
     });
 
     container.appendChild(svg);
+    axisNote(container, `Oldest to newest. Range: ${Math.min(...values)}${unit} to ${Math.max(...values)}${unit}.`);
+    tableView(container, title, ['When', unit ? `Value (${unit})` : 'Value'], data.map((d) => [d.label, `${d.value}${unit}`]));
   }
 
   return {

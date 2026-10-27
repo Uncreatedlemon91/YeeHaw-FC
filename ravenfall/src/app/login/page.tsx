@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { SignInButton } from "@/components/auth-buttons";
-import { Container } from "@/components/container";
 import { Logo } from "@/components/logo";
+import { PublicFrame } from "@/components/public-frame";
 import { UNIT } from "@/config/unit";
 import { getSessionUser } from "@/lib/auth";
 
@@ -12,25 +12,37 @@ function safe(url: string | undefined) {
   return url && url.startsWith("/") && !url.startsWith("//") ? url : "/dashboard";
 }
 
+// NextAuth's ?error= codes, in plain words.
+const ERRORS: Record<string, string> = {
+  OAuthSignin: "We couldn't start the Discord sign-in. Give it another try in a moment.",
+  OAuthCallback: "Discord didn't complete the sign-in. Try again, and approve the Discord prompt when it appears.",
+  OAuthCreateAccount: "We couldn't create your account from Discord. Try again, or ask a recruiter for help.",
+  OAuthAccountNotLinked: "That Discord account is linked to a different sign-in. Use the account you first signed in with.",
+  Callback: "Something went wrong while finishing the sign-in. Try again.",
+  AccessDenied: "Access was denied. Make sure you approve the Discord prompt, and that you're allowed to use this site.",
+  SessionRequired: "Sign in to view that page.",
+  Configuration: "Sign-in is temporarily unavailable. Let a site admin know.",
+};
+const DEFAULT_ERROR = "Sign-in failed. Try again, and make sure you approve the Discord prompt.";
+
 export default async function Login({ searchParams }: { searchParams: Promise<{ callbackUrl?: string; error?: string }> }) {
   const { callbackUrl, error } = await searchParams;
   const target = safe(callbackUrl);
   if (await getSessionUser()) redirect(target);
 
   return (
-    <Container className="flex max-w-md flex-col items-center py-24 text-center">
-      <Logo className="size-14 text-accent" />
-      <h1 className="mt-6 text-3xl font-bold uppercase">{UNIT.siteName}</h1>
+    <PublicFrame tab="Sign in" icon={<Logo className="size-14 text-accent" />}>
+      <h1 className="mt-5 text-3xl font-bold uppercase">{UNIT.siteName}</h1>
       <p className="mt-2 text-sm text-muted-foreground">
         Sign in with the Discord account you use on the {UNIT.name} server. Your access on this site comes from your
         roles there.
       </p>
       {error && (
-        <p className="mt-6 w-full rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-red-300">
-          Sign-in failed ({error}). Try again, and make sure you approve the Discord prompt.
+        <p role="alert" className="mt-6 w-full rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive-fg">
+          {ERRORS[error] ?? DEFAULT_ERROR}
         </p>
       )}
       <SignInButton callbackUrl={target} size="lg" className="mt-8" />
-    </Container>
+    </PublicFrame>
   );
 }

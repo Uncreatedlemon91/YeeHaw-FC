@@ -36,9 +36,10 @@ export const DOCTRINE = [
 // `typical` is the usual time in the PMC by then, for guidance.
 // The personnel file shows it as a checklist; Command still promotes by hand.
 //
-// The pattern: each NCO step adds ~10 events and 15 days in grade, with
-// leadership approval from Sergeant up. Officer ranks carry the same steps
-// on, and the time between them keeps growing.
+// Paced for a long-term unit attending about one event a week: Corporal
+// takes around six months, Staff Sergeant a year and Commander three years
+// or more. Every rank from Private First Class up also needs time at the
+// rank below, and every NCO and officer rank needs leadership approval.
 export type RankDef = {
   abbr: string;
   short: string;
@@ -51,17 +52,17 @@ export type RankDef = {
 
 export const RANKS: readonly RankDef[] = [
   { abbr: "RCT", short: "Rct", name: "Recruit", grade: "E-1", tier: "enlisted" },
-  { abbr: "PVT", short: "Pvt", name: "Private", grade: "E-2", tier: "enlisted", requires: { ops: 1, service: 7, requiredReading: true }, typical: "1 week" },
-  { abbr: "PFC", short: "Pfc", name: "Private First Class", grade: "E-3", tier: "enlisted", requires: { ops: 3, service: 14 }, typical: "2 weeks" },
-  { abbr: "SPC", short: "Spc", name: "Specialist", grade: "E-4", tier: "enlisted", requires: { ops: 6, service: 30 } },
-  { abbr: "CPL", short: "Cpl", name: "Corporal", grade: "E-4", tier: "nco", requires: { ops: 12, service: 45 } },
-  { abbr: "SGT", short: "Sgt", name: "Sergeant", grade: "E-5", tier: "nco", requires: { ops: 20, days: 30, approval: true, requiredReading: true }, typical: "10–12 weeks" },
-  { abbr: "SSG", short: "SSgt", name: "Staff Sergeant", grade: "E-6", tier: "nco", requires: { ops: 30, days: 45, approval: true }, typical: "4–5 months" },
-  { abbr: "SFC", short: "SFC", name: "Sergeant First Class", grade: "E-7", tier: "nco", requires: { ops: 40, days: 60, approval: true }, typical: "6–8 months" },
-  { abbr: "2LT", short: "2Lt", name: "Second Lieutenant", grade: "O-1", tier: "officer", requires: { ops: 50, days: 75, approval: true, requiredReading: true }, typical: "9–11 months" },
-  { abbr: "1LT", short: "1Lt", name: "First Lieutenant", grade: "O-2", tier: "officer", requires: { ops: 60, days: 90, approval: true }, typical: "12–14 months" },
-  { abbr: "DCDR", short: "DCdr", name: "Deputy Commander", grade: "O-3", tier: "officer", requires: { ops: 75, days: 105, approval: true }, typical: "16–18 months" },
-  { abbr: "CDR", short: "Cdr", name: "Commander", grade: "O-4", tier: "officer", requires: { ops: 90, days: 120, approval: true }, typical: "20–24 months" },
+  { abbr: "PVT", short: "Pvt", name: "Private", grade: "E-2", tier: "enlisted", requires: { ops: 3, service: 21, requiredReading: true }, typical: "3 weeks" },
+  { abbr: "PFC", short: "Pfc", name: "Private First Class", grade: "E-3", tier: "enlisted", requires: { ops: 8, service: 60, days: 30 }, typical: "2 months" },
+  { abbr: "SPC", short: "Spc", name: "Specialist", grade: "E-4", tier: "enlisted", requires: { ops: 16, service: 120, days: 45 }, typical: "4 months" },
+  { abbr: "CPL", short: "Cpl", name: "Corporal", grade: "E-4", tier: "nco", requires: { ops: 24, service: 180, days: 60, approval: true }, typical: "6 months" },
+  { abbr: "SGT", short: "Sgt", name: "Sergeant", grade: "E-5", tier: "nco", requires: { ops: 36, service: 270, days: 90, quals: ["team-leader-course"], approval: true, requiredReading: true }, typical: "9 months" },
+  { abbr: "SSG", short: "SSgt", name: "Staff Sergeant", grade: "E-6", tier: "nco", requires: { ops: 50, service: 365, days: 120, approval: true }, typical: "12–14 months" },
+  { abbr: "SFC", short: "SFC", name: "Sergeant First Class", grade: "E-7", tier: "nco", requires: { ops: 65, service: 540, days: 150, approval: true }, typical: "18–20 months" },
+  { abbr: "2LT", short: "2Lt", name: "Second Lieutenant", grade: "O-1", tier: "officer", requires: { ops: 80, service: 730, days: 180, approval: true, requiredReading: true }, typical: "2 years" },
+  { abbr: "1LT", short: "1Lt", name: "First Lieutenant", grade: "O-2", tier: "officer", requires: { ops: 100, service: 910, days: 180, approval: true }, typical: "2½ years" },
+  { abbr: "DCDR", short: "DCdr", name: "Deputy Commander", grade: "O-3", tier: "officer", requires: { ops: 125, service: 1095, days: 240, approval: true }, typical: "3 years" },
+  { abbr: "CDR", short: "Cdr", name: "Commander", grade: "O-4", tier: "officer", requires: { ops: 150, service: 1275, days: 270, approval: true }, typical: "3½ years or more" },
 ];
 
 export const RECRUIT_RANK = RANKS[0].abbr;
@@ -75,37 +76,37 @@ export const SQUADS: readonly SquadDef[] = [
     name: "Command",
     callsign: "Raven",
     blurb: "Mission planning, coordination and unit leadership.",
-    billets: { Command: 3, "Radio Operator": 1 },
+    billets: { Command: 3, "Communications / Intelligence Specialist": 1 },
   },
   {
     name: "Alpha",
     callsign: "Wardog 1",
-    blurb: "Line infantry. Assault, clearance and holding ground.",
-    billets: { "Squad Leader": 1, "Team Leader": 2, "Radio Operator": 1, "Combat Medic": 1, "Automatic Rifleman": 2, Grenadier: 2, Rifleman: 4 },
+    blurb: "Assault team. Room clearing, close-quarters battle and holding ground.",
+    billets: { "Team Leader": 1, "Assistant Team Leader": 1, "Point Man": 1, Assaulter: 4, Breacher: 2, Medic: 1, "Communications / Intelligence Specialist": 1 },
   },
   {
     name: "Bravo",
     callsign: "Wardog 2",
-    blurb: "Line infantry. Fire support and manoeuvre element.",
-    billets: { "Squad Leader": 1, "Team Leader": 2, "Radio Operator": 1, "Combat Medic": 1, "Automatic Rifleman": 2, Grenadier: 2, Rifleman: 4 },
+    blurb: "Assault team. Fire support and manoeuvre element.",
+    billets: { "Team Leader": 1, "Assistant Team Leader": 1, "Point Man": 1, Assaulter: 4, Breacher: 2, Medic: 1, "Communications / Intelligence Specialist": 1 },
   },
   {
     name: "Charlie",
     callsign: "Shadow",
-    blurb: "Reconnaissance, marksmen and forward observers.",
-    billets: { "Squad Leader": 1, "Team Leader": 1, "Radio Operator": 1, Marksman: 4, Rifleman: 2 },
+    blurb: "Reconnaissance troop. Overwatch, sniper pairs and early warning.",
+    billets: { "Team Leader": 1, "Assistant Team Leader": 1, "Communications / Intelligence Specialist": 1, "Overwatch / Sniper": 4, Assaulter: 2 },
   },
   {
     name: "Reaper",
     callsign: "Reaper",
     blurb: "Rotary-wing transport, CAS and medevac.",
-    billets: { "Squad Leader": 1, Pilot: 4 },
+    billets: { "Team Leader": 1, Pilot: 4 },
   },
   {
     name: "Medical",
     callsign: "Lifeline",
-    blurb: "Combat medics and casualty evacuation.",
-    billets: { "Team Leader": 1, "Combat Medic": 4 },
+    blurb: "Tactical combat casualty care and casualty evacuation.",
+    billets: { "Team Leader": 1, Medic: 4 },
   },
 ];
 
@@ -113,19 +114,24 @@ export const SQUADS: readonly SquadDef[] = [
 // hold to request it as primary or secondary. `leads` marks billets whose
 // holders act as leadership for their own squad: they see its restricted
 // files and decide its role and leave requests.
-export type RoleDef = { name: string; code: string; blurb: string; requires: string[]; leads?: boolean };
+// `about` is optional longer copy for the public About > Billets page.
+// `name` is stored on each member and in the Admin page's role mapping, so
+// renaming one needs a data migration (see prisma/migrations/*_team_billets).
+export type RoleDef = { name: string; code: string; blurb: string; requires: string[]; leads?: boolean; about?: string };
+
+const LEADS = " A leadership billet: also decides the squad's role and leave requests.";
 
 export const ROLES: readonly RoleDef[] = [
-  { name: "Rifleman", code: "11B", blurb: "The backbone of the fireteam.", requires: ["basic-combat-training"] },
-  { name: "Automatic Rifleman", code: "11B-AR", blurb: "Suppressive fire with the team's LMG.", requires: ["basic-combat-training"] },
-  { name: "Grenadier", code: "11B-GR", blurb: "Indirect fire and smoke with the UGL.", requires: ["basic-combat-training"] },
-  { name: "Marksman", code: "11B-DM", blurb: "Precision fire at extended range.", requires: ["basic-combat-training", "marksman"] },
-  { name: "Combat Medic", code: "68W", blurb: "Casualty care under fire.", requires: ["basic-combat-training", "combat-lifesaver"] },
-  { name: "Radio Operator", code: "25C", blurb: "Keeps the element on the net.", requires: ["basic-combat-training"] },
-  { name: "Team Leader", code: "11B-TL", blurb: "Leads a fireteam of four.", requires: ["basic-combat-training", "team-leader-course"], leads: true },
-  { name: "Squad Leader", code: "11B-SL", blurb: "Leads the squad and its teams.", requires: ["basic-combat-training", "team-leader-course"], leads: true },
-  { name: "Pilot", code: "153A", blurb: "Rotary-wing aviator.", requires: ["rotary-wing-pilot"] },
-  { name: "Command", code: "HQ", blurb: "Unit command staff.", requires: ["team-leader-course"], leads: true },
+  { name: "Team Leader", code: "TL", blurb: "Commands the team.", requires: ["basic-combat-training", "team-leader-course"], leads: true, about: "Commands the team; typically a Master Sergeant (E-8) or senior Sergeant First Class (E-7)." + LEADS },
+  { name: "Assistant Team Leader", code: "ATL", blurb: "Second-in-command (2IC).", requires: ["basic-combat-training", "team-leader-course"], leads: true, about: "Second-in-command (2IC); assists with tactical planning, coordination, and execution." + LEADS },
+  { name: "Point Man", code: "PT", blurb: "Leads the stack or movement formation.", requires: ["basic-combat-training"], about: "Leads the team's stack or movement formation; responsible for forward security, navigation, and immediate threat engagement." },
+  { name: "Assaulter", code: "ASLT", blurb: "The core tactical element.", requires: ["basic-combat-training"], about: "Forms the core tactical element; executes room clearing, close-quarters battle (CQB), and primary target engagement." },
+  { name: "Breacher", code: "BRCH", blurb: "Mechanical, ballistic, thermal and explosive entry.", requires: ["basic-combat-training"], about: "Specializes in mechanical, ballistic, thermal, and explosive entry methods to bypass locked or fortified doors and obstacles." },
+  { name: "Medic", code: "MED", blurb: "Tactical combat casualty care under fire.", requires: ["basic-combat-training", "combat-lifesaver"], about: "Advanced tactical combat casualty care (TCCC) specialist trained to manage trauma and provide prolonged field care under fire." },
+  { name: "Communications / Intelligence Specialist", code: "COMMS", blurb: "Secure radio and satellite networks, and battlefield intel.", requires: ["basic-combat-training"], about: "Manages secure satellite and tactical radio networks; relays real-time battlefield data to higher command." },
+  { name: "Overwatch / Sniper", code: "OW", blurb: "Long-range surveillance and precision fire, in pairs.", requires: ["basic-combat-training", "marksman"], about: "Works as a sniper pair: provides long-range surveillance, precision fire support, and early warning from a distance (typically attached from a reconnaissance troop)." },
+  { name: "Pilot", code: "153A", blurb: "Rotary-wing aviator.", requires: ["rotary-wing-pilot"], about: "Flies the unit's rotary-wing transport, close air support and medevac." },
+  { name: "Command", code: "HQ", blurb: "Unit command staff.", requires: ["team-leader-course"], leads: true, about: "Sits on the unit's command staff, planning missions and leading the unit. A leadership billet: also decides role and leave requests across every squad." },
 ];
 
 export const UNIT_ROLES = ROLES.map((r) => r.name);

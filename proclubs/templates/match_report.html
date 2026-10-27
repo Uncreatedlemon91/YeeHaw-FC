@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_matchday.html" import scoreboard with context %}
 {% block title %}Match report · {{ event.title }}{% endblock %}
 {% block content %}
 <div class="page page-wide">
@@ -20,6 +21,11 @@
   {% elif not is_past %}
     <div class="card empty-state">The report opens after kick-off. Voting for Man of the Match opens two hours in.</div>
   {% else %}
+  {# The fixture's own result as a scoreboard; the night's EA total sits in
+     the report below. #}
+  <div class="panel scoreboard-panel">
+    {{ scoreboard(event, none, event.result or ((night.gf ~ '-' ~ night.ga) if night else '')) }}
+  </div>
   <div class="dash-grid">
     <div class="dash-main">
       {# --- The report, as everyone sees it ---------------------------------- #}

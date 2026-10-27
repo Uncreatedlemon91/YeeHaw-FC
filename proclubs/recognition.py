@@ -202,8 +202,11 @@ def leaderboards(people: list[dict], usage: dict, links: dict[int, str], motm: d
             boards["Turns up"].append(row(p, rec["rate"]))
     units = {"Form": "avg rating, last 5", "Goals": "recorded matches", "Assists": "recorded matches",
              "Man of the Match": "squad votes", "Turns up": "% of marked events"}
+    keys = {"Form": "form", "Goals": "goals", "Assists": "assists",
+            "Man of the Match": "motm", "Turns up": "attendance"}
     out = []
     for title, rows in boards.items():
         rows.sort(key=lambda r: (-r["value"], r["name"].casefold()))
-        out.append({"title": title, "unit": units[title], "rows": rows[:LEADERBOARD_SIZE]})
+        out.append({"title": title, "key": keys[title], "unit": units[title],
+                    "rows": rows[:LEADERBOARD_SIZE]})
     return out

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_ui.html" import empty_state %}
 {% block title %}Live{% endblock %}
 {% block content %}
 <div class="page">
@@ -10,13 +11,13 @@
   </div>
 
   {% if not twitch_enabled %}
-    <div class="card empty-state">Twitch isn't configured on this deployment yet, so live status can't be shown.</div>
+    <p class="notice-line">Live status isn't available right now, so channels show as offline.{% if is_staff %} <span class="config-hint-inline">Staff: Twitch credentials aren't configured.</span>{% endif %}</p>
   {% endif %}
 
   {% if featured_streamer %}
     <div class="featured-stream card">
       <div class="featured-stream-player">
-        <iframe
+        <iframe title="{{ featured_streamer.display_name }} on Twitch"
           src="https://player.twitch.tv/?channel={{ featured_streamer.twitch_login }}&parent={{ request.url.hostname }}&muted=true"
           allowfullscreen frameborder="0" scrolling="no" loading="lazy"></iframe>
       </div>
@@ -55,7 +56,7 @@
             </div>
           </div>
           {% if is_staff %}
-            <div class="form-actions" style="padding:0 1rem 1rem;">
+            <div class="form-actions streamer-actions">
               <form method="post" action="/streamers/{{ s.id }}/feature">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                 <button type="submit" class="btn secondary">Make Featured</button>
@@ -70,7 +71,7 @@
       {% endfor %}
     </div>
   {% elif not featured_streamer %}
-    <div class="card empty-state">No channels on the showcase yet.</div>
+    <div class="card">{{ empty_state('media', 'No channels yet', 'Channels the squad streams on will be listed here.') }}</div>
   {% endif %}
 
   {% if is_staff %}

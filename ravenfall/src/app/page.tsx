@@ -1,35 +1,33 @@
 import { ChevronRight, Crosshair, FileText, Radio, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { Container } from "@/components/container";
+import { Countdown } from "@/components/countdown";
 import { Logo } from "@/components/logo";
+import { PIPELINE } from "@/components/public-pipeline";
+import { VideoFacade } from "@/components/public-video";
 import { Button } from "@/components/ui/button";
 import { DOCTRINE, SQUADS, UNIT } from "@/config/unit";
 import { prisma } from "@/lib/prisma";
-import { fmt } from "@/lib/time";
 
 export const revalidate = 300;
 
 const ICONS = [Radio, Crosshair, ShieldCheck];
 
-const PIPELINE = [
-  { step: "01", title: "Apply", body: "Sign in with Discord and fill out a short questionnaire. No separate account." },
-  { step: "02", title: "Review", body: "Recruiters are alerted on Discord and review your application, usually within 48 hours." },
-  { step: "03", title: "Enlist", body: "Once approved you get your callsign, roles and a service record. You're a Recruit." },
-  { step: "04", title: "Deploy", body: "RSVP to your first op, complete basic training and start earning qualifications." },
-];
-
 async function stats() {
   try {
-    const [members, ops, quals, nextOp] = await Promise.all([
+    const [members, ops, quals, nextOp, filledRows] = await Promise.all([
       prisma.user.count({ where: { status: "ACTIVE" } }),
       prisma.event.count({ where: { type: "OP", startTime: { lt: new Date() } } }),
       prisma.userQualification.count(),
       prisma.event.findFirst({ where: { startTime: { gte: new Date() } }, orderBy: { startTime: "asc" } }),
+      prisma.user.groupBy({ by: ["squad"], where: { status: "ACTIVE", squad: { not: null } }, _count: true }),
     ]);
-    return { members, ops, quals, nextOp };
+    const filled: Record<string, number> = {};
+    for (const r of filledRows) if (r.squad) filled[r.squad] = r._count;
+    return { members, ops, quals, nextOp, filled };
   } catch {
     // The landing page should render even if the database is down.
-    return { members: 0, ops: 0, quals: 0, nextOp: null };
+    return { members: 0, ops: 0, quals: 0, nextOp: null, filled: {} as Record<string, number> };
   }
 }
 
@@ -55,7 +53,7 @@ export default async function Home() {
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-background/40 to-background" />
         <div className="pointer-events-none absolute -right-24 -top-24 size-[28rem] rounded-full bg-primary/10 blur-3xl" />
         <Container className="relative py-20 sm:py-28">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-accent">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-label text-accent">
             <Logo className="size-5" /> {UNIT.siteName}
           </div>
           <h1 className="mt-4 max-w-3xl text-5xl font-bold uppercase leading-[0.95] sm:text-7xl">
@@ -76,18 +74,20 @@ export default async function Home() {
             )}
           </div>
           {s.nextOp && (
-            <div className="mt-10 inline-flex items-center gap-3 rounded-md border bg-card/70 px-4 py-2 text-sm">
+            <div className="mt-10 inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border bg-card/70 px-4 py-2 text-sm">
               <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-75" />
+                <span className="absolute inline-flex size-full animate-ping rounded-full motion-reduce:animate-none bg-accent opacity-75" />
                 <span className="relative inline-flex size-2 rounded-full bg-accent" />
               </span>
               <span className="text-muted-foreground">Next deployment:</span>
-              <span className="font-semibold">{fmt(s.nextOp.startTime, "EEE d MMM, HH:mm zzz")}</span>
+              <span className="font-semibold">{s.nextOp.title}</span>
+              <Countdown to={s.nextOp.startTime} className="text-accent" />
             </div>
           )}
         </Container>
       </section>
 
+      {s.members > 0 && (
       <section className="border-b bg-card/40">
         <Container className="grid grid-cols-3 divide-x py-6 text-center">
           {[
@@ -97,11 +97,12 @@ export default async function Home() {
           ].map(([label, n]) => (
             <div key={label as string}>
               <div className="font-display text-3xl font-bold text-accent sm:text-4xl">{n}</div>
-              <div className="mt-1 text-[11px] uppercase tracking-widest text-muted-foreground">{label}</div>
+              <div className="mt-1 text-micro uppercase tracking-widest text-muted-foreground">{label}</div>
             </div>
           ))}
         </Container>
       </section>
+      )}
 
       <Container className="py-16">
         <SectionTitle eyebrow="Doctrine" title="How we fight" />
@@ -123,12 +124,21 @@ export default async function Home() {
         <Container className="py-16">
           <SectionTitle eyebrow="Order of battle" title="Squads & branches" />
           <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-3">
-            {SQUADS.map((sq) => (
-              <div key={sq.name} className="bg-card p-6">
-                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">{sq.name}</div>
-                <p className="mt-2 text-sm text-muted-foreground">{sq.blurb}</p>
-              </div>
-            ))}
+            {SQUADS.map((sq) => {
+              const cap = Object.values(sq.billets).reduce((a, b) => a + b, 0);
+              const filled = Math.min(s.filled[sq.name] ?? 0, cap);
+              return (
+                <div key={sq.name} className="bg-card p-6">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="text-xs font-semibold uppercase tracking-label text-accent">{sq.name}</div>
+                    <div className="text-micro uppercase tracking-wider text-muted-foreground">
+                      {s.members > 0 ? `${filled}/${cap} slots` : `${cap} slots`}
+                    </div>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">{sq.blurb}</p>
+                </div>
+              );
+            })}
           </div>
         </Container>
       </section>
@@ -152,16 +162,8 @@ export default async function Home() {
         <Container className="py-16">
           <SectionTitle eyebrow="Media" title="From the field" />
           <div className="grid gap-4 md:grid-cols-2">
-            {UNIT.media.map((id) => (
-              <div key={id} className="aspect-video overflow-hidden rounded-lg border">
-                <iframe
-                  src={`https://www.youtube-nocookie.com/embed/${id}`}
-                  title="Unit footage"
-                  className="size-full"
-                  allowFullScreen
-                  loading="lazy"
-                />
-              </div>
+            {UNIT.media.map((id, i) => (
+              <VideoFacade key={id} id={id} title={`Unit footage ${i + 1} of ${UNIT.media.length}`} />
             ))}
           </div>
         </Container>
@@ -178,8 +180,12 @@ export default async function Home() {
             </li>
           ))}
         </ol>
-        <div className="mt-10 flex flex-col items-center gap-4 rounded-lg border border-accent/30 bg-accent/5 p-8 text-center">
-          <h2 className="text-2xl font-bold uppercase">Ready to deploy?</h2>
+        <div className="jacket relative mt-10 flex flex-col items-center gap-4 overflow-hidden rounded-lg border p-8 text-center sm:p-12">
+          <div aria-hidden className="absolute right-4 top-4 hidden sm:block">
+            <span className="stamp stamp-amber">Now enlisting</span>
+          </div>
+          <p className="text-micro font-semibold uppercase tracking-label text-muted-foreground">File no. 001 · New recruit</p>
+          <h2 className="text-3xl font-bold uppercase sm:text-4xl">Ready to deploy?</h2>
           <p className="max-w-lg text-sm text-muted-foreground">
             All you need is a Discord account and a working microphone. We train you on the rest.
           </p>
@@ -197,7 +203,7 @@ export default async function Home() {
 function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
     <div className="mb-8">
-      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-accent">{eyebrow}</p>
+      <p className="text-xs font-semibold uppercase tracking-label text-accent">{eyebrow}</p>
       <h2 className="mt-1 text-3xl font-bold uppercase">{title}</h2>
     </div>
   );

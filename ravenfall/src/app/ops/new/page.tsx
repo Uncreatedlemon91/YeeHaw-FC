@@ -12,7 +12,7 @@ export default async function NewEvent() {
   await requireUser("INSTRUCTOR", "/ops/new");
   const { ops } = await getChannelConfig();
   return (
-    <Container className="max-w-3xl">
+    <Container size="narrow">
       <PageHeader eyebrow="Operations" title="Schedule event" />
       <Card>
         <CardContent className="py-6">

@@ -50,6 +50,15 @@
     slot.dataset.slotKey = slotKey;
 
     const name = currentSlots[slotKey];
+    if (IS_STAFF) {
+      slot.tabIndex = 0;
+      slot.setAttribute('role', 'button');
+      slot.setAttribute('aria-label', name
+        ? `${def.label}: ${name}. Activate to clear.`
+        : `${def.label}: empty. Drop a name here.`);
+    } else {
+      slot.setAttribute('aria-label', name ? `${def.label}: ${name}` : `${def.label}: empty`);
+    }
     slot.classList.toggle('filled', !!name);
     slot.innerHTML = name
       ? `<span class="pitch-slot-name">${esc(name)}</span><span class="pitch-slot-pos">${esc(def.label)}</span>`
@@ -72,6 +81,9 @@
         refreshRoster();
       });
       // Click a filled slot to clear it -- the touch/no-drag-support fallback.
+      slot.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); slot.click(); }
+      });
       slot.addEventListener('click', () => {
         if (!currentSlots[slotKey]) return;
         delete currentSlots[slotKey];
@@ -108,7 +120,7 @@
   function renderRoster(names, emptyMessage) {
     if (!rosterList) return;
     if (!names.length) {
-      rosterList.innerHTML = `<p class="chart-empty">${esc(emptyMessage)}</p>`;
+      rosterList.innerHTML = `<div class="tactics-roster-empty"><p class="empty-state-body">${esc(emptyMessage)}</p></div>`;
       return;
     }
     rosterList.innerHTML = '';
@@ -117,6 +129,7 @@
       chip.className = 'tactics-chip';
       chip.textContent = name;
       chip.draggable = true;
+      chip.title = 'Drag onto the pitch or bench';
       chip.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData('text/plain', name);
         e.dataTransfer.effectAllowed = 'copy';
@@ -134,12 +147,13 @@
     const available = allRosterNames.filter((name) => !placed.has(name));
     const emptyMessage = allRosterNames.length
       ? 'Everyone is on the pitch or bench.'
-      : 'No roster data available right now.';
+      : 'No players on the roster yet.';
     renderRoster(available, emptyMessage);
   }
 
   function loadRoster() {
     if (!IS_STAFF || !rosterList) return;
+    rosterList.innerHTML = '<p class="chart-empty" role="status">Loading roster&hellip;</p>';
     fetch('/api/members')
       .then((r) => {
         if (!r.ok) throw new Error('failed to load roster');
@@ -153,7 +167,9 @@
         refreshRoster();
       })
       .catch(() => {
-        rosterList.innerHTML = '<p class="chart-empty">Couldn’t load the roster right now.</p>';
+        rosterList.innerHTML = '<div class="tactics-roster-empty" role="alert"><p class="empty-state-body">Couldn’t load the roster.</p><button type="button" class="btn secondary btn-sm" id="tactics-roster-retry">Try again</button></div>';
+        const retry = document.getElementById('tactics-roster-retry');
+        if (retry) retry.addEventListener('click', loadRoster);
       });
   }
 

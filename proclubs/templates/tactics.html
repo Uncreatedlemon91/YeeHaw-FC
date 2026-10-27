@@ -18,23 +18,25 @@
   <div class="tactics-board" id="tactics-board" data-is-staff="{{ 'true' if is_staff else 'false' }}">
     <input type="hidden" id="tactics-csrf-token" name="csrf_token" value="{{ csrf_token }}" />
     <div class="tactics-toolbar">
-      <label class="field" style="max-width: 220px;">
-        <span class="field-hint" style="margin-bottom: 0.3rem; display: block;">Formation</span>
+      <div class="field tactics-formation">
+        <label for="tactics-formation-select">Formation</label>
         <select id="tactics-formation-select">
           {% for name in formations.keys() %}
             <option value="{{ name }}" {{ 'selected' if name == active_formation else '' }}>{{ name }}</option>
           {% endfor %}
         </select>
-      </label>
+      </div>
       {% if is_staff %}
-        <button type="button" id="tactics-save-btn" class="btn">Save Lineup</button>
-        <span id="tactics-save-status" class="field-hint" aria-live="polite"></span>
+        <div class="tactics-save">
+          <button type="button" id="tactics-save-btn" class="btn">Save Lineup</button>
+          <span id="tactics-save-status" class="field-hint" role="status" aria-live="polite"></span>
+        </div>
       {% endif %}
     </div>
 
     <div class="tactics-layout">
       <div class="pitch-column">
-        <div class="pitch" id="tactics-pitch">
+        <div class="pitch" id="tactics-pitch" role="group" aria-label="Pitch lineup">
           <div class="pitch-markings">
             <div class="pitch-center-circle"></div>
             <div class="pitch-center-line"></div>
@@ -57,7 +59,7 @@
           <h3>Roster</h3>
           <p class="field-hint">Drag a name onto the pitch or bench.</p>
           <div id="tactics-roster-list" class="tactics-roster-list">
-            <p class="chart-empty">Loading roster&hellip;</p>
+            <p class="chart-empty" role="status">Loading roster&hellip;</p>
           </div>
         </div>
       {% endif %}

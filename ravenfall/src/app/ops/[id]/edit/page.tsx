@@ -17,7 +17,7 @@ export default async function EditEvent({ params }: { params: Promise<{ id: stri
   const event = await prisma.event.findUnique({ where: { id } });
   if (!event) notFound();
   return (
-    <Container className="max-w-3xl">
+    <Container size="narrow">
       <PageHeader
         eyebrow="Operations"
         title={`Edit: ${event.title}`}

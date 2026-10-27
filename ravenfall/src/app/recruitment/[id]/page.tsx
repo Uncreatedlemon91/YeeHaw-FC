@@ -31,12 +31,12 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
   const ans = answersOf(app);
 
   return (
-    <Container className="max-w-4xl">
+    <Container size="narrow">
       <PageHeader
         eyebrow="Application"
         title={
           <span className="flex items-center gap-3">
-            <Avatar discordId={app.discordId} avatar={app.user.avatar} size={40} />
+            <Avatar discordId={app.discordId} avatar={app.user.avatar} name={app.discordUsername} size={40} />
             {app.discordUsername}
           </span>
         }

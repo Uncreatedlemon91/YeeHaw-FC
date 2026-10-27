@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ActionForm, SubmitButton } from "@/components/action-form";
+import { AdminForm } from "@/components/admin-form";
 import { Field, Select } from "@/components/ui/input";
 import { saveChannels } from "./actions";
 
@@ -20,7 +20,7 @@ export function ChannelForm({
 }) {
   const known = new Set(groups.flatMap((g) => g.channels.map((c) => c.id)));
   return (
-    <ActionForm action={saveChannels}>
+    <AdminForm action={saveChannels} saveLabel="Save channels">
       <div className="grid gap-4 sm:grid-cols-2">
         {targets.map((t) => (
           <Field key={t.key} label={t.label} help={t.help}>
@@ -28,10 +28,7 @@ export function ChannelForm({
           </Field>
         ))}
       </div>
-      <SubmitButton variant="accent" className="self-start" pendingText="Saving…">
-        Save channels
-      </SubmitButton>
-    </ActionForm>
+    </AdminForm>
   );
 }
 

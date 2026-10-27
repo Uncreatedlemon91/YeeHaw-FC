@@ -16,7 +16,7 @@ export function PageHeader({
   return (
     <div className={cn("mb-6 flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-end sm:justify-between", className)}>
       <div>
-        {eyebrow && <p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-accent">{eyebrow}</p>}
+        {eyebrow && <p className="mb-1 text-xs font-semibold uppercase tracking-label text-accent">{eyebrow}</p>}
         <h1 className="text-2xl font-bold uppercase sm:text-3xl">{title}</h1>
         {description && <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{description}</p>}
       </div>

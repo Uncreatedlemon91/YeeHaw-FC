@@ -37,4 +37,47 @@
     tick();
     setInterval(tick, 15000);
   }
+
+  // Horizontal strips (the phone's section links, the tab bar): bring the
+  // current item into view, and flag which edges have more to scroll to so
+  // CSS can fade them (data-fade="start|end|both", absent when it all fits).
+  function wireStrip(strip, current) {
+    function fade() {
+      var max = strip.scrollWidth - strip.clientWidth;
+      var parts = [];
+      if (max > 1 && strip.scrollLeft > 1) parts.push("start");
+      if (max > 1 && strip.scrollLeft < max - 1) parts.push("end");
+      if (parts.length) strip.setAttribute("data-fade", parts.join(" "));
+      else strip.removeAttribute("data-fade");
+    }
+    if (current && strip.scrollWidth > strip.clientWidth + 1) {
+      var s = strip.getBoundingClientRect(), c = current.getBoundingClientRect();
+      strip.scrollLeft += c.left - s.left - (s.width - c.width) / 2;
+    }
+    fade();
+    strip.addEventListener("scroll", fade, { passive: true });
+    window.addEventListener("resize", fade);
+  }
+  document.querySelectorAll(".side-nav, .tab-bar").forEach(function (strip) {
+    wireStrip(strip, strip.querySelector("[aria-current], .active"));
+  });
+
+  // <form data-loading="Saving..."> : on submit, disable the submit buttons,
+  // mark them .is-loading and swap their text, so a slow save can't be
+  // double-submitted. (The button's value is still sent: the disabling is
+  // deferred a tick so the browser has already collected the form data.)
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (!form.matches || !form.matches("form[data-loading]") || e.defaultPrevented) return;
+    var label = form.getAttribute("data-loading") || "Working\u2026";
+    var buttons = form.querySelectorAll("button[type=submit], button:not([type]), input[type=submit]");
+    setTimeout(function () {
+      buttons.forEach(function (b) {
+        b.disabled = true;
+        b.classList.add("is-loading");
+        b.setAttribute("aria-busy", "true");
+        if (b.tagName === "INPUT") b.value = label; else b.textContent = label;
+      });
+    }, 0);
+  });
 })();

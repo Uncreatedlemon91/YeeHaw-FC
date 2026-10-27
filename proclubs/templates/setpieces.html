@@ -1,8 +1,9 @@
 {% extends "base.html" %}
+{% from "_ui.html" import empty_state %}
 {% block title %}Set pieces{% endblock %}
 {% block content %}
 {% macro piece_form(piece=None) %}
-  <form method="post" action="/set-pieces{{ '/' ~ piece.id if piece else '' }}" class="stack-form piece-form">
+  <form method="post" action="/set-pieces{{ '/' ~ piece.id if piece else '' }}" class="stack-form piece-form" data-loading="Saving…">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
     <div class="field-row">
       <div class="field"><label>Name</label><input name="name" aria-label="Routine name" maxlength="60" required value="{{ piece.name if piece else '' }}" placeholder="e.g. Near-post flick" /></div>
@@ -29,7 +30,7 @@
   </div>
 
   {% if not total %}
-    <div class="card empty-state">No routines yet.{% if is_staff %} Add the first one below.{% endif %}</div>
+    <div class="card">{{ empty_state('target', 'No routines yet', 'Corners, free kicks and throw-ins the club has worked out will be listed here.' ~ (' Add the first one below.' if is_staff else '')) }}</div>
   {% endif %}
 
   {% for kind in kinds if book[kind] %}

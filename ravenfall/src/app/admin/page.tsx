@@ -1,5 +1,5 @@
-import { CheckCircle2, XCircle } from "lucide-react";
-import { ActionForm, SubmitButton } from "@/components/action-form";
+import { CheckCircle2, TriangleAlert } from "lucide-react";
+import { ActionCard, AdminCallout, ChecksCard, type Check } from "@/components/admin-parts";
 import { Container } from "@/components/container";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,41 +56,26 @@ export default async function Admin() {
   const gateway = gatewayRow?.value as { at: string; tag: string; members: boolean } | undefined;
   const gatewayOnline = !!gateway && Date.now() - new Date(gateway.at).getTime() < GATEWAY_STALE_MS;
 
-  const checks: [string, boolean, string][] = [
-    ["Discord OAuth", !!(env.clientId && process.env.DISCORD_CLIENT_SECRET), "DISCORD_CLIENT_ID / DISCORD_CLIENT_SECRET"],
-    ["Bot token", !!env.botToken, "DISCORD_BOT_TOKEN"],
-    ["Guild", !!env.guildId, "DISCORD_GUILD_ID"],
-    ["Interactions endpoint", !!env.publicKey, "DISCORD_PUBLIC_KEY"],
-    ["Recruitment board", !!channels.board, "channels below"],
-    ["Welcome channel", !!channels.welcome, "channels below"],
-    ["Ops announcements (optional)", !!channels.ops, "channels below"],
-    ["Personnel board (optional)", !!channels.personnel, "channels below"],
-    ["Library announcements (optional)", !!channels.library, "channels below"],
-    ["Recruit role", !!cfg.recruit, "role mapping below"],
-    ["Candidate role", !!cfg.candidate, "role mapping below"],
+  const botReady = !!(env.botToken && env.guildId);
+  const checks: Check[] = [
+    { label: "Discord OAuth", ok: !!(env.clientId && process.env.DISCORD_CLIENT_SECRET), env: "DISCORD_CLIENT_ID / DISCORD_CLIENT_SECRET", hint: "Create an app in the Discord Developer Portal and copy its OAuth2 credentials." },
+    { label: "Bot token", ok: !!env.botToken, env: "DISCORD_BOT_TOKEN", hint: "Developer Portal → Bot → Reset Token." },
+    { label: "Guild", ok: !!env.guildId, env: "DISCORD_GUILD_ID", hint: "Enable Developer Mode in Discord, then right-click the server → Copy Server ID." },
+    { label: "Interactions endpoint", ok: !!env.publicKey, env: "DISCORD_PUBLIC_KEY", hint: "Developer Portal → General Information → Public Key." },
+    { label: "Recruitment board", ok: !!channels.board, env: "Channels below", hint: "Pick a channel in Discord channels." },
+    { label: "Welcome channel", ok: !!channels.welcome, env: "Channels below", hint: "Pick a channel in Discord channels." },
+    { label: "Ops announcements", ok: !!channels.ops, env: "Channels below", optional: true, hint: "Only needed to announce new operations." },
+    { label: "Personnel board", ok: !!channels.personnel, env: "Channels below", optional: true, hint: "Only needed for billet, callsign and leave requests." },
+    { label: "Library announcements", ok: !!channels.library, env: "Channels below", optional: true, hint: "Only needed to announce library documents." },
+    { label: "Recruit role", ok: !!cfg.recruit, env: "Role mapping below", hint: "Map it under Discord role mapping → Recruitment." },
+    { label: "Candidate role", ok: !!cfg.candidate, env: "Role mapping below", hint: "Map it under Discord role mapping → Recruitment." },
   ];
 
   return (
-    <Container className="max-w-5xl">
+    <Container>
       <PageHeader eyebrow="Command" title="Admin" description="Discord integration status and one-off setup actions." />
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Configuration</CardTitle>
-            <CardDescription>Credentials live in the server&apos;s .env (restart the site after changing it). Roles and channels are set below.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            {checks.map(([label, ok, key]) => (
-              <div key={label} className="flex items-center justify-between gap-3 text-sm">
-                <span className="flex items-center gap-2">
-                  {ok ? <CheckCircle2 className="size-4 text-green-400" /> : <XCircle className="size-4 text-red-400" />}
-                  {label}
-                </span>
-                <code className="text-xs text-muted-foreground">{key}</code>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <ChecksCard checks={checks} />
 
         <Card>
           <CardHeader>
@@ -98,13 +83,11 @@ export default async function Admin() {
             <CardDescription>The gateway service keeps the bot online and watches for role changes.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2 text-sm">
-            <span className="flex items-center gap-2">
-              {gatewayOnline ? <CheckCircle2 className="size-4 text-green-400" /> : <XCircle className="size-4 text-red-400" />}
-              {gatewayOnline ? `Online as ${gateway!.tag}` : "Offline"}
+            <span className={`flex items-center gap-2 font-medium ${gatewayOnline ? "text-success-fg" : "text-warning"}`}>
+              {gatewayOnline ? <CheckCircle2 className="size-4" aria-hidden /> : <TriangleAlert className="size-4" aria-hidden />}
+              {gatewayOnline ? `Online as ${gateway!.tag}` : gateway ? "Offline" : "Never connected"}
             </span>
-            {gateway && (
-              <span className="text-xs text-muted-foreground">Last check-in {fmt(new Date(gateway.at))}</span>
-            )}
+            {gateway && <span className="text-xs text-muted-foreground">Last check-in {fmt(new Date(gateway.at))}</span>}
             {gatewayOnline && !gateway!.members && (
               <p className="text-xs text-accent">
                 Member events are off, so role changes won&apos;t update personnel files on their own. Turn on Server Members
@@ -113,42 +96,44 @@ export default async function Admin() {
             )}
             {!gatewayOnline && (
               <p className="text-xs text-muted-foreground">
-                Check <code>systemctl status ravenfall-gateway</code> and <code>journalctl -u ravenfall-gateway</code> on the server.
+                {botReady ? "" : "Set the bot token and guild ID first. "}
+                Then check <code>systemctl status ravenfall-gateway</code> and <code>journalctl -u ravenfall-gateway</code> on the server.
               </p>
             )}
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Recruitment message</CardTitle>
-            <CardDescription>Posts an embed with a persistent Enlist Now button to the welcome channel.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ActionForm action={postRecruitmentMessage}>
-              <SubmitButton variant="accent" className="self-start" disabled={!channels.welcome}>
-                Post to welcome channel
-              </SubmitButton>
-            </ActionForm>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Slash commands</CardTitle>
-            <CardDescription>Registers /enlist and /ops on the server. Safe to repeat.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ActionForm action={registerCommands}>
-              <SubmitButton variant="secondary" className="self-start" disabled={!env.botToken}>
-                Register commands
-              </SubmitButton>
-            </ActionForm>
-          </CardContent>
-        </Card>
       </div>
 
-      <Card className="mt-6">
+      <h2 className="mb-3 mt-8 text-micro font-semibold uppercase tracking-label text-muted-foreground">One-off actions</h2>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <ActionCard
+          title="Recruitment message"
+          description="Posts an embed with a persistent Enlist Now button to the welcome channel."
+          action={postRecruitmentMessage}
+          label="Post to welcome channel"
+          pendingText="Posting…"
+          variant="default"
+          disabledReason={channels.welcome ? undefined : "Pick a welcome channel under Discord channels first."}
+        />
+        <ActionCard
+          title="Slash commands"
+          description="Registers /enlist and /ops on the server. Safe to repeat."
+          action={registerCommands}
+          label="Register commands"
+          pendingText="Registering…"
+          disabledReason={env.botToken ? undefined : "Needs DISCORD_BOT_TOKEN in .env."}
+        />
+        <ActionCard
+          title="Personnel files from Discord"
+          description="Opens a personnel file for every member holding a mapped role, filling rank, squad, billets and callsign from their roles and nickname. Existing files only get blanks filled."
+          action={syncProfiles}
+          label="Sync profiles from Discord"
+          pendingText="Syncing…"
+          disabledReason={env.botToken ? undefined : "Needs DISCORD_BOT_TOKEN in .env."}
+        />
+      </div>
+
+      <Card className="mt-8">
         <CardHeader>
           <CardTitle>Discord channels</CardTitle>
           <CardDescription>
@@ -158,7 +143,7 @@ export default async function Admin() {
         </CardHeader>
         <CardContent>
           {channelsError ? (
-            <p className="text-sm text-red-300">{channelsError}</p>
+            <AdminCallout tone="warning" title="Couldn't load channels">{channelsError}</AdminCallout>
           ) : channelGroups.length ? (
             <ChannelForm
               key={JSON.stringify(channels)}
@@ -173,12 +158,14 @@ export default async function Admin() {
               ]}
             />
           ) : (
-            <p className="text-sm text-muted-foreground">Set the bot token and guild ID to load the server&apos;s channels.</p>
+            <AdminCallout title="Connect the bot to load channels">
+              Set <code>DISCORD_BOT_TOKEN</code> and <code>DISCORD_GUILD_ID</code> in .env and restart the site; the server&apos;s text channels will be listed here.
+            </AdminCallout>
           )}
         </CardContent>
       </Card>
 
-      <Card className="mt-6">
+      <Card className="mt-8">
         <CardHeader>
           <CardTitle>Discord role mapping</CardTitle>
           <CardDescription>
@@ -188,7 +175,7 @@ export default async function Admin() {
         </CardHeader>
         <CardContent>
           {rolesError ? (
-            <p className="text-sm text-red-300">{rolesError}</p>
+            <AdminCallout tone="warning" title="Couldn't load roles">{rolesError}</AdminCallout>
           ) : roles.length ? (
             <RoleMappingForm
               key={JSON.stringify(cfg)}
@@ -200,28 +187,13 @@ export default async function Admin() {
               billets={ROLES.map((r) => ({ key: r.name, label: r.name }))}
             />
           ) : (
-            <p className="text-sm text-muted-foreground">Set the bot token and guild ID to load the server&apos;s roles.</p>
+            <AdminCallout title="Connect the bot to load roles">
+              Set <code>DISCORD_BOT_TOKEN</code> and <code>DISCORD_GUILD_ID</code> in .env and restart the site; the server&apos;s roles will be listed here.
+            </AdminCallout>
           )}
         </CardContent>
       </Card>
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Personnel files from Discord</CardTitle>
-          <CardDescription>
-            Opens a personnel file for every server member holding a mapped role, with rank, squad and billets read from
-            their roles and the callsign from their nickname. Existing files only have their blanks filled. With the bot
-            online this also happens on its own whenever someone&apos;s roles change.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ActionForm action={syncProfiles}>
-            <SubmitButton variant="secondary" className="self-start" disabled={!env.botToken} pendingText="Syncing…">
-              Sync profiles from Discord
-            </SubmitButton>
-          </ActionForm>
-        </CardContent>
-      </Card>
     </Container>
   );
 }

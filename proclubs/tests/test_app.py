@@ -987,7 +987,7 @@ def test_signed_in_guild_member_can_comment(client):
 
     detail = client.get(f"/news/{slug}")
     assert "Nice win!" in detail.text
-    assert "1 Comment" in detail.text
+    assert "1 comment" in detail.text
 
 
 def test_comment_body_is_escaped_not_rendered_as_html(client):

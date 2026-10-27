@@ -15,6 +15,15 @@ const schema = z.object({
   content: z.string().max(100000).default(""),
 });
 
+function invalid(err: z.ZodError): ActionState {
+  const fieldErrors: Record<string, string> = {};
+  for (const i of err.issues) {
+    const k = String(i.path[0] ?? "");
+    if (k && !fieldErrors[k]) fieldErrors[k] = i.message;
+  }
+  return { error: "Fix the highlighted fields.", fieldErrors };
+}
+
 function parse(data: FormData) {
   return schema.safeParse({
     title: data.get("title"),
@@ -27,7 +36,7 @@ function parse(data: FormData) {
 export async function createDoc(_: ActionState, data: FormData): Promise<ActionState> {
   const me = await assertPerm("INSTRUCTOR");
   const p = parse(data);
-  if (!p.success) return { error: p.error.issues[0]?.message };
+  if (!p.success) return invalid(p.error);
   let slug = slugify(p.data.title) || "document";
   if (await prisma.qualification.findUnique({ where: { slug } })) slug = `${slug}-${Date.now().toString(36)}`;
   await prisma.qualification.create({ data: { ...p.data, slug, updatedById: me.id } });
@@ -39,7 +48,7 @@ export async function updateDoc(_: ActionState, data: FormData): Promise<ActionS
   const me = await assertPerm("INSTRUCTOR");
   const id = String(data.get("id"));
   const p = parse(data);
-  if (!p.success) return { error: p.error.issues[0]?.message };
+  if (!p.success) return invalid(p.error);
   const prev = await prisma.qualification.findUnique({ where: { id } });
   if (!prev) return { error: "Document not found." };
   // A new version only when the standard itself changes, not a retitle.

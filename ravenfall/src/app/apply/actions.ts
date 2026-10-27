@@ -35,7 +35,14 @@ export async function submitApplication(_: ActionState, data: FormData): Promise
   if (hasPerm(user.perms, "OPERATOR")) return { error: "You're already a member." };
 
   const parsed = schema.safeParse(Object.fromEntries(data));
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check your answers." };
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
+    return { error: parsed.error.issues[0]?.message ?? "Check your answers.", fieldErrors };
+  }
 
   const existing = await prisma.recruitmentApplication.findFirst({
     where: { userId: user.id },

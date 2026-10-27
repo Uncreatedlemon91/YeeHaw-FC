@@ -3,12 +3,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Avatar } from "@/components/avatar";
+import { ChipCheckbox } from "@/components/chip";
 import { ConfirmButton } from "@/components/confirm-button";
 import { RankInsignia } from "@/components/insignia";
-import { Redacted } from "@/components/redacted";
+import { Redacted, RedactedBar } from "@/components/redacted";
 import { AttendanceBadge, ATTENDANCE_LABEL, MemberStatusBadge } from "@/components/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { MAX_SECONDARY_ROLES, RANKS, rankIndex, rankName, roleDef, ROLES, squadDef, SQUADS, UNIT, UNIT_ROLES, WEEKDAYS } from "@/config/unit";
+import { categoryLabel, CATEGORIES, RIBBON } from "@/components/vault-category";
 import { requireUser } from "@/lib/auth";
 import { career } from "@/lib/career";
 import { getViewer, viewerLevel } from "@/lib/library";
@@ -23,7 +26,7 @@ import { RequestCard } from "../../personnel/request-card";
 import { addRecord, awardQualification, revokeQualification, updateProfile } from "../actions";
 import { BilletPicker } from "./billet-picker";
 import { FileTabs } from "./file-tabs";
-import { RECORD_STYLE } from "./record-style";
+import { promotionRanks, RECORD_STYLE } from "./record-style";
 import { RecordTimeline } from "./record-timeline";
 import { RequestForm } from "./request-form";
 
@@ -91,11 +94,18 @@ export default async function Dossier({ params, searchParams }: { params: Promis
   const primary = roleDef(member.unitRole);
   const sn = serviceNumber(member);
   const name = member.callsign ?? member.discordUsername;
+  // Ribbon rack: grouped by category in a fixed order, capped at RACK_MAX with a "+M" for the rest.
+  const RACK_MAX = 10;
+  const shownRibbons = member.qualifications.slice(0, RACK_MAX);
+  const hiddenRibbons = member.qualifications.length - shownRibbons.length;
+  const rack = CATEGORIES
+    .map((cat) => [cat, shownRibbons.filter((q) => q.qualification.category === cat)] as const)
+    .filter(([, list]) => list.length > 0);
 
   // --- Header: the jacket's cover sheet ------------------------------------ //
   const header = (
     <div className="relative mb-8">
-      <div className="jacket-tab typed absolute -top-6 left-6 px-6 py-1 text-[11px] font-bold uppercase tracking-[0.2em]">
+      <div className="jacket-tab typed absolute -top-6 left-6 px-6 py-1 text-micro font-bold uppercase tracking-label">
         Personnel file · {sn}
       </div>
       <div className="jacket relative overflow-hidden rounded-lg border">
@@ -110,25 +120,25 @@ export default async function Dossier({ params, searchParams }: { params: Promis
         </div>
         <div className="grid gap-6 p-6 md:grid-cols-[220px_1fr]">
           {/* ID card */}
-          <div className="mx-auto w-full max-w-[200px] self-start rounded-md border border-foreground/15 bg-[oklch(0.9_0.02_90)] md:mx-0 md:max-w-none p-3 text-[oklch(0.25_0.02_80)] shadow-lg">
-            <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.2em]">
+          <div className="mx-auto w-full max-w-[200px] self-start rounded-md border border-foreground/15 bg-paper p-3 text-paper-ink md:mx-0 md:max-w-none shadow-lg">
+            <div className="flex items-center justify-between text-micro font-bold uppercase tracking-label">
               <span>{UNIT.org}</span>
               <span>ID</span>
             </div>
-            <Avatar discordId={member.discordId} avatar={member.avatar} size={196} className="mt-2 aspect-square h-auto w-full rounded-sm border-[oklch(0.25_0.02_80)]/30 grayscale-[35%]" />
+            <Avatar discordId={member.discordId} avatar={member.avatar} name={name} size={196} className="mt-2 aspect-square h-auto w-full rounded-sm border-paper-ink/30 grayscale-[35%]" />
             <div className="mt-2 font-display text-lg font-bold uppercase leading-tight">{name}</div>
-            <div className="typed text-[10px] uppercase">
+            <div className="typed text-micro uppercase">
               {member.rank ?? "—"} · {squad?.callsign ?? "Unassigned"}
             </div>
-            <div className="typed text-[10px]">{sn}</div>
+            <div className="typed text-micro">{sn}</div>
             <div className="barcode mt-2 h-6 w-full opacity-80" aria-hidden />
           </div>
 
-          <div className="flex flex-col gap-5">
+          <div className="flex min-w-0 flex-col gap-5">
             <div className="flex items-start gap-4 pr-0 sm:pr-32">
               <RankInsignia rank={member.rank} size={56} />
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-accent">
+                <p className="text-xs font-semibold uppercase tracking-label text-accent">
                   {member.rank ? `${rankName(member.rank)} · ${path.current?.grade}` : "Personnel file"}
                 </p>
                 <h1 className="mt-1 text-3xl font-bold uppercase sm:text-4xl">
@@ -138,9 +148,9 @@ export default async function Dossier({ params, searchParams }: { params: Promis
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                   <MemberStatusBadge status={member.status} />
                   {currentLeave && (
-                    <span className="inline-flex items-center gap-1 rounded-sm border border-accent/40 bg-accent/10 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-accent">
-                      <CalendarOff className="size-3" /> LOA to {fmtDate(currentLeave.endDate!)}
-                    </span>
+                    <Badge variant="accent">
+                      <CalendarOff /> LOA to {fmtDate(currentLeave.endDate!)}
+                    </Badge>
                   )}
                   <span>@{member.discordUsername}</span>
                 </div>
@@ -158,21 +168,68 @@ export default async function Dossier({ params, searchParams }: { params: Promis
               <Typed label="Quals held" value={String(member.qualifications.length)} />
             </dl>
 
-            {/* Ribbon rack: one bar per qualification. */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              {member.qualifications.map((q) => (
-                <Link
-                  key={q.id}
-                  href={`/vault/${q.qualification.slug}`}
-                  title={`${q.qualification.title} — ${fmtDate(q.awardedAt)}`}
-                  className={cn("h-3 w-10 rounded-[2px] border border-black/40", RIBBON[q.qualification.category])}
+            {/* Meters: fill the right-hand column and link the numbers to the tabs. */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Meter
+                label="Attendance"
+                value={rate ?? 0}
+                max={100}
+                text={rate === null ? "No ops yet" : `${rate}% · ${attended} of ${total} ops`}
+                tone="success"
+              />
+              {clr.squad && path.next ? (
+                <Meter
+                  label={`Promotion to ${path.next.abbr}`}
+                  value={path.checks.filter((c) => c.ok).length}
+                  max={Math.max(1, path.checks.length)}
+                  text={`${path.checks.filter((c) => c.ok).length} of ${path.checks.length} criteria met`}
+                  tone="accent"
                 />
-              ))}
-              {!member.qualifications.length && <span className="text-xs text-muted-foreground">No ribbons awarded.</span>}
+              ) : (
+                <Meter label="Qualifications" value={member.qualifications.length} max={Math.max(1, allQuals.length)} text={`${member.qualifications.length} of ${allQuals.length} in the vault`} tone="info" />
+              )}
+            </div>
+
+            {/* Ribbon rack: one ribbon per qualification, grouped by category. */}
+            <div className="mt-auto">
+              <div className="field-label mb-2">Ribbon rack</div>
+              {member.qualifications.length ? (
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+                    {rack.map(([cat, list]) => (
+                      <div key={cat} role="group" aria-label={`${categoryLabel(cat)} ribbons`} className="flex flex-wrap gap-1">
+                        {list.map((q) => (
+                          <Link
+                            key={q.id}
+                            href={`/vault/${q.qualification.slug}`}
+                            title={`${q.qualification.title} — ${fmtDate(q.awardedAt)}`}
+                            aria-label={`${q.qualification.title}, ${categoryLabel(cat)} ribbon, awarded ${fmtDate(q.awardedAt)}`}
+                            className={cn("h-5 w-14 rounded-[2px] border border-black/50 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", RIBBON[cat])}
+                          />
+                        ))}
+                      </div>
+                    ))}
+                    {hiddenRibbons > 0 && (
+                      <span className="typed text-xs font-semibold text-muted-foreground" title={`${hiddenRibbons} more in the Qualifications list`}>
+                        +{hiddenRibbons}
+                      </span>
+                    )}
+                  </div>
+                  <ul className="flex flex-wrap gap-x-4 gap-y-1 text-micro uppercase tracking-wider text-muted-foreground" aria-label="Ribbon key">
+                    {rack.map(([cat]) => (
+                      <li key={cat} className="flex items-center gap-1.5">
+                        <span className={cn("inline-block h-2.5 w-5 rounded-[1px] border border-black/40", RIBBON[cat])} aria-hidden /> {categoryLabel(cat)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground">No ribbons awarded.</span>
+              )}
             </div>
           </div>
         </div>
-        <div className="typed flex flex-wrap items-center justify-between gap-2 border-t border-foreground/10 bg-black/20 px-6 py-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="typed flex flex-wrap items-center justify-between gap-2 border-t border-foreground/10 bg-black/20 px-6 py-2 text-micro uppercase tracking-label text-muted-foreground">
           <span>
             Viewing clearance: <span className={clr.squad ? "text-accent" : ""}>{clr.label}</span>
           </span>
@@ -186,8 +243,8 @@ export default async function Dossier({ params, searchParams }: { params: Promis
 
   // --- File (overview) ----------------------------------------------------- //
   const overview = (
-    <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
-      <div className="flex flex-col gap-8">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="flex min-w-0 flex-col gap-8">
         <Section title="Operator statement">
           {member.bio ? <p className="whitespace-pre-wrap text-sm">{member.bio}</p> : <Empty>No statement on file.</Empty>}
           {member.loadout && (
@@ -201,13 +258,13 @@ export default async function Dossier({ params, searchParams }: { params: Promis
         <Section title="Availability" restricted={!clr.squad}>
           {clr.squad ? (
             <div className="flex flex-col gap-3">
-              <div className="flex gap-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 {WEEKDAYS.map((d) => (
                   <span
                     key={d}
                     className={cn(
                       "typed w-11 rounded-sm border py-1 text-center text-xs uppercase",
-                      member.availability.includes(d) ? "border-success/50 bg-success/15 text-green-300" : "text-muted-foreground/60",
+                      member.availability.includes(d) ? "border-success/50 bg-success/15 text-success-fg" : "text-muted-foreground",
                     )}
                   >
                     {d}
@@ -231,14 +288,20 @@ export default async function Dossier({ params, searchParams }: { params: Promis
                     key={a.id}
                     href={`/ops/${a.eventId}`}
                     title={`${a.event.title} · ${fmtDate(a.event.startTime)} · ${ATTENDANCE_LABEL[a.status]}`}
-                    className={cn("size-5 rounded-[2px] border border-black/30", TILE[a.status])}
-                  />
+                    aria-label={`${a.event.title}, ${fmtDate(a.event.startTime)}: ${ATTENDANCE_LABEL[a.status]}`}
+                    className={cn("flex size-6 items-center justify-center rounded-[2px] border border-black/30 text-micro font-bold", TILE[a.status])}
+                  >
+                    {TILE_LETTER[a.status]}
+                  </Link>
                 ))}
               </div>
-              <div className="flex flex-wrap gap-3 text-[11px] uppercase tracking-wider text-muted-foreground">
+              <div className="flex flex-wrap gap-3 text-micro uppercase tracking-wider text-muted-foreground">
                 {(["ATTENDING", "EXCUSED", "ABSENT", "NOSHOW"] as const).map((s) => (
                   <span key={s} className="flex items-center gap-1.5">
-                    <span className={cn("size-2.5 rounded-[2px]", TILE[s])} /> {ATTENDANCE_LABEL[s]} {clr.squad || s === "ATTENDING" ? n(s) : ""}
+                    <span className={cn("flex size-4 items-center justify-center rounded-[2px] text-micro font-bold", TILE[s])} aria-hidden>
+                      {TILE_LETTER[s]}
+                    </span>{" "}
+                    {ATTENDANCE_LABEL[s]} {clr.squad || s === "ATTENDING" ? n(s) : ""}
                   </span>
                 ))}
               </div>
@@ -249,7 +312,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
                       <span className="font-semibold">{a.event.title}</span>
                       <span className="typed ml-2 text-xs text-muted-foreground">{fmtDate(a.event.startTime)}</span>
                     </span>
-                    {clr.squad || a.status === "ATTENDING" ? <AttendanceBadge status={a.status} /> : <span className="redacted-bar w-16" />}
+                    {clr.squad || a.status === "ATTENDING" ? <AttendanceBadge status={a.status} /> : <RedactedBar className="w-16" />}
                   </Link>
                 ))}
               </div>
@@ -277,12 +340,15 @@ export default async function Dossier({ params, searchParams }: { params: Promis
                 <legend className="field-label mb-1.5">Usually available</legend>
                 <div className="flex flex-wrap gap-1.5">
                   {WEEKDAYS.map((d) => (
-                    <label key={d} className="cursor-pointer">
-                      <input type="checkbox" name="availability" value={d} defaultChecked={member.availability.includes(d)} className="peer sr-only" />
-                      <span className="typed block w-12 rounded-sm border py-1.5 text-center text-xs uppercase text-muted-foreground peer-checked:border-success/50 peer-checked:bg-success/15 peer-checked:text-green-300 peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
-                        {d}
-                      </span>
-                    </label>
+                    <ChipCheckbox
+                      key={d}
+                      name="availability"
+                      value={d}
+                      defaultChecked={member.availability.includes(d)}
+                      chipClassName="typed w-12 py-1.5 text-center uppercase"
+                    >
+                      {d}
+                    </ChipCheckbox>
                   ))}
                 </div>
               </fieldset>
@@ -294,7 +360,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
         )}
       </div>
 
-      <div className="flex flex-col gap-8">
+      <div className="flex min-w-0 flex-col gap-8">
         <Section title="Qualifications">
           <div className="flex flex-col gap-3">
             {member.qualifications.map((q) => (
@@ -351,6 +417,8 @@ export default async function Dossier({ params, searchParams }: { params: Promis
           title: r.title,
           description: r.description,
           date: fmtDate(r.createdAt),
+          iso: r.createdAt.toISOString(),
+          ...(r.type === "PROMOTION" ? promotionRanks(r.title, r.description) : {}),
           issuer: r.issuedBy ? (r.issuedBy.callsign ?? r.issuedBy.discordUsername) : null,
         }))}
       />
@@ -382,9 +450,9 @@ export default async function Dossier({ params, searchParams }: { params: Promis
 
   // --- Career ---------------------------------------------------------------- //
   const careerPanel = (
-    <div className="flex flex-col gap-8">
+    <div className="flex min-w-0 flex-col gap-8">
       <Section title="Rank progression">
-        <ol className="flex gap-1 overflow-x-auto pb-2">
+        <ol className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 lg:grid-cols-12">
           {RANKS.map((r, i) => {
             const at = rankIndex(member.rank);
             const state = i < at ? "past" : i === at ? "current" : i === at + 1 ? "next" : "future";
@@ -393,7 +461,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
                 key={r.abbr}
                 title={`${r.name} (${r.grade})`}
                 className={cn(
-                  "flex w-16 shrink-0 flex-col items-center gap-1 rounded-md border px-1 py-2",
+                  "flex min-w-0 flex-col items-center gap-1 rounded-md border px-1 py-2",
                   state === "current" && "border-accent bg-accent/10",
                   state === "next" && "border-dashed border-accent/60",
                   state === "future" && "opacity-35",
@@ -401,7 +469,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
                 )}
               >
                 <RankInsignia rank={r.abbr} size={28} className={state === "past" ? "text-muted-foreground" : undefined} />
-                <span className="typed text-[10px]">{r.abbr}</span>
+                <span className="typed text-micro">{r.abbr}</span>
               </li>
             );
           })}
@@ -434,7 +502,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
                 <li key={c.label} className="flex flex-col gap-1">
                   <div className="flex items-center justify-between gap-3 text-sm">
                     <span className="flex items-center gap-2">
-                      {c.ok ? <CheckCircle2 className="size-4 text-green-400" /> : <Circle className="size-4 text-muted-foreground" />}
+                      {c.ok ? <CheckCircle2 className="size-4 text-success-fg" /> : <Circle className="size-4 text-muted-foreground" />}
                       {c.detail === "qualification" ? `Qualification: ${c.label}` : c.label}
                     </span>
                     <span className="typed text-xs text-muted-foreground">
@@ -502,9 +570,9 @@ export default async function Dossier({ params, searchParams }: { params: Promis
             return (
               <li key={r.name} className="flex items-center justify-between gap-3 py-2 text-sm">
                 <span className="flex items-center gap-2">
-                  {missing.length ? <Lock className="size-3.5 text-muted-foreground" /> : <Crosshair className="size-3.5 text-green-400" />}
+                  {missing.length ? <Lock className="size-3.5 text-muted-foreground" /> : <Crosshair className="size-3.5 text-success-fg" />}
                   <span className={cn("font-semibold", missing.length && "text-muted-foreground")}>{r.name}</span>
-                  <span className="typed text-[11px] text-muted-foreground">{r.code}</span>
+                  <span className="typed text-micro text-muted-foreground">{r.code}</span>
                 </span>
                 <span className="text-right text-xs text-muted-foreground">
                   {holds ? <span className="text-accent">{holds}</span> : missing.length ? `Needs ${titles(missing).join(", ")}` : "Qualified"}
@@ -551,7 +619,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
 
   // --- Requests -------------------------------------------------------------- //
   const requests = clr.squad && (
-    <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
       <Section title="Personnel actions">
         <div className="flex flex-col gap-3">
           {member.requests.map((r) => (
@@ -567,7 +635,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
         </div>
       </Section>
       {clr.self && member.status === "ACTIVE" && (
-        <div className="flex flex-col gap-8">
+        <div className="flex min-w-0 flex-col gap-8">
           <Section title="Leave of absence">
             <RequestForm action={requestLeave} pending={pendingTypes.has("LOA")} pendingNote="Your leave request is with leadership.">
               <div className="grid grid-cols-2 gap-3">
@@ -653,12 +721,9 @@ export default async function Dossier({ params, searchParams }: { params: Promis
             <legend className="field-label mb-1.5">Secondary roles (up to {MAX_SECONDARY_ROLES})</legend>
             <div className="flex flex-wrap gap-1.5">
               {UNIT_ROLES.map((r) => (
-                <label key={r} className="cursor-pointer">
-                  <input type="checkbox" name="secondaryRoles" value={r} defaultChecked={member.secondaryRoles.includes(r)} className="peer sr-only" />
-                  <span className="block rounded-sm border px-2 py-1 text-xs text-muted-foreground peer-checked:border-sky-400/60 peer-checked:bg-sky-400/10 peer-checked:text-sky-300 peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
-                    {r}
-                  </span>
-                </label>
+                <ChipCheckbox key={r} tone="info" name="secondaryRoles" value={r} defaultChecked={member.secondaryRoles.includes(r)}>
+                  {r}
+                </ChipCheckbox>
               ))}
             </div>
           </fieldset>
@@ -705,9 +770,9 @@ export default async function Dossier({ params, searchParams }: { params: Promis
 function Section({ title, restricted, children }: { title: string; restricted?: boolean; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="mb-3 flex items-center gap-2 border-b border-foreground/10 pb-2 text-sm font-semibold uppercase tracking-[0.2em]">
+      <h2 className="mb-3 flex items-center gap-2 border-b border-foreground/10 pb-2 text-sm font-semibold uppercase tracking-label">
         {title}
-        {restricted && <Lock className="size-3.5 text-muted-foreground" />}
+        {restricted && <Lock className="size-3.5 text-muted-foreground" aria-label="Restricted" />}
       </h2>
       {children}
     </section>
@@ -725,22 +790,35 @@ function Typed({ label, value }: { label: string; value: string }) {
   );
 }
 
+function Meter({ label, value, max, text, tone }: { label: string; value: number; max: number; text: string; tone: "success" | "accent" | "info" }) {
+  const pct = Math.min(100, Math.round((value / max) * 100));
+  const fill = { success: "bg-success", accent: "bg-accent", info: "bg-info" }[tone];
+  return (
+    <div className="min-w-0">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="field-label">{label}</span>
+        <span className="typed text-micro text-muted-foreground">{pct}%</span>
+      </div>
+      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-foreground/10" role="img" aria-label={`${label}: ${text}`}>
+        <div className={cn("h-full", fill)} style={{ width: `${pct}%` }} />
+      </div>
+      <div className="typed mt-1 truncate text-xs text-muted-foreground" title={text}>
+        {text}
+      </div>
+    </div>
+  );
+}
+
 function Empty({ children }: { children: React.ReactNode }) {
   return <p className="text-sm text-muted-foreground">{children}</p>;
 }
 
 const TILE: Record<string, string> = {
-  ATTENDING: "bg-success",
-  EXCUSED: "bg-accent/70",
-  ABSENT: "bg-foreground/25",
-  NOSHOW: "bg-destructive",
+  ATTENDING: "bg-success text-background",
+  EXCUSED: "bg-accent/80 text-background",
+  ABSENT: "bg-foreground/25 text-foreground",
+  NOSHOW: "bg-destructive text-destructive-foreground",
 };
+// A letter in every tile so the outcome never rides on colour alone.
+const TILE_LETTER: Record<string, string> = { ATTENDING: "A", EXCUSED: "E", NOSHOW: "N", ABSENT: "X" };
 
-// Ribbon colours per qualification category.
-const RIBBON: Record<string, string> = {
-  WEAPONS: "bg-[linear-gradient(90deg,#7a1f1f_0_30%,#c9a227_30%_40%,#7a1f1f_40%_60%,#c9a227_60%_70%,#7a1f1f_70%)]",
-  LEADERSHIP: "bg-[linear-gradient(90deg,#1f3a7a_0_35%,#e5e5e5_35%_45%,#1f3a7a_45%_55%,#e5e5e5_55%_65%,#1f3a7a_65%)]",
-  MEDICAL: "bg-[linear-gradient(90deg,#e5e5e5_0_40%,#a32020_40%_60%,#e5e5e5_60%)]",
-  PILOT: "bg-[linear-gradient(90deg,#3b6fb5_0_25%,#c9a227_25%_35%,#3b6fb5_35%_65%,#c9a227_65%_75%,#3b6fb5_75%)]",
-  GENERAL: "bg-[linear-gradient(90deg,#4f6b2f_0_40%,#d4b483_40%_60%,#4f6b2f_60%)]",
-};

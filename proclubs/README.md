@@ -50,25 +50,45 @@ red-hooped crest, and every page a "file" with
 a short code above its title (`YFC / FIXTURES & SIGN-UPS`). The layout is
 still a management tool -- a sidebar of sections, a strip of tabs, panels
 and compact tables -- built to be scanned before a match rather than to
-put on a show. The tokens live in `static/css/site.css`'s `:root`; the
-theme layer ("Club file theme") is the last block in that file and
-restyles the components above it. The rules worth knowing before adding
-anything:
+put on a show. All tokens live in the **single `:root`** at the top of
+`static/css/site.css` (colours, `--font-*`, the `--fs-*` type scale, the
+`--s-*` spacing scale, `--track-label`, `--shadow-*`, `--ring`,
+`--ease`/`--dur-fast`, `--overlay-*`); the "Club file theme" block later in
+the file restyles the components above it but defines no tokens. The
+`Pages:` sections at the very end are where page-level rules go. The rules
+worth knowing before adding anything:
 
-- **One accent.** `--accent` (khaki) marks the primary action and where
-  you are. Every other colour has a meaning: `--accent-2` brass is staff
-  and club roles, `--amber` orange needs attention, `--live` red is a
-  stream on air or a destructive action. If a colour isn't saying one of
-  those things, it should be grey-olive.
+- **One accent.** `--accent` (red) marks the primary action and where
+  you are; use `--accent-text` when it is text on a dark surface. Every
+  other colour has a meaning: `--accent-2` blue is staff and club roles,
+  `--amber` orange needs attention, `--live` is a stream on air, and
+  `--danger` / `--danger-strong` are destructive actions. If a colour
+  isn't saying one of those things, it should be grey-blue. `--faint` and
+  `--border-control` (input edges) are tuned for contrast (4.5:1 text,
+  3:1 controls) -- don't darken them.
 - **The ground.** The page background is fixed chalk pitch markings
   (`static/img/pitch.svg`) over mown stripes and a fine grain
   (`static/img/grain.svg`); panels are slightly translucent over it.
   Borders do the separating, and a panel's meaning is a 2px line across
   its top (`.panel-amber`, `.panel-staff`, `.panel-live`).
-- **Two voices of type.** Inter is for reading and for every figure.
-  IBM Plex Mono is for labels: kickers, table heads, chips, the
-  breadcrumb, always small and tracked. Buttons and tabs are sentence
-  case in Inter.
+- **Two voices of type.** Inter is for reading and for every figure
+  (`--font-body`, `--font-num`). IBM Plex Mono (`--font-label`) is for
+  labels: kickers, table heads, chips, the breadcrumb, always small and
+  tracked. Buttons and tabs are sentence case in Inter. Sizes and gaps
+  come from `--fs-*` and `--s-*`.
+- **Focus and motion are global.** One `:focus-visible` outline (`--ring`,
+  in `--accent-text`) covers every control -- never remove it without
+  replacing it. `button:disabled`, `.btn[aria-disabled=true]` and
+  `.btn.is-loading` share a dimmed style, and buttons press down 1px.
+  `prefers-reduced-motion` switches animation and transitions off
+  site-wide.
+- **Shared pieces.** `templates/_ui.html` has `empty_state(icon, title,
+  body, action_url=None, action_label=None)` and `result_chip(result,
+  title=None)` (a W/D/L `.form-chip` with a text alternative); import them
+  instead of hand-rolling. `<form data-loading="Saving...">` disables its
+  submit buttons on submit (`shell.js`). `.table-scroll` is the one wrapper
+  for a wide table (`.table-wrap` is an alias); `.visually-hidden` is the
+  screen-reader-only utility. Breakpoints are 600 / 900 / 1100px.
 - **Kickers come from the shell.** `base.html` sets `--kicker` on `<main>`
   from the current section and tab, and `.page-head` draws it above the
   title, so no template repeats it. `.kicker` is the same style for
@@ -84,8 +104,10 @@ anything:
   `SITE_SHORT` (default `YFC`) and `SITE_MOTTO` set the code and the line
   under the crest.
 - **On a phone** the sidebar folds into a top bar with the sections in a
-  scrollable row, and tables scroll inside their panel rather than
-  pushing the page sideways.
+  row that scrolls sideways (it fades at an edge with more, and opens
+  scrolled to the current section, as does the tab strip); tables scroll
+  inside their panel rather than pushing the page sideways, and small
+  controls get a 44px tap target.
 - **`--series-*` is the validated categorical chart palette**, read
   directly by `charts.js`; the `--status-*` colours are for win/draw/loss
   and health states only. The tactics pitch stays grass green.

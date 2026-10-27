@@ -1,9 +1,10 @@
-import { CalendarOff, Medal } from "lucide-react";
+import { ArrowRight, CalendarOff, Medal } from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { Container } from "@/components/container";
 import { RankInsignia } from "@/components/insignia";
 import { PageHeader } from "@/components/page-header";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { rankIndex } from "@/config/unit";
 import { requireUser } from "@/lib/auth";
@@ -117,7 +118,7 @@ export default async function S1Desk() {
             <Card>
               <CardHeader>
                 <CardTitle>
-                  In-tray {pending > 0 && <span className="ml-2 rounded-sm bg-accent px-1.5 text-xs text-accent-foreground">{pending}</span>}
+                  In-tray {pending > 0 && <Badge variant="accent" className="ml-2">{pending}</Badge>}
                 </CardTitle>
                 <CardDescription>
                   {command
@@ -125,9 +126,9 @@ export default async function S1Desk() {
                     : "Billet changes within your squad and its leave requests. Transfers and callsigns go to Command."}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col gap-3">
+              <CardContent className="flex flex-col divide-y divide-foreground/10">
                 {queue.map((r) => (
-                  <RequestCard key={r.id} r={r} decidable showNotes showMember />
+                  <RequestCard key={r.id} r={r} decidable showNotes showMember flush />
                 ))}
                 {!queue.length && <p className="text-sm text-muted-foreground">Nothing waiting. In-tray clear.</p>}
               </CardContent>
@@ -138,9 +139,9 @@ export default async function S1Desk() {
             <CardHeader>
               <CardTitle>My requests</CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3">
+            <CardContent className="flex flex-col divide-y divide-foreground/10">
               {mine.map((r) => (
-                <RequestCard key={r.id} r={r} own showNotes />
+                <RequestCard key={r.id} r={r} own showNotes flush />
               ))}
               {!mine.length && (
                 <p className="text-sm text-muted-foreground">
@@ -167,8 +168,12 @@ export default async function S1Desk() {
               <CardContent className="flex flex-col gap-3">
                 {board.map(({ u, path }) => (
                   <Link key={u.id} href={`/roster/${u.id}?tab=career`} className="flex items-center gap-3 text-sm hover:text-accent">
-                    <RankInsignia rank={u.rank} size={24} />
-                    <span className="flex-1">
+                    <span className="flex shrink-0 items-center gap-0.5" aria-label={`${u.rank} to ${path.next?.abbr}`}>
+                      <RankInsignia rank={u.rank} size={26} className="opacity-70" />
+                      <ArrowRight className="size-3 text-muted-foreground" aria-hidden />
+                      <RankInsignia rank={path.next?.abbr} size={30} />
+                    </span>
+                    <span className="min-w-0 flex-1">
                       <span className="font-semibold">{u.callsign ?? u.discordUsername}</span>
                       <span className="block text-xs text-muted-foreground">
                         {u.rank} → {path.next?.abbr} · {path.daysInGrade} days in grade
@@ -192,7 +197,7 @@ export default async function S1Desk() {
                   const current = l.startDate! <= now;
                   return (
                     <Link key={l.id} href={`/roster/${l.userId}?tab=requests`} className="flex items-center gap-3 text-sm hover:text-accent">
-                      <Avatar discordId={l.user.discordId} avatar={l.user.avatar} size={24} />
+                      <Avatar discordId={l.user.discordId} avatar={l.user.avatar} name={l.user.callsign ?? l.user.discordUsername} size={24} />
                       <span className="flex-1">
                         <span className="font-semibold">{l.user.callsign ?? l.user.discordUsername}</span>
                         <span className="typed block text-xs text-muted-foreground">

@@ -25,29 +25,32 @@ export function RequestCard({
   own,
   showNotes,
   showMember,
+  flush,
 }: {
   r: Req;
   decidable?: boolean;
   own?: boolean;
   showNotes?: boolean;
   showMember?: boolean;
+  /** Borderless row for use inside a Card's divided list (avoids a card in a card). */
+  flush?: boolean;
 }) {
   const Icon = ICON[r.type];
   const now = new Date();
   const onLeaveNow = r.type === "LOA" && r.status === "APPROVED" && r.startDate! <= now && r.endDate! >= now;
   return (
-    <div className="rounded-md border bg-background/40 p-4">
+    <div className={flush ? "py-4 first:pt-0 last:pb-0" : "rounded-md border bg-background/40 p-4"}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <Icon className="mt-0.5 size-4 text-accent" />
-          <div>
+        <div className="flex min-w-0 items-start gap-3">
+          <Icon className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold">{REQUEST_LABEL[r.type]}</span>
               <Badge variant={VARIANT[r.status]}>{onLeaveNow ? "On leave" : r.status}</Badge>
             </div>
             {showMember && r.user && (
               <Link href={`/roster/${r.user.id}?tab=requests`} className="mt-1 flex items-center gap-2 text-sm hover:text-accent">
-                <Avatar discordId={r.user.discordId} avatar={r.user.avatar} size={18} />
+                <Avatar discordId={r.user.discordId} avatar={r.user.avatar} name={r.user.callsign ?? r.user.discordUsername} size={18} />
                 {r.user.rank && <span className="text-muted-foreground">{r.user.rank}</span>}
                 <span className="font-semibold">{r.user.callsign ?? r.user.discordUsername}</span>
                 <span className="text-muted-foreground">{[r.user.squad, r.user.unitRole].filter(Boolean).join(" · ")}</span>
@@ -55,7 +58,7 @@ export function RequestCard({
             )}
             <div className="typed mt-1 text-sm">{describe(r)}</div>
             {showNotes && r.reason && <p className="mt-1 text-sm text-muted-foreground">“{r.reason}”</p>}
-            <div className="typed mt-1 text-[11px] uppercase text-muted-foreground">
+            <div className="typed mt-1 text-micro uppercase text-muted-foreground">
               Filed {fmtDate(r.createdAt)}
               {r.decidedAt && r.status !== "CANCELLED" && (
                 <> · Decided {fmtDate(r.decidedAt)}{r.reviewedBy && ` by ${r.reviewedBy.callsign ?? r.reviewedBy.discordUsername}`}</>

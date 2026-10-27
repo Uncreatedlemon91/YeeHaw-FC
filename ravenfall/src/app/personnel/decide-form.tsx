@@ -1,9 +1,30 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { useActionState } from "react";
-import { FormMessage, SubmitButton } from "@/components/action-form";
+import { useFormStatus } from "react-dom";
+import { FormMessage } from "@/components/action-form";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { decide } from "./actions";
+
+// One of the verdict buttons. While the form is in flight both are disabled
+// (so Approve and Deny can never both fire) and only the one clicked spins.
+function Verdict({ verdict, children, pendingText, variant }: { verdict: "approve" | "deny"; children: string; pendingText: string; variant?: "destructive" }) {
+  const { pending, data } = useFormStatus();
+  const mine = pending && data?.get("verdict") === verdict;
+  return (
+    <Button type="submit" name="verdict" value={verdict} size="sm" variant={variant} disabled={pending} aria-busy={mine || undefined}>
+      {mine ? (
+        <>
+          <Loader2 className="animate-spin" aria-hidden /> {pendingText}
+        </>
+      ) : (
+        children
+      )}
+    </Button>
+  );
+}
 
 // Client-side so the outcome survives the re-render: once the decision
 // lands the request stops being PENDING, and a plain server-rendered form
@@ -18,12 +39,12 @@ export function DecideForm({ requestId, pending }: { requestId: string; pending:
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input name="note" maxLength={500} placeholder="Note to the member (optional)" className="sm:flex-1" />
         <div className="flex gap-2">
-          <SubmitButton name="verdict" value="approve" size="sm">
+          <Verdict verdict="approve" pendingText="Approving…">
             Approve
-          </SubmitButton>
-          <SubmitButton name="verdict" value="deny" size="sm" variant="destructive">
+          </Verdict>
+          <Verdict verdict="deny" variant="destructive" pendingText="Denying…">
             Deny
-          </SubmitButton>
+          </Verdict>
         </div>
       </div>
       <FormMessage state={state} />

@@ -792,7 +792,7 @@ function togglePlayerDetail(row, member) {
       <div class="chart-row">
         <div class="chart-card">
           <h3>Season vs career</h3>
-          <div class="table-wrap">
+          <div class="table-scroll">
             <table class="compare-table">
               <thead>
                 <tr><th>Stat</th><th class="num">Season</th><th class="num">Career</th></tr>

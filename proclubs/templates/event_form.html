@@ -5,6 +5,7 @@
   <div class="page-head"><h1>{{ 'Edit event' if event else 'New event' }}</h1></div>
 
   <form class="card" method="post" enctype="multipart/form-data"
+        data-loading="{{ 'Saving…' if event else 'Creating…' }}"
         action="{{ '/events/' ~ event.id ~ '/edit' if event else '/events/new' }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
 
@@ -37,7 +38,7 @@
          offset for the instant they pick -- not for today, which would be
          an hour out across a daylight-saving boundary. With JavaScript off
          neither happens and the field means UTC, as the hint says. #}
-      <input id="scheduled_at" type="datetime-local" name="scheduled_at" required
+      <input id="scheduled_at" class="date-input" type="datetime-local" name="scheduled_at" required
              value="{{ event.scheduled_at.strftime('%Y-%m-%dT%H:%M') if event else '' }}"
              {% if event %}data-utc="{{ event.scheduled_at.isoformat() }}Z"{% endif %} />
       <input id="tz_offset" type="hidden" name="tz_offset" value="" />
@@ -88,8 +89,8 @@
 
     <div class="field">
       <label for="image">Image</label>
-      <input id="image" type="file" name="image" accept="image/*" />
-      {% if event and event.image %}<img class="form-preview" src="{{ event.image }}" alt="" />{% endif %}
+      <input id="image" class="file-input" type="file" name="image" accept="image/*" />
+      {% if event and event.image %}<img class="form-preview" src="{{ event.image }}" alt="Current event image" />{% endif %}
     </div>
 
     {% if not event %}

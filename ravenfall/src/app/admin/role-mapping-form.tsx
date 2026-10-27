@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 import { useState } from "react";
-import { ActionForm, SubmitButton } from "@/components/action-form";
+import { AdminForm } from "@/components/admin-form";
 import { Field, Select } from "@/components/ui/input";
 import { saveRoleMapping } from "./actions";
 
@@ -83,11 +83,11 @@ function SingleRolePicker({ name, roles, initial }: { name: string; roles: PickR
 
 function Section({ title, help, children }: { title: string; help: string; children: React.ReactNode }) {
   return (
-    <fieldset className="flex flex-col gap-3 border-t pt-4 first:border-t-0 first:pt-0">
+    <fieldset className="flex flex-col gap-3 rounded-lg border bg-background/30 p-4">
       <legend className="sr-only">{title}</legend>
       <div>
-        <div className="text-sm font-semibold">{title}</div>
-        <p className="text-xs text-muted-foreground">{help}</p>
+        <div className="text-xs font-semibold uppercase tracking-label text-accent">{title}</div>
+        <p className="mt-0.5 text-xs text-muted-foreground">{help}</p>
       </div>
       {children}
     </fieldset>
@@ -119,7 +119,7 @@ export function RoleMappingForm({
 }) {
   const grid = "grid gap-3 sm:grid-cols-2 lg:grid-cols-3";
   return (
-    <ActionForm action={saveRoleMapping} className="gap-6">
+    <AdminForm action={saveRoleMapping} saveLabel="Save role mapping">
       <Section title="Site permissions" help="Members get the highest permission any of their Discord roles grants.">
         <div className="grid gap-4 sm:grid-cols-2">
           {perms.map((p) => (
@@ -166,9 +166,6 @@ export function RoleMappingForm({
         </Section>
       ))}
 
-      <SubmitButton variant="accent" className="self-start" pendingText="Saving…">
-        Save role mapping
-      </SubmitButton>
-    </ActionForm>
+    </AdminForm>
   );
 }

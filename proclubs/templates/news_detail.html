@@ -1,27 +1,45 @@
 {% extends "base.html" %}
 {% block title %}{{ article.title }}{% endblock %}
 {% block content %}
+{% from "_crest.html" import crest %}
+{% set cat_cls = 'cat-' ~ (article.category | replace(' ', '-') | lower) %}
+{% set read_min = [1, ((body_html | striptags | wordcount) / 220) | round(0, 'ceil') | int] | max %}
 <div class="page narrow">
+  <p class="back-link"><a href="/news">&larr; Back to News</a></p>
+
+  {% if article.cover_image %}
+    <img class="article-cover" src="{{ media_url('article', article, 'cover') }}" alt="{{ article.title }}"
+         fetchpriority="high" decoding="async"
+         style="object-position: {{ focal_position(article) }};" />
+  {% else %}
+    <div class="article-cover article-cover-fallback {{ cat_cls }}" aria-hidden="true">{{ crest(initials(SITE_NAME, 3), 72, "nd") }}</div>
+  {% endif %}
+
   <div class="page-head">
     <div>
-      <span class="category-badge cat-{{ article.category | replace(' ', '-') | lower }}">{{ article.category }}</span>
-      <h1>{{ article.title }}{% if not article.published %} <span class="draft-pill">Draft</span>{% endif %}</h1>
-      <p class="page-lede">{{ article.author_name }} &middot; {{ article.published_at.strftime('%B %-d, %Y') }}</p>
-    </div>
-    {% if is_staff %}
-      <div class="form-actions">
-        <a class="btn secondary" href="/news/{{ article.slug }}/edit">Edit</a>
-        <form method="post" action="/news/{{ article.slug }}/delete" onsubmit="return confirm('Delete this article?');">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-          <button type="submit" class="btn danger">Delete</button>
-        </form>
+      <div class="article-tags">
+        <span class="category-badge {{ cat_cls }}">{{ article.category }}</span>
+        {% if not article.published %}<span class="draft-pill">Draft</span>{% endif %}
       </div>
-    {% endif %}
+      <h1>{{ article.title }}</h1>
+      <p class="page-lede">{{ article.author_name }} &middot; {{ article.published_at.strftime('%B %-d, %Y') }} &middot; {{ read_min }} min read</p>
+    </div>
   </div>
 
-  {% if article.cover_image %}<img class="article-cover" src="{{ media_url('article', article, 'cover') }}" alt=""
-                                  fetchpriority="high" decoding="async"
-                                  style="object-position: {{ focal_position(article) }};" />{% endif %}
+  {% if is_staff %}
+    <div class="article-toolbar" role="group" aria-label="Staff actions">
+      <a class="btn secondary btn-sm" href="/news/{{ article.slug }}/edit">Edit</a>
+      <details class="confirm-inline">
+        <summary class="btn secondary btn-sm">Delete</summary>
+        <form method="post" action="/news/{{ article.slug }}/delete" data-loading="Deleting…">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <span class="confirm-text">Delete this article for good?</span>
+          <button type="submit" class="btn danger btn-sm">Yes, delete</button>
+        </form>
+      </details>
+    </div>
+  {% endif %}
+
   <div class="article-body">{{ body_html | safe }}</div>
 
   {# One figure, not two: site likes and Discord reactions are summed by
@@ -31,7 +49,7 @@
   {% set like_title = 'Likes here plus reactions on the Discord announcement' if article.discord_reaction_count else 'Likes on this article' %}
   <div class="article-reactions">
     {% if is_member %}
-      <form method="post" action="/news/{{ article.slug }}/like">
+      <form method="post" action="/news/{{ article.slug }}/like" data-loading="…">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <button type="submit" class="like-btn {{ 'liked' if user_has_liked else '' }}" title="{{ like_title }}">
           {{ '♥' if user_has_liked else '♡' }} {{ like_count }} {{ 'Like' if like_count == 1 else 'Likes' }}
@@ -40,10 +58,11 @@
     {% else %}
       <span class="like-btn static" title="{{ like_title }}">♡ {{ like_count }} {{ 'Like' if like_count == 1 else 'Likes' }}</span>
     {% endif %}
+    <button type="button" class="like-btn share-btn" data-copy-link data-copied="Link copied" title="Copy a link to this article">Copy link</button>
   </div>
 
   <div class="comments" id="comments">
-    <h2 class="comments-head">{{ comments | length }} Comment{{ '' if comments | length == 1 else 's' }}</h2>
+    <h2 class="comments-head">{{ comments | length }} comment{{ '' if comments | length == 1 else 's' }}</h2>
 
     {% if not user %}
       <p class="field-hint">
@@ -57,9 +76,10 @@
         {% if DISCORD_INVITE_URL %}<a href="{{ DISCORD_INVITE_URL }}" target="_blank" rel="noopener noreferrer">Join our Discord</a>{% endif %}
       </p>
     {% else %}
-      <form method="post" action="/news/{{ article.slug }}/comments" class="comment-form">
+      <form method="post" action="/news/{{ article.slug }}/comments" class="comment-form" data-loading="Posting…">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-        <textarea name="body" placeholder="Say something about this one..." maxlength="2000" required></textarea>
+        <label for="comment-body" class="visually-hidden">Your comment</label>
+        <textarea id="comment-body" name="body" placeholder="Say something about this one..." maxlength="2000" required></textarea>
         <div class="form-actions"><button type="submit" class="btn">Comment</button></div>
       </form>
     {% endif %}
@@ -76,11 +96,14 @@
             <strong>{{ c.author_name }}</strong>
             <span class="article-meta">{{ c.created_at.strftime('%b %-d, %Y') }}</span>
             {% if user and (is_staff or user.id == c.author_discord_id) %}
-              <form method="post" action="/news/{{ article.slug }}/comments/{{ c.id }}/delete"
-                    class="comment-delete" onsubmit="return confirm('Delete this comment?');">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-                <button type="submit" class="link-btn">Delete</button>
-              </form>
+              <details class="confirm-inline comment-delete">
+                <summary class="link-btn">Delete</summary>
+                <form method="post" action="/news/{{ article.slug }}/comments/{{ c.id }}/delete" data-loading="Deleting…">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                  <span class="confirm-text">Delete this comment?</span>
+                  <button type="submit" class="link-btn danger-link">Yes, delete</button>
+                </form>
+              </details>
             {% endif %}
           </div>
           <p class="comment-text">{{ c.body }}</p>
@@ -89,4 +112,15 @@
     {% endfor %}
   </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+  document.querySelectorAll("[data-copy-link]").forEach(function (b) {
+    var label = b.textContent;
+    b.addEventListener("click", function () {
+      var done = function () { b.textContent = b.dataset.copied; setTimeout(function () { b.textContent = label; }, 1800); };
+      if (navigator.clipboard) navigator.clipboard.writeText(location.href.split("#")[0]).then(done, function () {});
+    });
+  });
+</script>
 {% endblock %}
