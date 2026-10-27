@@ -1,0 +1,26 @@
+[Unit]
+Description=YeeHaw FC (Next.js)
+After=network-online.target postgresql.service
+Wants=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=yeehaw
+Group=yeehaw
+WorkingDirectory=/opt/yeehaw/yeehaw
+# The one source of configuration. systemd strips the quotes .env.example
+# uses, so the file works unchanged.
+EnvironmentFile=/opt/yeehaw/yeehaw/.env
+Environment=NODE_ENV=production
+# Localhost only; Caddy is the public face. Ravenfall HQ has 8002.
+Environment=PORT=8001
+Environment=HOSTNAME=127.0.0.1
+# Keep a runaway from starving Ravenfall HQ on a small droplet.
+Environment=NODE_OPTIONS=--max-old-space-size=320
+MemoryMax=512M
+ExecStart=/usr/bin/node .next/standalone/server.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

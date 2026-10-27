@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+/* YeeHaw FC club-file theme: broadcast navy, one red accent, white ink.
+   Carries over proclubs/static/css/site.css (--bg #0A1427, --panel #0F1B33,
+   --accent #E31937, Inter + IBM Plex Mono) under shadcn/ui token names so
+   its components drop in unchanged.
+
+   The site is dark-only: there is no light palette and no `dark:` variants,
+   so :root is the dark theme and color-scheme below is pinned to dark.
+
+   Colour rules, as in the old site: red (--primary) is THE action and the
+   current location; every other colour means something. --accent is the red
+   as TEXT on navy; --info (blue) is staff and club roles; --warning (amber)
+   is attention and standing; --success / --destructive are win/good and
+   destructive. `--success` / `--destructive` are FILLS; the `-fg` ones and
+   --info, --warning, --accent are TEXT/ICON colours that clear 4.5:1 on
+   background and card. Never use a raw palette class (text-green-300 etc.). */
+
+:root {
+  --background: #0a1427;
+  --foreground: #eef2f8;
+  --card: #0f1b33;
+  --card-foreground: #eef2f8;
+  --muted: #14233f;
+  --muted-foreground: #9eaac0;
+  --border: #253a62;
+  --input: #5a73a3; /* form-control edge: >= 3:1 on the panels (WCAG 1.4.11) */
+  --ring: #79aef7;
+  --primary: #d4142f; /* 5.3:1 with white; the club red, nudged for text contrast */
+  --primary-foreground: #ffffff;
+  --secondary: #1c2d50;
+  --secondary-foreground: #eef2f8;
+  --accent: #ff5e72; /* the red as text/icon on navy */
+  --accent-foreground: #06122a;
+  --destructive: #c4362f;
+  --destructive-foreground: #ffffff;
+  --success: #2f9e63;
+  --success-fg: #8fd6a9;
+  --destructive-fg: #ef6a6e;
+  --info: #79aef7;
+  --warning: #e39a3b;
+  --pitch: #12351f; /* the squad pitch's grass, kept dark so shirts read */
+  --pitch-line: rgb(255 255 255 / 0.18);
+
+  --radius: 0.25rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-fg: var(--success-fg);
+  --color-destructive-fg: var(--destructive-fg);
+  --color-info: var(--info);
+  --color-warning: var(--warning);
+  --color-pitch: var(--pitch);
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1rem;
+  --tracking-label: 0.14em;
+  --tracking-display: 0.04em;
+  --radius-sm: calc(var(--radius) - 1px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --font-sans: var(--font-body), "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-body), "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-label), ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    color-scheme: dark;
+    font-size: 15px;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  h1, h2, h3 {
+    @apply font-display tracking-tight;
+  }
+  /* Figures line up in columns: shirt numbers, scores, ratings. */
+  table, .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Honour the OS "reduce motion" setting everywhere (spinners, ping, smooth
+   scroll, transitions). Per-element `motion-reduce:` is only needed to hide
+   a decorative animation outright. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Floodlit-pitch backdrop for hero and section headers. */
+.pitch-glow {
+  background:
+    radial-gradient(90% 120% at 50% 0%, color-mix(in srgb, var(--info) 14%, transparent), transparent 70%),
+    linear-gradient(to bottom, color-mix(in srgb, var(--card) 80%, transparent), transparent);
+}
+
+/* Labels: small, tracked, mono (kickers, table heads, chips). */
+.field-label {
+  @apply font-mono text-micro font-semibold uppercase tracking-label text-muted-foreground;
+}
+
+/* Markdown (articles, notes). */
+.prose-yfc {
+  @apply text-sm leading-relaxed text-foreground/90;
+}
+.prose-yfc h1 { @apply mt-6 mb-3 text-2xl font-bold; }
+.prose-yfc h2 { @apply mt-6 mb-2 text-xl font-bold; }
+.prose-yfc h3 { @apply mt-4 mb-2 text-base font-bold; }
+.prose-yfc p { @apply my-3; }
+.prose-yfc ul { @apply my-3 list-disc pl-6; }
+.prose-yfc ol { @apply my-3 list-decimal pl-6; }
+.prose-yfc li { @apply my-1; }
+.prose-yfc a { @apply text-accent underline underline-offset-2; }
+.prose-yfc code { @apply rounded bg-muted px-1 py-0.5 font-mono text-xs; }
+.prose-yfc pre { @apply my-3 overflow-x-auto rounded bg-muted p-3; }
+.prose-yfc pre code { @apply bg-transparent p-0; }
+.prose-yfc blockquote { @apply my-3 border-l-2 border-primary pl-4 text-muted-foreground; }
+.prose-yfc table { @apply my-3 w-full text-left text-sm; }
+.prose-yfc th { @apply border-b px-2 py-1 font-semibold text-muted-foreground; }
+.prose-yfc td { @apply border-b px-2 py-1; }
+.prose-yfc hr { @apply my-6; }
+
+/* A selected folder tab on the player hub: a navy panel edge. */
+.folder-tab {
+  background: var(--card);
+  border-color: var(--border);
+  box-shadow: inset 0 2px 0 var(--primary);
+}
+
+/* A redaction bar: what a viewer below clearance sees in place of a value. */
+.redacted-bar {
+  @apply h-3 rounded-[1px];
+  background: #02060f;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.05);
+}

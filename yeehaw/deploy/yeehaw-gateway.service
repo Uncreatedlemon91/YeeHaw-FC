@@ -1,0 +1,25 @@
+[Unit]
+Description=YeeHaw FC Discord gateway (bot presence + member events)
+After=network-online.target yeehaw.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=yeehaw
+Group=yeehaw
+WorkingDirectory=/opt/yeehaw/yeehaw
+# Same .env as the site: DISCORD_BOT_TOKEN, DISCORD_GUILD_ID, NEXTAUTH_SECRET.
+EnvironmentFile=/opt/yeehaw/yeehaw/.env
+Environment=SITE_PORT=8001
+# One websocket and a few timers: it needs very little.
+Environment=NODE_OPTIONS=--max-old-space-size=64
+MemoryMax=128M
+ExecStart=/usr/bin/node scripts/gateway.mjs
+# Routine Discord disconnects are handled inside the script; it exits only on
+# a crash or a fatal problem the log names (e.g. a bad token), or cleanly
+# when no token is set, in which case it stays stopped.
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=YeeHaw FC database backup
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=yeehaw
+Group=yeehaw
+# For BACKUP_DIR / BACKUP_RETENTION, if set.
+EnvironmentFile=-/opt/yeehaw/yeehaw/.env
+ExecStart=/usr/bin/env bash /opt/yeehaw/yeehaw/deploy/backup.sh

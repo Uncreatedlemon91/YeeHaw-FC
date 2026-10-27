@@ -1,0 +1,971 @@
+// YeeHaw FC data model. People are keyed by Discord ID: there is no local
+// registration, so a Player row exists for anyone who has signed in with
+// Discord, been put under contract, or been acted on by the bot.
+//
+// This one schema covers every feature of the site (contracts, events,
+// recognition, EA stats, news, staff tools); later phases build on it
+// without reshaping it. It replaces proclubs/models.py (site.db) and
+// proclubs/db.py (history.db).
+//
+// Some rules Prisma cannot express live in the init migration as raw SQL
+// (prisma/migrations/*_init/migration.sql, the "Partial unique indexes"
+// block). `prisma migrate dev` would try to drop them, so migrations here
+// are written by hand and applied with `migrate deploy`:
+//   - Contract: one live (OFFERED/ACTIVE) shirt number per season, one live
+//     CAPTAIN and one live VICE per season, shirtNumber between 1 and 99.
+//   - Season: at most one WINDOW and one ACTIVE season at a time.
+//   - EventSignup: one player per formation slot per event.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Enums --------------------------------------------------------------- //
+
+// The re-signing flow: DRAFT while management set it up, WINDOW while offers
+// are being made for it (the previous season is still ACTIVE), ACTIVE once it
+// has started, ENDED when its end date has passed.
+enum SeasonState {
+  DRAFT
+  WINDOW
+  ACTIVE
+  ENDED
+}
+
+enum ContractState {
+  OFFERED
+  ACTIVE
+  DECLINED
+  RELEASED
+  ENDED
+}
+
+// What a player can expect of their playing time. Part of the contract, not
+// a permission (proclubs/roles.py SQUAD_STATUSES).
+enum SquadStatus {
+  STARTER
+  ROTATION
+  SUBSTITUTE
+}
+
+enum Captaincy {
+  NONE
+  CAPTAIN
+  VICE
+}
+
+// proclubs/discord_roster.py PITCH_POSITIONS. Labels live in src/config/club.ts.
+enum Position {
+  GOALKEEPER
+  CENTRE_BACK
+  FULL_BACK
+  WING_BACK
+  DEFENSIVE_MIDFIELD
+  CENTRE_MIDFIELD
+  ATTACKING_MIDFIELD
+  WINGER
+  STRIKER
+  ANY_OUTFIELD
+}
+
+enum ObjectiveKind {
+  APPEARANCES
+  GOALS
+  ASSISTS
+  AVG_RATING
+  ATTENDANCE
+  CLEAN_SHEETS
+  MOTM
+}
+
+// How the person came to hold a club title. Derived from the Discord role
+// mapping on sign-in and sync; display only (permissions come from the same
+// roles, see src/lib/permissions.ts).
+enum ClubRole {
+  PRESIDENT
+  HEAD_COACH
+  COACH
+}
+
+// What happened to a contract or squad place, for the history and the
+// announcement trail.
+enum RosterMoveKind {
+  OFFER
+  ACCEPT
+  DECLINE
+  RELEASE
+  RENEWAL
+  CHANGE
+  EXPIRE
+  STAFF_OFFER
+  SIGNING
+}
+
+enum EventType {
+  MATCH
+  SCRIM
+  TOURNAMENT
+  COMMUNITY
+  TRAINING
+  THEORY
+}
+
+// Deliberately three states, not yes/no: "maybe" is the honest answer often
+// enough that forcing it makes a roster untrustworthy.
+enum SignupStatus {
+  GOING
+  MAYBE
+  OUT
+}
+
+enum SignupSource {
+  SITE
+  DISCORD
+}
+
+// What actually happened, marked by staff. Only these feed the reliability
+// figure; an unmarked event is not evidence.
+enum Attendance {
+  PRESENT
+  ABSENT
+  EXCUSED
+}
+
+// COMMENDATION is public, WARNING is for the player and staff, NOTE is for
+// staff alone (proclubs/service_record.py can_view).
+enum ServiceEntryKind {
+  COMMENDATION
+  WARNING
+  NOTE
+}
+
+enum ArticleCategory {
+  NEWS
+  TRANSFER
+  MATCH_HIGHLIGHT
+}
+
+enum ArticleSource {
+  STAFF
+  AI
+}
+
+// MARKDOWN for staff-written articles; HTML (already sanitised) for the
+// AI roundups and articles carried over from the old site.
+enum ArticleFormat {
+  MARKDOWN
+  HTML
+}
+
+enum ProspectStage {
+  PROSPECT
+  TRIAL
+  OFFERED
+  SIGNED
+  REJECTED
+}
+
+enum SuggestionStatus {
+  OPEN
+  PLANNED
+  DONE
+  DECLINED
+}
+
+enum LineupStatus {
+  DRAFT
+  PUBLISHED
+}
+
+// --- Settings ------------------------------------------------------------ //
+
+// Key/value JSON the club edits about itself or the system keeps for itself:
+// "roles" and "channels" (Admin page), "profile" (club profile), "gateway"
+// (bot check-in), "ea-poll" (last poll), "recruitment-dismissed".
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+// --- People -------------------------------------------------------------- //
+
+model Player {
+  id              String    @id @default(cuid())
+  discordId       String    @unique
+  discordUsername String
+  // The server nickname if there is one, else the Discord display name.
+  displayName     String
+  avatar          String?
+  // /players/[slug]; derived from the gamertag or name when first created.
+  slug            String    @unique
+  // The EA account name the player plays under. Matches EA's per-player
+  // lines to this person (case-insensitively, in code).
+  gamertag        String?   @unique
+  clubRole        ClubRole?
+  clubRoleSince   DateTime?
+  // Filled in by the player themselves.
+  preferredFoot   String?
+  archetype       String?
+  bio             String?
+  timezone        String?
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  contracts          Contract[]           @relation("ContractPlayer")
+  offeredContracts   Contract[]           @relation("ContractOfferer")
+  releasedContracts  Contract[]           @relation("ContractReleaser")
+  rosterMoves        RosterMove[]         @relation("MoveSubject")
+  rosterMovesBy      RosterMove[]         @relation("MoveActor")
+  signups            EventSignup[]
+  lineupSlots        EventLineup[]
+  eventsCreated      Event[]              @relation("EventCreator")
+  seriesCreated      EventSeries[]
+  ratings            MatchRating[]
+  motmVotesCast      MotmVote[]           @relation("MotmVoter")
+  motmVotesReceived  MotmVote[]           @relation("MotmNominee")
+  serviceEntries     ServiceEntry[]       @relation("ServiceSubject")
+  serviceEntriesBy   ServiceEntry[]       @relation("ServiceAuthor")
+  milestones         Milestone[]
+  potmWins           PotmWinner[]
+  availability       AvailabilityPattern?
+  away               AvailabilityAway[]
+  suggestions        TrainingSuggestion[]
+  articles           Article[]
+  tacticsSlots       TacticsSlot[]
+  lineupPlaces       LineupSlot[]
+  lineupsPublished   Lineup[]
+  prospect           Prospect[]
+  prospectNotes      ProspectNote[]
+  setPiecesTaken     SetPiece[]
+  eaPlayerLines      EaMatchPlayer[]
+}
+
+// --- Seasons and contracts ----------------------------------------------- //
+
+model Season {
+  id              String      @id @default(cuid())
+  // "Season 2".
+  name            String
+  startsAt        DateTime
+  endsAt          DateTime
+  // When the re-signing window opens: management can send offers from then.
+  windowOpensAt   DateTime
+  state           SeasonState @default(DRAFT)
+  // Once-only markers for the daily job (src/lib/season-job.ts).
+  windowOpenedAt  DateTime?
+  startedAt       DateTime?
+  announcedAt     DateTime?
+  endReminderAt   DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  contracts   Contract[]
+  rosterMoves RosterMove[]
+  lineups     Lineup[]
+
+  @@index([startsAt])
+}
+
+// One per player per season. A declined or released contract keeps its row
+// (it is history); offering again reopens it rather than adding a second.
+model Contract {
+  id              String        @id @default(cuid())
+  seasonId        String
+  season          Season        @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  playerId        String
+  player          Player        @relation("ContractPlayer", fields: [playerId], references: [id], onDelete: Cascade)
+  // 1-99, unique per season across OFFERED + ACTIVE contracts (partial index
+  // in the init migration). Null for contracts carried over from before
+  // numbers existed; staff assign them later.
+  shirtNumber     Int?
+  squadStatus     SquadStatus
+  position        Position?
+  secondaryPosition Position?
+  captaincy       Captaincy     @default(NONE)
+  state           ContractState @default(OFFERED)
+  // The contract this one re-signs, when it came from the window screen.
+  previousContractId String?
+  previousContract   Contract?  @relation("Resigned", fields: [previousContractId], references: [id], onDelete: SetNull)
+  resignedAs         Contract[] @relation("Resigned")
+  offeredById     String?
+  offeredBy       Player?       @relation("ContractOfferer", fields: [offeredById], references: [id], onDelete: SetNull)
+  offeredAt       DateTime      @default(now())
+  // Where the offer was posted, so Accept / Decline can edit that message
+  // and the hub can show the same state. DM when the channel is unset.
+  offerChannelId  String?
+  offerMessageId  String?
+  respondedAt     DateTime?
+  // Whether accepting put the squad and status roles on the player. The
+  // acceptance always stands; the role write can fail on its own, and
+  // roleError says why so Admin can show what to fix.
+  rolesGranted    Boolean       @default(false)
+  roleError       String?
+  releasedAt      DateTime?
+  releasedById    String?
+  releasedBy      Player?       @relation("ContractReleaser", fields: [releasedById], references: [id], onDelete: SetNull)
+  releaseNote     String?
+  endedAt         DateTime?
+  note            String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  objectives  ContractObjective[]
+  rosterMoves RosterMove[]
+
+  @@unique([seasonId, playerId])
+  @@index([playerId])
+  @@index([seasonId, state])
+}
+
+model ContractObjective {
+  id         String        @id @default(cuid())
+  contractId String
+  contract   Contract      @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  kind       ObjectiveKind
+  // Appearances/goals/...: a count. AVG_RATING: a rating out of 10.
+  // ATTENDANCE: a percentage.
+  target     Float
+  note       String?
+  position   Int           @default(0)
+
+  @@index([contractId])
+}
+
+// The history of squad changes, one row per thing that happened. Kept
+// because the announcement itself lives in Discord, where it scrolls away,
+// and because the old site's roster moves migrate here as history.
+model RosterMove {
+  id               String         @id @default(cuid())
+  kind             RosterMoveKind
+  // Snapshotted so the history still says who it was about after they leave
+  // the server.
+  playerId         String
+  player           Player         @relation("MoveSubject", fields: [playerId], references: [id], onDelete: Cascade)
+  displayName      String
+  seasonId         String?
+  season           Season?        @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  contractId       String?
+  contract         Contract?      @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  position         Position?
+  secondaryPosition Position?
+  squadStatus      SquadStatus?
+  note             String?
+  actorId          String?
+  actor            Player?        @relation("MoveActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorName        String?
+  // Null when the post itself failed: the row is still written so the
+  // attempt is visible.
+  discordChannelId String?
+  discordMessageId String?
+  createdAt        DateTime       @default(now())
+
+  @@index([playerId, createdAt])
+  @@index([seasonId])
+}
+
+// --- Events -------------------------------------------------------------- //
+
+// A recurring series: the nights and time it repeats, in its own timezone.
+// Occurrences are generated ahead as ordinary Event rows (src/lib/recurrence.ts).
+model EventSeries {
+  id              String    @id @default(cuid())
+  title           String
+  type            EventType @default(TRAINING)
+  opponent        String?
+  description     String    @default("")
+  // 0 = Monday ... 6 = Sunday, matching AvailabilityPattern.days.
+  weekdays        Int[]
+  // "20:00", wall-clock time in `timezone`.
+  timeOfDay       String
+  timezone        String
+  durationMinutes Int       @default(90)
+  formation       String?
+  // First date it can occur on, and optionally the last (yyyy-mm-dd, series time).
+  startsOn        DateTime  @db.Date
+  endsOn          DateTime? @db.Date
+  // How far ahead occurrences are kept generated.
+  generateAheadDays Int     @default(21)
+  // The last date occurrences were generated up to, so a run resumes.
+  generatedThrough DateTime? @db.Date
+  active          Boolean   @default(true)
+  createdById     String?
+  createdBy       Player?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  events Event[]
+}
+
+model Event {
+  id              String    @id @default(cuid())
+  title           String
+  type            EventType @default(MATCH)
+  opponent        String?
+  description     String    @default("")
+  startsAt        DateTime
+  // End of the event window: EA matches played between startsAt and endsAt
+  // (plus a grace period, in code) are linked to it for the match report.
+  endsAt          DateTime?
+  image           String?
+  createdById     String?
+  createdBy       Player?   @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  seriesId        String?
+  series          EventSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // The RSVP announcement, so signing up on the site can edit the message
+  // and both surfaces show the same roster.
+  discordChannelId String?
+  discordMessageId String?
+  // The thread under it, for staged invites (EventTierInvite).
+  discordThreadId  String?
+  signupsOpen     Boolean   @default(true)
+  // When set, signing up claims a named slot in this formation: the team
+  // sheet is the sign-up sheet. Null keeps plain going / maybe / out.
+  formation       String?
+
+  // The match-week loop: team sheet, then the report.
+  lineupPublishedAt DateTime?
+  lineupMessageId   String?
+  usScore         Int?
+  oppScore        Int?
+  // Free text result when there is no score ("W on penalties").
+  result          String?
+  reviewNotes     String?
+  reviewClips     String?
+  reviewPublishedAt DateTime?
+  reviewPublishedBy String?
+  // The post-match vote: opened after full time (or by staff), closed when
+  // the report is published or the window ends.
+  voteOpenedAt    DateTime?
+  voteClosesAt    DateTime?
+  voteMessageId   String?
+
+  // Training sessions (type TRAINING / THEORY).
+  sessionObjective String?
+  sessionPlan     String?
+  // slot key -> what that position does in this session.
+  roleBriefs      Json?
+  sessionReview   String?
+  sessionReviewedBy String?
+
+  signups     EventSignup[]
+  lineup      EventLineup[]
+  ratings     MatchRating[]
+  motmVotes   MotmVote[]
+  tierInvites EventTierInvite[]
+  eaMatches   EaMatch[]
+  prospectNotes ProspectNote[]
+
+  // A series produces one occurrence per start time.
+  @@unique([seriesId, startsAt])
+  @@index([startsAt])
+}
+
+model EventSignup {
+  id        String       @id @default(cuid())
+  eventId   String
+  event     Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  playerId  String
+  player    Player       @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  status    SignupStatus @default(GOING)
+  // The slot claimed on the event's formation ("GK", "CM2", "SUB1"). Only
+  // ever with GOING; at most one player per slot per event (partial index).
+  slotKey   String?
+  source    SignupSource @default(SITE)
+  // Where the player would like to play, best first.
+  pref1     Position?
+  pref2     Position?
+  pref3     Position?
+  respondedAt DateTime   @default(now())
+  updatedAt DateTime     @updatedAt
+  // Marked by staff afterwards; null means not marked.
+  attendance          Attendance?
+  attendanceMarkedBy  String?
+  attendanceMarkedAt  DateTime?
+
+  @@unique([eventId, playerId])
+  @@index([playerId])
+}
+
+// Who staff picked for one slot of one event's team sheet.
+model EventLineup {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  slotKey   String
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
+
+  @@unique([eventId, slotKey])
+  @@unique([eventId, playerId])
+}
+
+// One staged invite already sent for one event (the invite ladder widens a
+// fixture's audience as it approaches). A row means "that tier has had its
+// turn", and the unique key makes a double-fire a database error.
+model EventTierInvite {
+  id          String   @id @default(cuid())
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  // "create", or the hours-before as written ("48").
+  tierKey     String
+  roleId      String
+  invitedAt   DateTime @default(now())
+  // How many members were added to the thread; zero with a pinged role is
+  // the signature of a missing Server Members intent.
+  memberCount Int      @default(0)
+
+  @@unique([eventId, tierKey])
+}
+
+// One player's ratings for one match: their own, out of ten, and the
+// coach's. The coach's rating and comment are shown to that player and staff.
+model MatchRating {
+  id           String   @id @default(cuid())
+  eventId      String
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  playerId     String
+  player       Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  selfRating   Int?
+  coachRating  Int?
+  coachComment String?
+  coachName    String?
+  updatedAt    DateTime @updatedAt
+
+  @@unique([eventId, playerId])
+}
+
+// One Man of the Match vote per voter per match; voting again changes it.
+model MotmVote {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  voterId   String
+  voter     Player   @relation("MotmVoter", fields: [voterId], references: [id], onDelete: Cascade)
+  nomineeId String
+  nominee   Player   @relation("MotmNominee", fields: [nomineeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([eventId, voterId])
+  @@index([nomineeId])
+}
+
+// A message the bot has already sent, so each goes out once however often
+// the job runs. `key` says what it was about, e.g. "event-1234:player-5678".
+model Notification {
+  id     String   @id @default(cuid())
+  kind   String
+  key    String
+  sentAt DateTime @default(now())
+  ok     Boolean  @default(true)
+  detail String?
+
+  @@unique([kind, key])
+}
+
+// --- Team showcase and tactics -------------------------------------------- //
+
+// The first-choice XI on /squad. Staff build a draft on the board and
+// publish it; the current lineup is the newest PUBLISHED one. Only players
+// with a live contract can be placed (checked in code). Slot keys come from
+// src/config/formations.ts; bench slots are "SUB1", "SUB2", ...
+model Lineup {
+  id            String       @id @default(cuid())
+  seasonId      String?
+  season        Season?      @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  formation     String
+  status        LineupStatus @default(DRAFT)
+  publishedAt   DateTime?
+  publishedById String?
+  publishedBy   Player?      @relation(fields: [publishedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  slots LineupSlot[]
+
+  @@index([status, publishedAt])
+}
+
+model LineupSlot {
+  id       String @id @default(cuid())
+  lineupId String
+  lineup   Lineup @relation(fields: [lineupId], references: [id], onDelete: Cascade)
+  slotKey  String
+  playerId String
+  player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([lineupId, slotKey])
+  @@unique([lineupId, playerId])
+}
+
+// Singleton (id = 1): which formation the staff tactics board shows. Each
+// formation keeps its own slots, so switching loses nothing.
+model TacticsBoard {
+  id              Int      @id @default(1)
+  activeFormation String   @default("4-3-3")
+  updatedAt       DateTime @updatedAt
+  updatedByName   String?
+}
+
+model TacticsSlot {
+  id        String   @id @default(cuid())
+  formation String
+  slotKey   String
+  playerId  String?
+  player    Player?  @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  // Free text for a name that isn't a known player (an EA-only gamertag).
+  playerName String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([formation, slotKey])
+}
+
+// One routine in the set-piece book.
+model SetPiece {
+  id         String   @id @default(cuid())
+  name       String
+  // Corner, Free kick, Penalty, Throw-in, Kick-off (src/config/club.ts).
+  kind       String
+  side       String?
+  takerId    String?
+  taker      Player?  @relation(fields: [takerId], references: [id], onDelete: SetNull)
+  routine    String?
+  targets    String?
+  position   Int      @default(0)
+  updatedBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// A player's suggestion for what training works on next. Seen by staff and
+// the player who made it, nobody else.
+model TrainingSuggestion {
+  id         String           @id @default(cuid())
+  playerId   String
+  player     Player           @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  body       String
+  status     SuggestionStatus @default(OPEN)
+  staffNote  String?
+  handledBy  String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@index([playerId])
+}
+
+// --- Availability --------------------------------------------------------- //
+
+// The nights a player can usually play. `days` is seven characters, Monday
+// first: "1" free, "0" not ("1010100" is Mon, Wed, Fri). Evenings implied.
+model AvailabilityPattern {
+  playerId  String   @id
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  days      String   @default("0000000")
+  note      String?
+  updatedAt DateTime @updatedAt
+}
+
+// An exception to the usual pattern: away from these dates, inclusive.
+model AvailabilityAway {
+  id       String   @id @default(cuid())
+  playerId String
+  player   Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  startsOn DateTime @db.Date
+  endsOn   DateTime @db.Date
+  note     String?
+  createdAt DateTime @default(now())
+
+  @@index([playerId, endsOn])
+}
+
+// --- Recognition ----------------------------------------------------------- //
+
+// An entry staff write into a service record by hand, beside the ones the
+// site works out itself (milestones, honors, contracts).
+model ServiceEntry {
+  id         String           @id @default(cuid())
+  playerId   String
+  player     Player           @relation("ServiceSubject", fields: [playerId], references: [id], onDelete: Cascade)
+  kind       ServiceEntryKind
+  body       String
+  authorId   String?
+  author     Player?          @relation("ServiceAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  authorName String
+  // When it happened (staff can set a past day); createdAt is when written.
+  occurredAt DateTime         @default(now())
+  createdAt  DateTime         @default(now())
+
+  @@index([playerId, occurredAt])
+}
+
+// A milestone a player has reached (25 appearances, first goal). Awarded and
+// announced once. Keys follow proclubs/recognition.py MILESTONES ("apps-25").
+model Milestone {
+  id          String    @id @default(cuid())
+  playerId    String
+  player      Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  key         String
+  label       String
+  achievedAt  DateTime  @default(now())
+  // Null until the bot has posted it. Milestones found on the first run are
+  // recorded as already announced: history is not news.
+  announcedAt DateTime?
+
+  @@unique([playerId, key])
+}
+
+// The month's award, from the squad's post-match votes. A tie names everyone
+// level, one PotmWinner row each.
+model PlayerOfTheMonth {
+  id          String   @id @default(cuid())
+  // "2026-10", in club time.
+  month       String   @unique
+  votes       Int      @default(0)
+  awardedAt   DateTime @default(now())
+  announcedAt DateTime?
+
+  winners PotmWinner[]
+}
+
+model PotmWinner {
+  potmId   String
+  potm     PlayerOfTheMonth @relation(fields: [potmId], references: [id], onDelete: Cascade)
+  playerId String
+  player   Player           @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@id([potmId, playerId])
+}
+
+// --- Recruitment ----------------------------------------------------------- //
+
+// Somebody the club is looking at: Prospect -> Trial -> Offered -> Signed (or
+// Not for us), then settling in. Staff only. Offering a contract creates a
+// Contract for the current or next season.
+model Prospect {
+  id            String        @id @default(cuid())
+  name          String
+  // Set once they are in the server; links the prospect to a Player.
+  playerId      String?
+  player        Player?       @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  discordId     String?
+  gamertag      String?
+  position      Position?
+  secondaryPosition Position?
+  stage         ProspectStage @default(PROSPECT)
+  source        String?
+  addedBy       String?
+  // When the club confirmed the signing; the settling-in checklist runs
+  // from here.
+  signedAt      DateTime?
+  // Checklist steps staff ticked by hand (the rest are worked out).
+  onboarding    String[]      @default([])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  notes ProspectNote[]
+
+  @@index([stage])
+}
+
+// An assessment: from a trial match (eventId) or general.
+model ProspectNote {
+  id         String   @id @default(cuid())
+  prospectId String
+  prospect   Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  eventId    String?
+  event      Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  rating     Int?
+  body       String
+  authorId   String?
+  author     Player?  @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorName String
+  // The copy posted to the recruitment channel, null when not posted.
+  discordMessageId String?
+  createdAt  DateTime @default(now())
+
+  @@index([prospectId])
+}
+
+// --- News ------------------------------------------------------------------ //
+
+model Article {
+  id          String          @id @default(cuid())
+  title       String
+  slug        String          @unique
+  category    ArticleCategory @default(NEWS)
+  summary     String?
+  body        String
+  format      ArticleFormat   @default(MARKDOWN)
+  // File name under UPLOAD_DIR/articles, served by /api/uploads. Null = none.
+  coverImage  String?
+  coverThumb  String?
+  // Where the cover stays centred when cropped (percent, 50/50 = centre).
+  coverFocalX Float           @default(50)
+  coverFocalY Float           @default(50)
+  source      ArticleSource   @default(STAFF)
+  authorId    String?
+  author      Player?         @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorName  String
+  published   Boolean         @default(true)
+  publishedAt DateTime?       @default(now())
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  // The Discord announcement, so its reaction count can be re-checked.
+  discordChannelId String?
+  discordMessageId String?
+  discordReactionCount Int?
+
+  @@index([published, publishedAt])
+}
+
+// --- EA data (replaces proclubs/data/history.db) ---------------------------- //
+
+// One row per poll: the club's division and record at that moment.
+model EaClubSnapshot {
+  id          String   @id @default(cuid())
+  platform    String
+  clubId      String
+  capturedAt  DateTime @default(now())
+  division    String?
+  bestDivision String?
+  points      Int?
+  skillRating Int?
+  wins        Int?
+  losses      Int?
+  ties        Int?
+  goals       Int?
+  goalsAgainst Int?
+  promotions  Int?
+  relegations Int?
+  teamSize    Int?
+
+  @@index([platform, clubId, capturedAt])
+}
+
+// A match EA reported for a tracked club. EA only keeps a rolling window of
+// recent matches, so this is the only long-term copy. One row per club per
+// match (both clubs of a league match may be tracked).
+model EaMatch {
+  id         String   @id @default(cuid())
+  matchId    String
+  platform   String
+  clubId     String
+  playedAt   DateTime?
+  matchType  String
+  usScore    Int?
+  oppScore   Int?
+  oppName    String?
+  oppClubId  String?
+  // "W", "L" or "D".
+  outcome    String
+  forfeit    Boolean  @default(false)
+  capturedAt DateTime @default(now())
+  // The scheduled event this match was played in, linked for the report.
+  eventId    String?
+  event      Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  players EaMatchPlayer[]
+
+  @@unique([matchId, clubId])
+  @@index([platform, clubId, playedAt])
+  @@index([eventId])
+}
+
+model EaMatchPlayer {
+  id             String  @id @default(cuid())
+  matchRef       String
+  match          EaMatch @relation(fields: [matchRef], references: [id], onDelete: Cascade)
+  // EA's name for the player; playerId is resolved from the gamertag.
+  playerName     String
+  playerId       String?
+  player         Player? @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  pos            String?
+  rating         Float?
+  goals          Int?
+  assists        Int?
+  shots          Int?
+  passesMade     Int?
+  passAttempts   Int?
+  tacklesMade    Int?
+  tackleAttempts Int?
+  saves          Int?
+  mom            Boolean @default(false)
+  redCards       Int?
+  cleanSheet     Boolean @default(false)
+  minutesPlayed  Int?
+
+  @@unique([matchRef, playerName])
+  @@index([playerName])
+  @@index([playerId])
+}
+
+// Membership of the auto-built league table: the clubs we have actually
+// played, capped at EA_LEAGUE_MAX_TEAMS. `pinned` protects our own row.
+model EaLeagueClub {
+  platform String
+  clubId   String
+  label    String?
+  addedAt  DateTime @default(now())
+  pinned   Boolean  @default(false)
+
+  @@id([platform, clubId])
+}
+
+// EA's own season totals per player (members/stats); the latest poll wins.
+// Complete where the match table is not: matches played before tracking
+// began, or while the poll was down, are still counted here.
+model EaMemberTotal {
+  platform      String
+  clubId        String
+  playerName    String
+  gamesPlayed   Int?
+  goals         Int?
+  assists       Int?
+  mom           Int?
+  passesMade    Int?
+  passSuccess   Float?
+  tacklesMade   Int?
+  tackleSuccess Float?
+  shotSuccess   Float?
+  ratingAvg     Float?
+  cleanSheets   Int?
+  redCards      Int?
+  capturedAt    DateTime @default(now())
+
+  @@id([platform, clubId, playerName])
+}
+
+// Who is in the EA club right now, per EA's member list: the baseline the
+// signings and departures below are diffed against.
+model EaSquadMember {
+  platform   String
+  clubId     String
+  playerName String
+  joinedAt   DateTime @default(now())
+
+  @@id([platform, clubId, playerName])
+}
+
+model EaSquadMove {
+  id         String   @id @default(cuid())
+  platform   String
+  clubId     String
+  playerName String
+  // "joined" or "left".
+  move       String
+  movedAt    DateTime @default(now())
+
+  @@index([platform, clubId, movedAt])
+}
