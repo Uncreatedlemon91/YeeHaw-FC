@@ -11,6 +11,7 @@ import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { OBJECTIVE_LABEL, POSITION_LABEL, SQUAD_STATUS_LONG, WEEKDAYS } from "@/config/club";
 import { formatObjectives } from "@/lib/contract-rules";
+import { MAX_ARCHETYPE, MAX_BIO, PREFERRED_FEET } from "@/lib/lineup-rules";
 import type { ContractRow, PlayerHub } from "@/lib/player-hub";
 import { canAdd, canDelete, groupsPresent, type Entry } from "@/lib/service-record";
 import { fmtDate } from "@/lib/time";
@@ -22,6 +23,7 @@ import {
   offerFromHub,
   releasePlayer,
   respondOffer,
+  updateAbout,
   withdrawContractOffer,
 } from "./actions";
 
@@ -73,6 +75,36 @@ export function OfferBanner({ offer }: { offer: ContractRow }) {
 }
 
 // --- Overview ------------------------------------------------------------- //
+
+/** The player's own bio, preferred foot and build; shown only on their own hub. */
+function AboutForm({ player }: { player: PlayerHub["player"] }) {
+  return (
+    <details className="mt-2 border-t pt-3">
+      <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-accent">Edit about me</summary>
+      <ActionForm action={updateAbout} className="mt-3">
+        <Field label="Bio" htmlFor="about-bio" help={`Up to ${MAX_BIO} characters.`}>
+          <Textarea id="about-bio" name="bio" rows={4} maxLength={MAX_BIO} defaultValue={player.bio ?? ""} />
+        </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Preferred foot" htmlFor="about-foot">
+            <Select id="about-foot" name="preferredFoot" defaultValue={player.preferredFoot ?? ""}>
+              <option value="">—</option>
+              {PREFERRED_FEET.map((f) => (
+                <option key={f}>{f}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Build / archetype" htmlFor="about-build">
+            <Input id="about-build" name="archetype" maxLength={MAX_ARCHETYPE} defaultValue={player.archetype ?? ""} placeholder="e.g. Box-to-box" />
+          </Field>
+        </div>
+        <div>
+          <SubmitButton pendingText="Saving…">Save</SubmitButton>
+        </div>
+      </ActionForm>
+    </details>
+  );
+}
 
 export function Overview({ hub }: { hub: PlayerHub }) {
   const { player, totals } = hub;
@@ -155,6 +187,7 @@ export function Overview({ hub }: { hub: PlayerHub }) {
                 <dd>{player.archetype ?? "—"}</dd>
               </div>
             </dl>
+            {hub.viewer.isSelf && <AboutForm player={player} />}
           </CardContent>
         </Card>
         {hub.ribbons.length > 0 && (

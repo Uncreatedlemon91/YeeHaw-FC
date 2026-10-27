@@ -3,23 +3,24 @@ import Link from "next/link";
 import { Container } from "@/components/container";
 import { Countdown } from "@/components/countdown";
 import { Logo } from "@/components/logo";
-import { Placeholder } from "@/components/placeholder";
+import { Pitch } from "@/components/pitch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CLUB } from "@/config/club";
 import { getSessionUser } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+import { loadPublishedLineup } from "@/lib/squad";
 import { fmt } from "@/lib/time";
 
 export const revalidate = 300;
 
-// The home page's data. A later phase swaps the first card for the published
-// first-choice XI; the rest already read real tables. The page must render
-// even when the database is down, so every query is allowed to fail.
+// The home page's data: the published first-choice XI, the next fixture, the
+// latest article and recent results. The page must render even when the
+// database is down, so every query is allowed to fail.
 async function load() {
   try {
-    const [nextEvent, article, results] = await Promise.all([
+    const [nextEvent, article, results, lineup] = await Promise.all([
       prisma.event.findFirst({ where: { startsAt: { gte: new Date() } }, orderBy: { startsAt: "asc" } }),
       prisma.article.findFirst({
         where: { published: true },
@@ -34,10 +35,11 @@ async function load() {
             select: { id: true, outcome: true, usScore: true, oppScore: true, oppName: true },
           })
         : [],
+      loadPublishedLineup(),
     ]);
-    return { nextEvent, article, results };
+    return { nextEvent, article, results, lineup };
   } catch {
-    return { nextEvent: null, article: null, results: [] };
+    return { nextEvent: null, article: null, results: [], lineup: null };
   }
 }
 
@@ -48,7 +50,7 @@ const OUTCOME_CLASS: Record<string, string> = {
 };
 
 export default async function Home() {
-  const [user, { nextEvent, article, results }] = await Promise.all([getSessionUser(), load()]);
+  const [user, { nextEvent, article, results, lineup }] = await Promise.all([getSessionUser(), load()]);
 
   return (
     <>
@@ -80,9 +82,24 @@ export default async function Home() {
       <Container>
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <Placeholder title="First-choice XI">
-              The published lineup on the pitch, with shirt numbers and armbands, appears here once the squad phase lands.
-            </Placeholder>
+            <Card className="overflow-hidden">
+              <CardHeader className="flex-row items-center justify-between gap-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Shirt aria-hidden className="size-4 text-accent" /> First-choice XI
+                  {lineup && <span className="font-mono text-xs font-normal normal-case tracking-normal text-muted-foreground">{lineup.formation}</span>}
+                </CardTitle>
+                <Link href="/squad" className="text-xs font-semibold uppercase tracking-wider text-accent hover:underline">
+                  Full squad
+                </Link>
+              </CardHeader>
+              <CardContent className="pitch-glow">
+                {lineup ? (
+                  <Pitch formation={lineup.formation} slots={lineup.slots} className="max-w-[30rem]" />
+                ) : (
+                  <p className="py-10 text-center text-sm text-muted-foreground">The lineup hasn&apos;t been named yet.</p>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           <div className="flex flex-col gap-6">

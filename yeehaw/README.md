@@ -47,11 +47,35 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   contract in the next season, and starts a Window season on its start date
   with a squad announcement. Every step is once-only, so running it twice or
   by hand (`npm run season:job`) is harmless.
-- **Team showcase** *(planned)*. `/squad` shows the published first-choice
-  XI on a pitch with numbers and armbands, the bench, and everyone else by
-  squad status. Staff build and publish the lineup on a board from
-  contracted players only. The home page shows it with the latest article,
-  next fixture and recent results.
+- **Team showcase** *(built)*. `/squad` (public) shows the published
+  first-choice XI on a pitch with shirt numbers, captain / vice armbands and
+  avatars (each a link to the player's hub), the armband holders, the bench,
+  and everyone else under contract by squad status, with a link on to
+  `/players`. The home page shows the same pitch beside the next fixture,
+  recent results and the latest article. Numbers and armbands are read from
+  today's contracts, not stored on the lineup, so a mid-season change shows
+  at once; a player released since publishing leaves an empty slot.
+  **The lineup editor** (`/staff/lineup`, staff) picks a formation and places
+  contracted players on the pitch and the seven bench slots: tap a name then a
+  slot (phone friendly), or drag; tap a placed player to move or swap them.
+  *Save draft* keeps work in progress; *Publish* needs all eleven pitch slots
+  and writes a new Published lineup (older ones stay as history, the site
+  shows the newest). Only players with a live contract can be picked, one
+  player per slot, slot keys must belong to the formation: checked on the
+  server (`src/lib/lineup-rules.ts`), not just in the browser.
+- **Tactics board and set pieces** *(built)*. `/staff/tactics` is the same
+  board component as the lineup editor (port of `tactics.html` / `tactics.js`):
+  staff place names on a formation, each formation remembers its own slots,
+  Save replaces the one you're on and makes it the active shape. Roster =
+  the people under contract plus free-text names (EA gamertags with no file
+  show up as suggestions). Members see the board read-only. `/staff/set-pieces`
+  is the routine book by kind (corner, free kick, penalty, throw-in,
+  kick-off): name, side, taker, routine, targets; members read, staff write.
+  `tacticsRoles()` is the port of `tactics_roles_for` (the position someone
+  holds on the active formation).
+- **Player self-service** *(built)*. On their own hub a player can edit their
+  bio (500 characters), preferred foot and build (40 characters); the action
+  never takes a player id, it only ever writes the signed-in person's file.
 - **Player hub** *(built)*. `/players` lists staff, the squad by status and
   alumni; `/players/[slug]` is a player's file: a card (number, positions,
   status, armband, ribbon rack, headline stats) and tabs Overview (stats from
@@ -79,7 +103,7 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   league pages read it.
 - **News** *(planned)*. Staff articles and an AI roundup every 48 hours
   (Claude Code CLI, headless, tools disabled), announced in Discord.
-- **Staff tools** *(planned)*. Tactics board, set pieces, training sessions
+- **Staff tools** *(planned)*. Training sessions
   and suggestions, availability, the recruitment pipeline (prospects →
   contract offer), Player of the Month, club profile.
 
@@ -137,6 +161,13 @@ src/lib/role-sync.ts         squad / status / trialist roles kept in step with c
 src/lib/season-rules.ts      season transitions and what the daily job has due (pure)
 src/lib/seasons.ts           season CRUD, transitions, ending, announcements
 src/lib/season-job.ts        the daily job's loop
+src/lib/lineup-rules.ts      team-sheet rules: slots, one place each, contracted only, moving players (pure)
+src/lib/lineups.ts           lineup editor: draft / publish
+src/lib/squad.ts             the live squad and the published XI
+src/lib/tactics.ts           tactics board persistence, tacticsRoles()
+src/lib/set-piece-rules.ts   set-piece form rules (pure)
+src/components/pitch.tsx     pitch, bench and player token (drawing only)
+src/components/board-editor.tsx  the editable board shared by lineup and tactics
 src/lib/service-record.ts    milestones, timeline, who sees what (pure)
 src/lib/player-stats.ts      totals, attendance reliability, objective progress (pure)
 src/lib/player-hub.ts        loads a hub with clearance applied
@@ -191,7 +222,7 @@ as a redirect on the Discord application and set
 
 `npm run typecheck`, `npm run test` and `npm run build` are the checks. The
 tests are fast and need no database (permissions, role config, formations,
-signature verification, the migration's indexes, contract and season rules, role sync, the service record's visibility); logic that needs the
+signature verification, the migration's indexes, contract and season rules, role sync, the service record's visibility, lineup and set-piece rules); logic that needs the
 database takes the Prisma client as an argument so it can be tested with a
 stub.
 

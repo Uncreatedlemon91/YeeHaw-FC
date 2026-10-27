@@ -7,6 +7,7 @@ import { canAdd, canDelete, type Viewer } from "@/lib/service-record";
 import { afterResponse, changeContract, offerContracts, releaseContract, respondToContract, withdrawOffer, type Actor } from "@/lib/contracts";
 import { hasPerm } from "@/lib/permissions";
 import { prefixErrors, readTerms } from "@/lib/form-terms";
+import { parseAbout } from "@/lib/lineup-rules";
 import { prisma } from "@/lib/prisma";
 import { fromInput } from "@/lib/time";
 
@@ -120,4 +121,19 @@ export async function deleteServiceEntry(_: ActionState, data: FormData): Promis
   await prisma.serviceEntry.delete({ where: { id: e.id } });
   refresh();
   return { ok: "Deleted." };
+}
+
+/**
+ * A player edits their own bio, preferred foot and build. Takes no player id:
+ * it always writes the signed-in person's own file, so nobody can edit
+ * someone else's by changing a form field.
+ */
+export async function updateAbout(_: ActionState, data: FormData): Promise<ActionState> {
+  const user = await getSessionUser();
+  if (!user) return { error: "Sign in to edit your profile." };
+  const r = parseAbout({ preferredFoot: str(data, "preferredFoot"), archetype: str(data, "archetype"), bio: str(data, "bio") });
+  if (!r.ok) return { error: r.error, fieldErrors: { [r.field]: r.error } };
+  await prisma.player.update({ where: { id: user.id }, data: r.value });
+  refresh();
+  return { ok: "Saved." };
 }
