@@ -65,6 +65,7 @@ export default async function Admin() {
     ["Welcome channel", !!channels.welcome, "channels below"],
     ["Ops announcements (optional)", !!channels.ops, "channels below"],
     ["Personnel board (optional)", !!channels.personnel, "channels below"],
+    ["Library announcements (optional)", !!channels.library, "channels below"],
     ["Recruit role", !!cfg.recruit, "role mapping below"],
     ["Candidate role", !!cfg.candidate, "role mapping below"],
   ];
@@ -168,6 +169,7 @@ export default async function Admin() {
                 { key: "welcome", label: "Welcome channel", help: "Where “Post to welcome channel” puts the Enlist Now message." },
                 { key: "ops", label: "Ops announcements", help: "New operations, if the scheduler ticks Announce." },
                 { key: "personnel", label: "Personnel board", help: "Billet, callsign and leave requests. Leadership only." },
+                { key: "library", label: "Library announcements", help: "New Public and Unit documents, and major updates to required reading." },
               ]}
             />
           ) : (

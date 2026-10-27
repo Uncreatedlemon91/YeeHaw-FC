@@ -1,4 +1,4 @@
-import { ChevronRight, FileText, Folder, Plus, Search } from "lucide-react";
+import { BookCheck, ChevronRight, FileText, Folder, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { Container } from "@/components/container";
 import { PageHeader } from "@/components/page-header";
@@ -19,6 +19,7 @@ import {
   searchDocs,
 } from "@/lib/library";
 import { prisma } from "@/lib/prisma";
+import { canSeeCompliance } from "@/lib/required-reading";
 import { fmtDate } from "@/lib/time";
 import { ClearanceBadge } from "./clearance";
 import { FolderTools } from "./folder-forms";
@@ -125,6 +126,13 @@ export async function Browser({ folderId, q }: { folderId: string | null; q?: st
         actions={
           <>
             {current && <ClearanceBadge clearance={current.clearance} />}
+            {canSeeCompliance(viewer) && (
+              <Button asChild variant="outline">
+                <Link href="/library/compliance">
+                  <BookCheck /> Required reading
+                </Link>
+              </Button>
+            )}
             {author && (
               <Button asChild>
                 <Link href={newDoc}>

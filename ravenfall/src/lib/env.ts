@@ -72,6 +72,10 @@ export const env = {
   get personnelChannelId() {
     return process.env.PERSONNEL_BOARD_CHANNEL_ID ?? "";
   },
+  /** Where new and majorly-updated library documents are announced. */
+  get libraryChannelId() {
+    return process.env.LIBRARY_ANNOUNCE_CHANNEL_ID ?? "";
+  },
   /** Discord role per squad name, kept in step with each member's squad. */
   get squadRoleIds() {
     return pairs("ROLE_IDS_SQUADS");

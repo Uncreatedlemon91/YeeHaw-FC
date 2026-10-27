@@ -35,6 +35,8 @@ export function career(opts: {
   opsAttended: number;
   quals: readonly string[];
   qualTitles?: Record<string, string>;
+  /** Required library reading: documents required of the member, and how many are acknowledged. */
+  reading?: { total: number; done: number };
   now?: Date;
 }): Career {
   const i = rankIndex(opts.rank);
@@ -58,6 +60,10 @@ export function career(opts: {
   for (const q of req?.quals ?? []) {
     const ok = opts.quals.includes(q);
     checks.push({ label: opts.qualTitles?.[q] ?? q, have: ok ? 1 : 0, need: 1, ok, detail: "qualification" });
+  }
+  if (req?.requiredReading && opts.reading && opts.reading.total > 0) {
+    const { total, done } = opts.reading;
+    checks.push({ label: "Required reading acknowledged", have: done, need: total, ok: done >= total });
   }
   const eligible = !!next && checks.every((c) => c.ok);
   const needsApproval = !!req?.approval;

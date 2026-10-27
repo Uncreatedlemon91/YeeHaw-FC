@@ -47,6 +47,11 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
   return user ? { id: session.id, perms: session.perms, user } : null;
 });
 
+/** Numeric rank of a tier, for comparing against a viewer's level. */
+export function clearanceLevel(c: LibraryClearance): number {
+  return LEVEL[c];
+}
+
 /** Highest tier the viewer is cleared for (guests get PUBLIC). */
 export function viewerLevel(viewer: Viewer | null): number {
   if (!viewer) return LEVEL.PUBLIC;

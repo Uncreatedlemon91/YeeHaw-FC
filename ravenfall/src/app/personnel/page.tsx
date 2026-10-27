@@ -11,6 +11,7 @@ import { career } from "@/lib/career";
 import { hasPerm } from "@/lib/permissions";
 import { canDecide, isLeader, leads } from "@/lib/personnel";
 import { prisma } from "@/lib/prisma";
+import { readingProgress } from "@/lib/required-reading";
 import { fmtDate } from "@/lib/time";
 import { RequestCard } from "./request-card";
 
@@ -74,6 +75,7 @@ export default async function S1Desk() {
       })
     : [];
   const ops = new Map(attended.map((a) => [a.userId, a._count]));
+  const reading = leader ? await readingProgress(active.filter(covers)) : new Map();
   const board = active
     .filter(covers)
     .map((u) => ({
@@ -84,6 +86,7 @@ export default async function S1Desk() {
         enlistedAt: u.enlistedAt,
         opsAttended: ops.get(u.id) ?? 0,
         quals: u.qualifications.map((q) => q.qualification.slug),
+        reading: reading.get(u.id),
         now,
       }),
     }))

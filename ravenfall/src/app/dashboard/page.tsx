@@ -1,4 +1,4 @@
-import { ChevronRight, ClipboardList, FileStack, Inbox } from "lucide-react";
+import { BookCheck, ChevronRight, ClipboardList, FileStack, Inbox } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Avatar } from "@/components/avatar";
@@ -9,9 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { rankName } from "@/config/unit";
 import { requireUser } from "@/lib/auth";
+import { getViewer, viewerLevel } from "@/lib/library";
 import { hasPerm } from "@/lib/permissions";
 import { canDecide, isLeader } from "@/lib/personnel";
 import { prisma } from "@/lib/prisma";
+import { outstandingFor } from "@/lib/required-reading";
 import { fmt, fmtDate } from "@/lib/time";
 
 export const metadata = { title: "Dashboard" };
@@ -56,12 +58,37 @@ export default async function Dashboard() {
         ).length
       : 0;
 
+  // Required library reading this member hasn't acknowledged yet.
+  const reading = await outstandingFor(profile, viewerLevel(await getViewer()));
+
   return (
     <Container>
       <PageHeader eyebrow="Dashboard" title={`Welcome back, ${profile.callsign ?? me.name}`} />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <div className="flex flex-col gap-6">
+          {reading.length > 0 && (
+            <div className="flex flex-col gap-2 rounded-lg border border-accent/40 bg-accent/10 p-4">
+              <div className="flex items-center gap-3">
+                <BookCheck className="size-6 text-accent" />
+                <div>
+                  <div className="font-semibold">
+                    {reading.length} required reading{reading.length === 1 ? "" : "s"} to acknowledge
+                  </div>
+                  <div className="text-xs text-muted-foreground">Read each document, then press “I have read and understood”.</div>
+                </div>
+              </div>
+              <ul className="ml-9 flex flex-col gap-1 text-sm">
+                {reading.map((d) => (
+                  <li key={d.id}>
+                    <Link href={`/library/${d.slug}`} className="hover:text-accent">
+                      {d.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {(pending > 0 || needAar.length > 0 || s1 > 0) && (
             <div className="grid gap-3 sm:grid-cols-2">
               {pending > 0 && (

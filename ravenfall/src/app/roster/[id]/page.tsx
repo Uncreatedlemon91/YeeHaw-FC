@@ -11,9 +11,11 @@ import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { MAX_SECONDARY_ROLES, RANKS, rankIndex, rankName, roleDef, ROLES, squadDef, SQUADS, UNIT, UNIT_ROLES, WEEKDAYS } from "@/config/unit";
 import { requireUser } from "@/lib/auth";
 import { career } from "@/lib/career";
+import { getViewer, viewerLevel } from "@/lib/library";
 import { hasPerm } from "@/lib/permissions";
 import { billetFill, billetKey, canDecide, clearanceFor, missingQuals, onLeave, recordTypesFor, serviceNumber } from "@/lib/personnel";
 import { prisma } from "@/lib/prisma";
+import { readingFor } from "@/lib/required-reading";
 import { fmt, fmtDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { requestCallsign, requestLeave, updateOwnProfile } from "../../personnel/actions";
@@ -70,7 +72,18 @@ export default async function Dossier({ params, searchParams }: { params: Promis
   const titles = (slugs: string[]) => slugs.map((s) => qualTitle[s] ?? s);
   const since =
     member.rankSince ?? member.serviceRecords.find((r) => r.type === "PROMOTION")?.createdAt ?? member.enlistedAt ?? null;
-  const path = career({ rank: member.rank, since, enlistedAt: member.enlistedAt, opsAttended: attended, quals: held, qualTitles: qualTitle });
+  // Required library reading. Your own file is judged on your real clearance;
+  // anyone else's on what their record shows (see memberLevel).
+  const reading = clr.squad ? await readingFor(member, clr.self ? viewerLevel(await getViewer()) : undefined) : [];
+  const path = career({
+    rank: member.rank,
+    since,
+    enlistedAt: member.enlistedAt,
+    opsAttended: attended,
+    quals: held,
+    qualTitles: qualTitle,
+    reading: { total: reading.length, done: reading.filter((r) => r.acknowledgedAt).length },
+  });
   const currentLeave = leave.get(id);
   const pendingTypes = new Set(member.requests.filter((r) => r.status === "PENDING").map((r) => r.type));
   const recordTypes = recordTypesFor(me.perms, viewer, member.squad, clr.self);
@@ -450,6 +463,29 @@ export default async function Dossier({ params, searchParams }: { params: Promis
                 : "Meeting the criteria makes a member eligible; promotion is at Command's discretion."}
             </p>
           </div>
+        )}
+      </Section>
+      <Section title="Required reading" restricted={!clr.squad}>
+        {!clr.squad ? (
+          <Redacted clearance="Squad leadership" lines={3} />
+        ) : !reading.length ? (
+          <Empty>Nothing is required of this member.</Empty>
+        ) : (
+          <ul className="flex flex-col divide-y divide-foreground/10">
+            {reading.map(({ doc, acknowledgedAt }) => (
+              <li key={doc.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <span className="flex items-center gap-2">
+                  {acknowledgedAt ? <CheckCircle2 className="size-4 text-green-400" /> : <Circle className="size-4 text-muted-foreground" />}
+                  <Link href={`/library/${doc.slug}`} className="hover:text-accent">
+                    {doc.title}
+                  </Link>
+                </span>
+                <span className={cn("typed text-xs", acknowledgedAt ? "text-muted-foreground" : "text-accent")}>
+                  {acknowledgedAt ? `Acknowledged ${fmtDate(acknowledgedAt)}` : "Outstanding"}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </Section>
     </div>

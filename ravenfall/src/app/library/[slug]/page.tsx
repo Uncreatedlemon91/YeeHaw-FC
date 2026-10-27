@@ -1,15 +1,18 @@
-import { History, Pencil } from "lucide-react";
+import { BookCheck, CheckCircle2, History, Pencil } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Container } from "@/components/container";
 import { Markdown } from "@/components/markdown";
 import { PageHeader } from "@/components/page-header";
+import { SubmitButton } from "@/components/action-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { allFolders, canAuthor, canRead, folderChain, getViewer } from "@/lib/library";
+import { allFolders, canAuthor, canRead, folderChain, getViewer, viewerLevel } from "@/lib/library";
 import { hasPerm } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { isRequiredOf } from "@/lib/required-reading";
 import { fmtDate } from "@/lib/time";
+import { acknowledgeDoc } from "../actions";
 import { ClearanceBadge } from "../clearance";
 import { DocCrumbs } from "../doc-crumbs";
 
@@ -30,6 +33,20 @@ export default async function LibraryDoc({ params }: { params: Promise<{ slug: s
     notFound();
   }
   const chain = folderChain(await allFolders(), doc.folderId);
+
+  // Required reading: shown to members it's required of, with their acknowledgement.
+  const me = viewer
+    ? await prisma.user.findUnique({
+        where: { id: viewer.id },
+        select: { id: true, discordId: true, status: true, rank: true, unitRole: true, secondaryRoles: true, squad: true },
+      })
+    : null;
+  const requiredOfMe = !!me && isRequiredOf(doc, me, viewerLevel(viewer));
+  const ack = requiredOfMe
+    ? await prisma.libraryAcknowledgement.findUnique({
+        where: { userId_documentId_ackVersion: { userId: me!.id, documentId: doc.id, ackVersion: doc.ackVersion } },
+      })
+    : null;
 
   return (
     <Container className="max-w-4xl">
@@ -58,6 +75,30 @@ export default async function LibraryDoc({ params }: { params: Promise<{ slug: s
           </>
         }
       />
+      {requiredOfMe && (
+        <Card className="mb-6 border-accent/40">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+            {ack ? (
+              <p className="flex items-center gap-2 text-sm">
+                <CheckCircle2 className="size-5 text-green-400" />
+                Required reading: you acknowledged this on {fmtDate(ack.acknowledgedAt)}.
+              </p>
+            ) : (
+              <>
+                <p className="flex items-center gap-2 text-sm">
+                  <BookCheck className="size-5 text-accent" />
+                  Required reading: read this document, then acknowledge it.
+                </p>
+                <form action={acknowledgeDoc}>
+                  <input type="hidden" name="id" value={doc.id} />
+                  <input type="hidden" name="ackVersion" value={doc.ackVersion} />
+                  <SubmitButton variant="accent">I have read and understood</SubmitButton>
+                </form>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
       <Card>
         <CardContent className="py-6">
           {doc.content ? <Markdown>{doc.content}</Markdown> : <p className="text-sm text-muted-foreground">No content yet.</p>}

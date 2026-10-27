@@ -14,9 +14,11 @@ export type ChannelConfig = {
   ops: string;
   /** Billet, callsign and leave requests, with Approve / Deny (optional). */
   personnel: string;
+  /** New and majorly-updated Public / Unit library documents (optional). */
+  library: string;
 };
 
-export const CHANNEL_KEYS = ["board", "welcome", "ops", "personnel"] as const;
+export const CHANNEL_KEYS = ["board", "welcome", "ops", "personnel", "library"] as const;
 
 const KEY = "channels";
 const TTL_MS = 30_000;
@@ -28,6 +30,7 @@ export function channelConfigFromEnv(): ChannelConfig {
     welcome: env.welcomeChannelId,
     ops: env.opsChannelId,
     personnel: env.personnelChannelId,
+    library: env.libraryChannelId,
   };
 }
 
@@ -35,7 +38,7 @@ const id = (v: unknown) => (typeof v === "string" && /^\d+$/.test(v) ? v : "");
 
 export function cleanChannelConfig(raw: unknown): ChannelConfig {
   const r = (raw ?? {}) as Partial<Record<keyof ChannelConfig, unknown>>;
-  return { board: id(r.board), welcome: id(r.welcome), ops: id(r.ops), personnel: id(r.personnel) };
+  return { board: id(r.board), welcome: id(r.welcome), ops: id(r.ops), personnel: id(r.personnel), library: id(r.library) };
 }
 
 async function load() {

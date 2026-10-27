@@ -77,6 +77,24 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   PNG/JPG/WebP images (up to 5 MB) with an Insert image button; they're
   served only to readers cleared for the document they belong to. Documents
   can link to related vault qualifications, shown on both pages.
+- **Required reading.** A document can be required of everyone, of a rank
+  and above, of specific ranks, billets or squads (targets add up). Active
+  members it's required of, and cleared to read, press "I have read and
+  understood" in the reader. Edits to a required document are Minor
+  (acknowledgements stand) or Major (everyone acknowledges again). Outstanding
+  reading shows as a dashboard banner and on the Career tab of the personnel
+  file (the member and squad leadership), can gate a promotion
+  (`requiredReading: true` on a rank in `src/config/unit.ts`), and
+  `/library/compliance` lists who hasn't acknowledged what (Command and
+  instructors see everyone, squad leaders their squads). Clearance for these
+  checks comes from the database (active = Unit, billet that leads =
+  Leadership, `ADMIN_USER_IDS` = Command); a signed-in member is judged on
+  their real permissions.
+- **Library on Discord.** New Public and Unit documents, and major updates to
+  required reading, are announced in the library channel (never Leadership or
+  Command documents). Members a document newly becomes required of get a
+  DM with a link (sent one by one, at most 150 per save; failures are logged,
+  never block the save).
 - **Public landing page** at `/` with the Enlist Now call to action.
 
 ### Permissions
@@ -133,6 +151,8 @@ src/lib/recruitment.ts       approve / deny pipeline (shared by web and Discord)
 src/lib/personnel.ts         clearance, billets, leave, and the S1 request pipeline (shared by web and Discord)
 src/lib/career.ts            promotion criteria checklist
 src/lib/library.ts           library clearance, folder tree and search
+src/lib/required-reading.ts  who must read what, acknowledgements and compliance
+src/lib/library-notify.ts    library announcement embed and required-reading DMs
 src/lib/library-images.ts    library image storage on disk (LIBRARY_UPLOAD_DIR)
 src/lib/diff.ts              line diff for library revisions
 src/lib/role-config.ts       Discord role mapping (Admin page; .env fallback)
@@ -195,8 +215,8 @@ Don't reuse YeeHaw FC's: each app has exactly one interactions endpoint.
    `https://ravenfallpmc.com/api/discord/interactions`. Discord checks it as
    you save, so the site has to be running first.
 7. Sign in, open **Admin**. Under **Discord channels**, pick the
-   recruitment board, welcome channel and (optionally) the ops and
-   personnel channels, and save. Give the bot View Channel, Send Messages
+   recruitment board, welcome channel and (optionally) the ops, personnel
+   and library announcements channels, and save. Give the bot View Channel, Send Messages
    and Embed Links in each. Then press **Register commands** and **Post to
    welcome channel**, and pin the welcome message in Discord.
 8. On **Admin → Discord role mapping**, pick which Discord roles grant each
