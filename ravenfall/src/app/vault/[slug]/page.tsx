@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
+import { getViewer, readableClearances } from "@/lib/library";
 import { hasPerm } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { fmtDate } from "@/lib/time";
@@ -23,6 +24,12 @@ export default async function Doc({ params }: { params: Promise<{ slug: string }
     include: { updatedBy: true, holders: { include: { user: true }, orderBy: { awardedAt: "asc" } } },
   });
   if (!doc) notFound();
+  // Only library documents the viewer is cleared to read.
+  const related = await prisma.libraryDocument.findMany({
+    where: { qualifications: { some: { id: doc.id } }, clearance: { in: readableClearances(await getViewer()) } },
+    select: { id: true, slug: true, title: true },
+    orderBy: { title: "asc" },
+  });
   const mine = doc.holders.find((h) => h.userId === me.id);
 
   return (
@@ -72,6 +79,20 @@ export default async function Doc({ params }: { params: Promise<{ slug: string }
               {!doc.holders.length && <p className="text-sm text-muted-foreground">Nobody yet.</p>}
             </CardContent>
           </Card>
+          {related.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Related documents</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-1.5">
+                {related.map((d) => (
+                  <Link key={d.id} href={`/library/${d.slug}`} className="text-sm hover:text-accent">
+                    {d.title}
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </Container>

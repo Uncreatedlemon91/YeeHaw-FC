@@ -2,7 +2,7 @@ import { Container } from "@/components/container";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
-import { allFolders, getViewer } from "@/lib/library";
+import { allFolders, getViewer, qualificationOptions } from "@/lib/library";
 import { createDoc } from "../actions";
 import { DocForm } from "../doc-form";
 
@@ -17,7 +17,7 @@ export default async function NewDoc({ searchParams }: { searchParams: Promise<{
       <PageHeader eyebrow="Library" title="New document" />
       <Card>
         <CardContent className="py-6">
-          <DocForm action={createDoc} viewer={viewer} folders={await allFolders()} folderId={folder} />
+          <DocForm action={createDoc} viewer={viewer} folders={await allFolders()} folderId={folder} qualifications={await qualificationOptions()} />
         </CardContent>
       </Card>
     </Container>

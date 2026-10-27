@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
-import { allFolders, canDelete, canRead, getViewer } from "@/lib/library";
+import { allFolders, canDelete, canRead, getViewer, qualificationOptions } from "@/lib/library";
 import { prisma } from "@/lib/prisma";
 import { deleteDoc, updateDoc } from "../../actions";
 import { DocForm } from "../../doc-form";
@@ -18,7 +18,7 @@ export default async function EditDoc({ params }: { params: Promise<{ slug: stri
   const { slug } = await params;
   await requireUser("INSTRUCTOR", `/library/${slug}/edit`);
   const viewer = (await getViewer())!;
-  const doc = await prisma.libraryDocument.findUnique({ where: { slug } });
+  const doc = await prisma.libraryDocument.findUnique({ where: { slug }, include: { qualifications: { select: { id: true } } } });
   if (!doc || !canRead(viewer, doc.clearance)) notFound();
   return (
     <Container className="max-w-4xl">
@@ -45,7 +45,7 @@ export default async function EditDoc({ params }: { params: Promise<{ slug: stri
       />
       <Card>
         <CardContent className="py-6">
-          <DocForm action={updateDoc} viewer={viewer} folders={await allFolders()} doc={doc} />
+          <DocForm action={updateDoc} viewer={viewer} folders={await allFolders()} doc={doc} qualifications={await qualificationOptions()} linked={doc.qualifications.map((q) => q.id)} />
         </CardContent>
       </Card>
     </Container>

@@ -163,3 +163,11 @@ export async function searchDocs(viewer: Viewer | null, q: string): Promise<Sear
     ORDER BY ts_rank(to_tsvector('english', d."title" || ' ' || d."content"), websearch_to_tsquery('english', ${q})) DESC, d."title"
     LIMIT 50`;
 }
+
+/** Vault qualifications a document can be linked to. */
+export async function qualificationOptions() {
+  return prisma.qualification.findMany({
+    select: { id: true, title: true, category: true },
+    orderBy: [{ category: "asc" }, { title: "asc" }],
+  });
+}

@@ -73,7 +73,10 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   for, and search is PostgreSQL full-text. Instructors and Command publish
   and organise folders; only Command deletes documents or a non-empty
   folder. Every title or content edit keeps a revision: view, compare two
-  (line diff) or restore (which writes a new revision).
+  (line diff) or restore (which writes a new revision). Editors upload
+  PNG/JPG/WebP images (up to 5 MB) with an Insert image button; they're
+  served only to readers cleared for the document they belong to. Documents
+  can link to related vault qualifications, shown on both pages.
 - **Public landing page** at `/` with the Enlist Now call to action.
 
 ### Permissions
@@ -130,6 +133,7 @@ src/lib/recruitment.ts       approve / deny pipeline (shared by web and Discord)
 src/lib/personnel.ts         clearance, billets, leave, and the S1 request pipeline (shared by web and Discord)
 src/lib/career.ts            promotion criteria checklist
 src/lib/library.ts           library clearance, folder tree and search
+src/lib/library-images.ts    library image storage on disk (LIBRARY_UPLOAD_DIR)
 src/lib/diff.ts              line diff for library revisions
 src/lib/role-config.ts       Discord role mapping (Admin page; .env fallback)
 src/lib/member-sync.ts       personnel files generated from Discord roles
@@ -313,12 +317,16 @@ rebuild is needed.
 
 `ravenfall-backup.timer` runs `deploy/backup.sh` daily at about 03:45. It
 `pg_dump`s to `/opt/ravenfall/backups` and keeps the newest 14.
-`BACKUP_DIR` and `BACKUP_RETENTION` in `.env` change that.
+It also tars the library images (`LIBRARY_UPLOAD_DIR`, default
+`/opt/ravenfall/uploads/library`) to `ravenfall-uploads-*.tar.gz`, with the
+same retention; `update.sh` creates that directory, owned by `ravenfall`.
+`BACKUP_DIR` and `BACKUP_RETENTION` in `.env` change the rest.
 
 ```bash
 systemctl list-timers ravenfall-backup.timer
 sudo -u ravenfall bash /opt/ravenfall/ravenfall/deploy/backup.sh         # one now
 gunzip -c /opt/ravenfall/backups/ravenfall-XXXX.sql.gz | sudo -u ravenfall psql ravenfall   # restore
+sudo -u ravenfall tar -xzf /opt/ravenfall/backups/ravenfall-uploads-XXXX.tar.gz -C /opt/ravenfall/uploads   # restore images
 ```
 
 Copy them off the droplet too. `rclone`, set up as in YeeHaw FC's

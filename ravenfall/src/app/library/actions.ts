@@ -18,6 +18,7 @@ import {
   uniqueSlug,
   type Viewer,
 } from "@/lib/library";
+import { linkImages, removeImageFiles } from "@/lib/library-images";
 import { prisma } from "@/lib/prisma";
 
 // Every action re-checks permission and clearance on the server; the hidden
@@ -110,11 +111,15 @@ export async function deleteFolder(data: FormData) {
   const docs = await prisma.libraryDocument.count({ where: { folderId: { in: ids } } });
   // Instructors can tidy away an empty folder; only Command empties a full one.
   if ((ids.length > 1 || docs > 0) && !canDelete(me)) throw new Error("Only Command can delete a folder that isn't empty.");
+  // Deleting a document only detaches its images, so remove them explicitly.
+  const images = await prisma.libraryImage.findMany({ where: { document: { folderId: { in: ids } } }, select: { id: true, filename: true } });
   await prisma.$transaction([
+    prisma.libraryImage.deleteMany({ where: { id: { in: images.map((i) => i.id) } } }),
     prisma.libraryDocument.deleteMany({ where: { folderId: { in: ids } } }),
     // Children come after their parents in `ids`, so delete in reverse.
     ...[...ids].reverse().map((fid) => prisma.libraryFolder.delete({ where: { id: fid } })),
   ]);
+  await removeImageFiles(images.map((i) => i.filename));
   refresh();
   redirect(folder.parentId ? `/library/f/${folder.parentId}` : "/library");
 }
@@ -128,6 +133,7 @@ const docSchema = z.object({
   clearance,
   folderId: optId,
   note: z.string().trim().max(200).default(""),
+  qualificationIds: z.array(z.string()).max(200).default([]),
 });
 
 function parseDoc(data: FormData) {
@@ -138,7 +144,14 @@ function parseDoc(data: FormData) {
     clearance: data.get("clearance"),
     folderId: data.get("folderId"),
     note: String(data.get("note") ?? ""),
+    qualificationIds: data.getAll("qualificationIds").map(String),
   });
+}
+
+/** Only ids that are real qualifications, so a stale form can't fail the save. */
+async function existingQualifications(ids: string[]) {
+  if (!ids.length) return [];
+  return prisma.qualification.findMany({ where: { id: { in: ids } }, select: { id: true } });
 }
 
 async function folderFor(me: Viewer, folderId: string | null) {
@@ -156,12 +169,13 @@ export async function createDoc(_: ActionState, data: FormData): Promise<ActionS
   if (error) return { error };
   const bad = checkClearance(me, p.data.clearance, folder?.clearance, "A document");
   if (bad) return { error: bad };
-  const { note, ...fields } = p.data;
+  const { note, qualificationIds, ...fields } = p.data;
   const slug = await uniqueSlug(fields.title);
-  await prisma.libraryDocument.create({
+  const doc = await prisma.libraryDocument.create({
     data: {
       ...fields,
       slug,
+      qualifications: { connect: await existingQualifications(qualificationIds) },
       createdById: me.id,
       updatedById: me.id,
       revisions: {
@@ -169,6 +183,7 @@ export async function createDoc(_: ActionState, data: FormData): Promise<ActionS
       },
     },
   });
+  await linkImages(doc.id, fields.content);
   refresh();
   redirect(`/library/${slug}`);
 }
@@ -185,7 +200,7 @@ export async function updateDoc(_: ActionState, data: FormData): Promise<ActionS
   const bad = checkClearance(me, p.data.clearance, folder?.clearance, "A document");
   if (bad) return { error: bad };
 
-  const { note, ...fields } = p.data;
+  const { note, qualificationIds, ...fields } = p.data;
   // A revision is kept whenever the text changes, not for a move or a
   // clearance change.
   const changed = prev.title !== fields.title || prev.summary !== fields.summary || prev.content !== fields.content;
@@ -194,6 +209,7 @@ export async function updateDoc(_: ActionState, data: FormData): Promise<ActionS
     data: {
       ...fields,
       updatedById: me.id,
+      qualifications: { set: await existingQualifications(qualificationIds) },
       ...(changed && {
         revision: { increment: 1 },
         revisions: {
@@ -209,6 +225,7 @@ export async function updateDoc(_: ActionState, data: FormData): Promise<ActionS
       }),
     },
   });
+  await linkImages(id, fields.content);
   refresh();
   redirect(`/library/${prev.slug}`);
 }
@@ -216,7 +233,13 @@ export async function updateDoc(_: ActionState, data: FormData): Promise<ActionS
 export async function deleteDoc(data: FormData) {
   const me = await getViewer();
   if (!canDelete(me)) throw new Error("You don't have permission to do that.");
-  const doc = await prisma.libraryDocument.delete({ where: { id: String(data.get("id")) } });
+  const id = String(data.get("id"));
+  const images = await prisma.libraryImage.findMany({ where: { documentId: id }, select: { id: true, filename: true } });
+  const [, doc] = await prisma.$transaction([
+    prisma.libraryImage.deleteMany({ where: { documentId: id } }),
+    prisma.libraryDocument.delete({ where: { id } }),
+  ]);
+  await removeImageFiles(images.map((i) => i.filename));
   refresh();
   redirect(doc.folderId ? `/library/f/${doc.folderId}` : "/library");
 }
@@ -252,6 +275,7 @@ export async function restoreRevision(data: FormData) {
       },
     },
   });
+  await linkImages(id, old.content);
   refresh();
   redirect(`/library/${doc.slug}`);
 }

@@ -21,6 +21,13 @@ export const env = {
   get siteUrl() {
     return (process.env.NEXTAUTH_URL ?? "http://localhost:3000").replace(/\/$/, "");
   },
+  /** Where library images live on disk. */
+  get libraryUploadDir() {
+    return (
+      process.env.LIBRARY_UPLOAD_DIR ||
+      (process.env.NODE_ENV === "production" ? "/opt/ravenfall/uploads/library" : "./uploads/library")
+    );
+  },
   get timezone() {
     return process.env.UNIT_TIMEZONE || "America/New_York";
   },

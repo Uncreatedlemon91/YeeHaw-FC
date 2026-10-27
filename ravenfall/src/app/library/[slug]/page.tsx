@@ -5,8 +5,9 @@ import { Container } from "@/components/container";
 import { Markdown } from "@/components/markdown";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { allFolders, canAuthor, canRead, folderChain, getViewer } from "@/lib/library";
+import { hasPerm } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { fmtDate } from "@/lib/time";
 import { ClearanceBadge } from "../clearance";
@@ -22,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function LibraryDoc({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const viewer = await getViewer();
-  const doc = await prisma.libraryDocument.findUnique({ where: { slug }, include: { updatedBy: true } });
+  const doc = await prisma.libraryDocument.findUnique({ where: { slug }, include: { updatedBy: true, qualifications: { orderBy: { title: "asc" } } } });
   if (!doc) notFound();
   if (!canRead(viewer, doc.clearance)) {
     if (!viewer) redirect(`/login?callbackUrl=${encodeURIComponent(`/library/${slug}`)}`);
@@ -66,6 +67,21 @@ export default async function LibraryDoc({ params }: { params: Promise<{ slug: s
           </p>
         </CardContent>
       </Card>
+      {/* The vault is operator-only, so guests don't get its links. */}
+      {viewer && hasPerm(viewer.perms, "OPERATOR") && doc.qualifications.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Related qualifications</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1.5">
+            {doc.qualifications.map((q) => (
+              <Link key={q.id} href={`/vault/${q.slug}`} className="text-sm hover:text-accent">
+                {q.title}
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </Container>
   );
 }

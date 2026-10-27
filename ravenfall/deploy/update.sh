@@ -13,6 +13,11 @@ cd "$APP"
 # Prisma and Next both read .env from the app directory themselves.
 as_app() { sudo -u ravenfall -H "$@"; }
 
+# Library images live outside the checkout so a deploy never touches them.
+# Honour LIBRARY_UPLOAD_DIR from .env, else the default.
+UPLOADS=$(sed -n 's/^LIBRARY_UPLOAD_DIR=//p' .env 2>/dev/null | tail -n1 | tr -d "\"'")
+install -d -o ravenfall -g ravenfall -m 750 "${UPLOADS:-/opt/ravenfall/uploads/library}"
+
 echo "== Installing dependencies"
 as_app npm ci --no-audit --no-fund
 echo "== Applying database migrations"
