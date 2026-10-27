@@ -204,7 +204,10 @@ def test_members_see_each_others_stats_but_not_contracts(client):
     _login(client, "Fan")
     html = client.get("/players/42").text
     assert "Season" in html                       # stats panel
-    assert "Contract</h2>" not in html and "Attendance</h2>" not in html
+    # Restricted sections stay in the page as redaction bars; their
+    # contents are not sent at all.
+    assert "Restricted · Player &amp; staff" in html
+    assert "8 weeks" not in html and "Turned up" not in html
 
 
 def test_a_player_sees_their_own_contract(client):
@@ -251,7 +254,7 @@ def test_coach_notes_are_staff_only_even_from_the_player(client):
 
     _login(client, "Self")
     html = client.get(f"/players/{uid}").text
-    assert "Drifts inside too early." not in html and "Coach notes" not in html
+    assert "Drifts inside too early." not in html and 'id="coach-notes"' not in html
 
     _login(client, "Fan")
     assert "Drifts inside too early." not in client.get(f"/players/{uid}").text
@@ -264,7 +267,7 @@ def test_staff_dont_see_notes_on_their_own_file(client):
         services.add_coach_note(session, discord_id=uid, body="About them.",
                                 author={"id": 1, "name": "Gaffer"})
     html = client.get(f"/players/{uid}").text
-    assert "About them." not in html and "Coach notes" not in html
+    assert "About them." not in html and 'id="coach-notes"' not in html
 
 
 def test_members_cannot_write_coach_notes(client):

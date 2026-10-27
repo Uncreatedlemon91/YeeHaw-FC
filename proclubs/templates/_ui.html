@@ -20,6 +20,14 @@
      (href, text) pairs, `current` the href of the page being shown. It is
      plain links, so each view keeps its own URL; drop it under .page-head.
 
+   redacted(clearance, lines=3)
+     What a viewer without clearance sees in place of a restricted section:
+     `lines` black bars and a "Restricted" label naming who can read it
+     ('Staff', 'Player & staff'), so the page keeps its shape. It is one
+     labelled image for a screen reader; the bars are decoration. Render it
+     INSTEAD of the content, never around it -- the data must not be in
+     the page at all.
+
    Related, in static/js/shell.js:
      <form data-loading="Saving...">  on submit, its submit buttons are
      disabled, get .is-loading and show that text -- no double submits.
@@ -52,4 +60,11 @@
 {%- set r = {'WIN': 'W', 'DRAW': 'D', 'LOSS': 'L', 'LOSE': 'L', 'TIE': 'D'}.get(r, r) -%}
 {%- set word = {'W': 'Win', 'D': 'Draw', 'L': 'Loss'}.get(r, 'No result') -%}
 <span class="form-chip{{ ' ' ~ r if r in ('W', 'D', 'L') }}" title="{{ title or word }}"><span aria-hidden="true">{{ r if r in ('W', 'D', 'L') else '–' }}</span><span class="visually-hidden">{{ title or word }}</span></span>
+{%- endmacro %}
+
+{% macro redacted(clearance, lines=3) -%}
+<div class="redacted" role="img" aria-label="Restricted: {{ clearance }} only">
+  {%- for i in range(lines) %}<span class="redacted-bar rb-{{ i % 4 }}" aria-hidden="true"></span>{% endfor %}
+  <span class="redacted-label" aria-hidden="true">Restricted · {{ clearance }}</span>
+</div>
 {%- endmacro %}

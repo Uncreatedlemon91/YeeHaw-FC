@@ -40,6 +40,7 @@ import recognition
 import recruitment
 import role_settings
 import role_sync
+import service_record
 import staff_routes
 import staff_tools
 import training
@@ -2116,13 +2117,20 @@ def player_page(request: Request, discord_id: str):
         honours = recognition.milestones_for(session, discord_id)
         goals = development.goals_for(session, discord_id) if see_private else []
         dev_reviews = development.reviews_for(session, discord_id) if see_private else []
-        potm_months = [recognition.month_label(a.month)
-                       for a in recognition.months_won(session, discord_id)]
+        potm_awards = recognition.months_won(session, discord_id)
+        potm_months = [recognition.month_label(a.month) for a in potm_awards]
+        written = services.list_service_entries(session, discord_id)
+        # Contracts and squad moves are the player's and the staff's; for
+        # anyone else they are not even read (service_record.build_timeline).
+        contracts = history
+        all_moves = services.moves_for(session, discord_id, limit=200) if see_private else []
     gamertag = link.player_name if link else None
     usage = _squad_usage(request)
     recent = []
+    career = []
     if gamertag and config.CLUB_ID:
-        trend = db.player_trend(config.CLUB_PLATFORM, str(config.CLUB_ID), gamertag)
+        career = db.player_trend(config.CLUB_PLATFORM, str(config.CLUB_ID), gamertag)
+        trend = career
         # The matches listed follow the span picked for playing time.
         if not usage["season"]:
             trend = trend[-int(squad.WINDOWS[usage["window_key"]][1]):]
@@ -2130,8 +2138,26 @@ def player_page(request: Request, discord_id: str):
             m["played"] = (datetime.fromtimestamp(m["played_at"], tz=timezone.utc).replace(tzinfo=None)
                            if m.get("played_at") else None)
             recent.append(m)
+    ea_moves = []
+    if see_private and gamertag and config.CLUB_ID:
+        ea_moves = [m for m in db.squad_moves(config.CLUB_PLATFORM, str(config.CLUB_ID), 0)
+                    if m["player_name"].casefold() == gamertag.casefold()]
+    timeline = service_record.build_timeline(
+        matches=career, potm=potm_awards, contracts=contracts, moves=all_moves, ea_moves=ea_moves,
+        written=written, is_self=is_self, is_staff=is_staff)
+    for item in timeline:
+        item["deletable"] = bool(item["entry_id"]) and service_record.can_delete(
+            item["kind"].upper(), item["author_id"], user, is_self=is_self)
+    tab = request.query_params.get("tab", "")
     return templates.TemplateResponse(request, "player.html", _ctx(
-        request, player=player, contract=contract, gamertag=gamertag,
+        request, player=player, timeline=timeline,
+        active_tab=tab if tab in ("overview", "record", "career", "attendance", "staff") else "overview",
+        today=now.strftime("%Y-%m-%d"),
+        timeline_groups=service_record.groups_present(timeline),
+        ribbons=service_record.ribbons(honours, potm_months),
+        career_totals=service_record.career_totals(career), career_months=service_record.career_months(career),
+        can_add_entry=service_record.can_add(is_self=is_self, is_staff=is_staff),
+        entry_kinds=services.SERVICE_ENTRY_KINDS, contract=contract, gamertag=gamertag,
         usage=_usage_for(usage, gamertag), window=usage["window"], recent=recent,
         usage_meta=usage, windows=squad.WINDOWS,
         history=history, moves=moves, attendance=attendance, notes=notes,
@@ -2259,6 +2285,45 @@ def player_delete_note(request: Request, discord_id: str, note_id: int,
     else:
         _flash(request, "Note deleted.")
     return RedirectResponse(f"/players/{discord_id}#coach-notes", status_code=303)
+
+
+@app.post("/players/{discord_id}/service")
+def player_add_service_entry(request: Request, discord_id: str, kind: str = Form(""),
+                             body: str = Form(""), occurred_on: str = Form(""),
+                             csrf_token: str = Form(...), staff=Depends(auth.require_staff)):
+    """Staff writing into somebody's service record: a commendation
+    (everyone sees it), a warning (the player and the staff) or a note
+    (staff only). Not about yourself."""
+    _check_csrf(request, csrf_token)
+    if not service_record.can_add(is_self=str(staff["id"]) == discord_id, is_staff=True):
+        raise services.ServiceError("Service record entries are about other people -- you can't write one on yourself.")
+    with get_session() as session:
+        if services.get_player(session, discord_id) is None:
+            raise services.ServiceError("There's no player file for that person.")
+        entry = services.add_service_entry(session, discord_id=discord_id, kind=kind, body=body,
+                                           author=staff, occurred_on=occurred_on)
+        shown = {"COMMENDATION": "Commendation added. Everyone can see it.",
+                 "WARNING": "Warning added. Only the player and the staff can see it.",
+                 "NOTE": "Note added. Only the staff can see it."}[entry.kind]
+    _flash(request, shown)
+    return RedirectResponse(f"/players/{discord_id}?tab=record#service-record", status_code=303)
+
+
+@app.post("/players/{discord_id}/service/{entry_id}/delete")
+def player_delete_service_entry(request: Request, discord_id: str, entry_id: int,
+                                csrf_token: str = Form(...), staff=Depends(auth.require_staff)):
+    """The entry's author, or management, can remove it."""
+    _check_csrf(request, csrf_token)
+    with get_session() as session:
+        entry = services.get_service_entry(session, entry_id)
+        if entry is None or entry.discord_id != discord_id:
+            raise services.ServiceError("That entry no longer exists.")
+        if not service_record.can_delete(entry.kind, entry.author_discord_id, staff,
+                                         is_self=str(staff["id"]) == discord_id):
+            raise services.ServiceError("Only the entry's author or management can delete it.")
+        services.delete_service_entry(session, entry)
+    _flash(request, "Entry deleted.")
+    return RedirectResponse(f"/players/{discord_id}?tab=record#service-record", status_code=303)
 
 
 # --------------------------------------------------------------------------- #

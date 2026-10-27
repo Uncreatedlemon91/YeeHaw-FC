@@ -537,6 +537,30 @@ class CoachNote(Base):
     discord_message_id = Column(String, nullable=True)
 
 
+SERVICE_ENTRY_KINDS = ("COMMENDATION", "WARNING", "NOTE")
+
+
+class ServiceEntry(Base):
+    """An entry staff write into a player's service record by hand, beside
+    the ones the site works out itself (service_record.py). COMMENDATION
+    is on show to every member, WARNING to the player and the staff, NOTE
+    to the staff alone -- including from the player it's about, like a
+    coach note. Who may see which is decided in service_record.can_view."""
+
+    __tablename__ = "service_entries"
+
+    id = Column(Integer, primary_key=True)
+    discord_id = Column(String, nullable=False, index=True)
+    kind = Column(String, nullable=False)    # one of SERVICE_ENTRY_KINDS
+    body = Column(Text, nullable=False)
+    author_name = Column(String, nullable=False)
+    author_discord_id = Column(String, nullable=True)
+    # When it happened, which staff can set to a day in the past; created_at
+    # is when it was written down.
+    occurred_at = Column(DateTime, nullable=False, default=_utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+
+
 class ClubSetting(Base):
     """Key/value text the club edits about itself -- what the public
     splash page says (see services.CLUB_PROFILE_FIELDS)."""

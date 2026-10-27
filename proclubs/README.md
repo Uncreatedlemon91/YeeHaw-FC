@@ -249,12 +249,42 @@ contract grouped as **Starting**, **Rotation** and **Substitute** players,
 each with appearances, form, goals, assists and MOTM. `/players/<id>` is a
 player's file and `/players/me` is your own.
 
+A file is a **service record**: an ID card on top (positions, club role,
+joined date, a ribbon rack from the recognition milestones and Player of
+the Month awards, and headline apps / goals / assists / rating), then tabs
+-- Overview, Service record, Career, Attendance, Staff file. The tabs are
+client-side (`static/js/player-file.js`); every panel is in the page, and
+`?tab=record` (or a `#section` hash) opens one first. Where a viewer lacks
+clearance the section is **not rendered at all** and a redaction bar
+(`redacted` in `_ui.html`) stands in its place, so the page keeps its shape
+and the data never leaves the server.
+
 | On a player's file | Them | Other members | Staff |
 |---|---|---|---|
-| Profile, positions, gamertag, foot, build, bio | yes | yes | yes |
-| Match stats and last 10 matches | yes | yes | yes |
-| Contract, past contracts, attendance, squad-move history | yes | -- | yes |
-| Coach notes | **never** | -- | yes (not on their own file) |
+| ID card, ribbons, overview, match stats, career | yes | yes | yes |
+| Service record: milestones, Player of the Month, commendations | yes | yes | yes |
+| Service record: warnings | yes | hidden | yes |
+| Service record: notes | **never** | hidden | yes (not on their own file) |
+| Contract, past contracts, squad moves (in the record), attendance, development | yes | redacted | yes |
+| Coach notes | **never** | redacted | yes (not on their own file) |
+
+The **service record** (`service_record.py`) is one timeline of milestones
+worked out on the fly from the player's recorded matches (debut, 25 / 50 /
+100 / 200 / 300 appearances, first goal and 10 / 25 / 50 / 100, first
+assist and 10 / 25 / 50 / 100, hat-tricks, EA Man of the Match, clean
+sheets for keepers and defenders, personal best rating), each dated by its
+match; contracts, squad announcements and EA squad changes; Player of the
+Month awards; and entries staff write by hand (`ServiceEntry`, table
+`service_entries`, created by `create_all` like the others). A staff entry
+is a **commendation** (everyone), a **warning** (the player and staff) or a
+**note** (staff only). Staff cannot write one about themselves, and the
+author or management deletes. A warning or note is simply absent for anyone
+not cleared to see it -- never a bar -- so the squad can't tell one exists.
+Milestones count what this site has recorded: EA's match window is short
+and its history is erased with each new title (see "A new season"), so the
+Career tab shows the current title month by month, not past seasons. The
+club has no kit-number or club-role-change history, so the card shows
+neither.
 
 Players write their own preferred foot, build and bio, and link their own
 gamertag. **Coach notes** are kept by staff, deleted by their author or

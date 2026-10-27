@@ -25,10 +25,11 @@ import html_sanitize
 import images
 import roles
 from formations import BENCH_SLOTS, FORMATIONS
-from models import (ARTICLE_CATEGORIES, ATTENDANCE_STATUSES, SIGNUP_STATUSES, Article, Clip,
-                    ClubSetting, CoachNote, Comment, Contract, Event, EventLineup, EventSignup,
-                    EventTierInvite, Like, MatchRating, MotmVote, Notification, Player, PlayerLink,
-                    ProspectNote, RosterMove, Streamer, TacticsBoard, TacticsSlot)
+from models import (ARTICLE_CATEGORIES, ATTENDANCE_STATUSES, SERVICE_ENTRY_KINDS, SIGNUP_STATUSES,
+                    Article, Clip, ClubSetting, CoachNote, Comment, Contract, Event, EventLineup,
+                    EventSignup, EventTierInvite, Like, MatchRating, MotmVote, Notification, Player,
+                    PlayerLink, ProspectNote, RosterMove, ServiceEntry, Streamer, TacticsBoard,
+                    TacticsSlot)
 
 EVENT_TYPES = ["Match", "Scrim", "Tournament", "Training", "Theory", "Community"]
 
@@ -1513,6 +1514,56 @@ def add_coach_note(session: Session, *, discord_id: str, body: str, author: dict
 
 def delete_coach_note(session: Session, note: CoachNote) -> None:
     session.delete(note)
+    session.commit()
+
+
+# --- Service record entries ------------------------------------------------- #
+_MAX_SERVICE_ENTRY = 1000
+
+
+def list_service_entries(session: Session, discord_id: str) -> list[ServiceEntry]:
+    return list(session.execute(
+        select(ServiceEntry).where(ServiceEntry.discord_id == str(discord_id))
+        .order_by(ServiceEntry.occurred_at.desc(), ServiceEntry.id.desc())
+    ).scalars())
+
+
+def get_service_entry(session: Session, entry_id: int) -> ServiceEntry | None:
+    return session.get(ServiceEntry, entry_id)
+
+
+def add_service_entry(session: Session, *, discord_id: str, kind: str, body: str,
+                      author: dict, occurred_on: str = "", now: datetime | None = None) -> ServiceEntry:
+    """`occurred_on` is an optional YYYY-MM-DD from the form; blank is today."""
+    now = now or datetime.utcnow()
+    kind = (kind or "").strip().upper()
+    if kind not in SERVICE_ENTRY_KINDS:
+        raise ServiceError("Pick commendation, warning or note.")
+    body = (body or "").strip()
+    if not body:
+        raise ServiceError("The entry is empty.")
+    if len(body) > _MAX_SERVICE_ENTRY:
+        raise ServiceError(f"Keep an entry under {_MAX_SERVICE_ENTRY} characters.")
+    when = now
+    if (occurred_on or "").strip():
+        try:
+            when = datetime.strptime(occurred_on.strip(), "%Y-%m-%d")
+        except ValueError:
+            raise ServiceError("That date isn't valid.") from None
+        if when.date() > now.date():
+            raise ServiceError("An entry can't be dated in the future.")
+    entry = ServiceEntry(discord_id=str(discord_id), kind=kind, body=body,
+                         author_name=author.get("name") or "Staff",
+                         author_discord_id=str(author.get("id") or "") or None,
+                         occurred_at=when)
+    session.add(entry)
+    session.commit()
+    session.refresh(entry)
+    return entry
+
+
+def delete_service_entry(session: Session, entry: ServiceEntry) -> None:
+    session.delete(entry)
     session.commit()
 
 

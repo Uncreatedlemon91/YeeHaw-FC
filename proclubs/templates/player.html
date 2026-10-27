@@ -2,10 +2,12 @@
 {% block title %}{{ player.display_name }}{% endblock %}
 {% from "_window_picker.html" import window_picker, span_text, coverage_note %}
 {% from "_positions.html" import pos_key, pos_chip %}
-{% from "_ui.html" import result_chip %}
+{% from "_ui.html" import result_chip, redacted %}
+{% from "_crest.html" import crest %}
 {% block content %}
 <div class="page page-wide player-page">
-  {# --- Who they are: the file's cover sheet --------------------------------- #}
+
+  {# --- Who they are: the ID card -------------------------------------------- #}
   {% set photo = (player.avatar_url or '') | replace('size=128', 'size=512') %}
   <section class="file-hero">
     {% if photo %}
@@ -15,33 +17,59 @@
       <span class="file-photo move-avatar-fallback{{ ' pos-' ~ pk if pk }}" aria-hidden="true">{{ initials(player.display_name) }}</span>
     {% endif %}
     <div class="file-id">
-      <p class="kicker">{{ SITE_NAME }} / player file</p>
+      <p class="kicker">{{ SITE_NAME }} / service record</p>
       <h1>{{ player.display_name }}</h1>
       <p class="file-role">
-        {% if contract %}{{ status_label(contract.squad_status) }}{% if contract.position %}<span class="sep">/</span>{{ contract.position }}{% endif %}
+        {% if contract %}{{ status_label(contract.squad_status) }}
         {% elif player.club_role %}{{ player.club_role }}
         {% else %}Not under contract{% endif %}
       </p>
       <div class="file-chips">
+        {% if contract and contract.position %}{{ pos_chip(contract.position) }}{% endif %}
+        {% if contract and contract.secondary_position %}{{ pos_chip(contract.secondary_position) }}{% endif %}
         {% if player.club_role %}<span class="role-pill">{{ player.club_role }}</span>{% endif %}
-        {% if contract %}<span class="contract-status">Signed</span>
-          <span class="file-state">{{ 'Active' if contract_state in ('active', 'expiring') else 'Contract expired' }}</span>
-        {% endif %}
+        {% if see_private and contract %}<span class="file-state">{{ 'Active' if contract_state in ('active', 'expiring') else 'Contract expired' }}</span>{% endif %}
       </div>
       <dl class="profile-facts">
-        {% if contract and contract.secondary_position %}<div><dt>Also plays</dt><dd>{{ contract.secondary_position }}</dd></div>{% endif %}
         <div><dt>Gamertag</dt><dd>{{ gamertag or '—' }}</dd></div>
         {% if player.preferred_foot %}<div><dt>Foot</dt><dd>{{ player.preferred_foot }}</dd></div>{% endif %}
         {% if player.archetype %}<div><dt>Build</dt><dd>{{ player.archetype }}</dd></div>{% endif %}
       </dl>
+      {% if ribbons %}
+        <ul class="ribbon-rack" aria-label="Ribbons: {{ ribbons | length }}">
+          {% for r in ribbons %}
+            <li class="ribbon{{ ' is-potm' if r.potm }}" title="{{ r.label }}" tabindex="0">
+              {% for s in r.stripes %}<i style="background: var(--ribbon-{{ s }})"></i>{% endfor %}
+              <span class="visually-hidden">{{ r.label }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      <dl class="card-numbers">
+        <div><dt>Apps</dt><dd>{{ career_totals.apps }}</dd></div>
+        <div><dt>Goals</dt><dd>{{ career_totals.goals }}</dd></div>
+        <div><dt>Assists</dt><dd>{{ career_totals.assists }}</dd></div>
+        <div><dt>Avg rating</dt><dd>{{ '%.1f' % career_totals.rating if career_totals.rating is not none else '—' }}</dd></div>
+      </dl>
     </div>
     <div class="file-side">
-      {% if player.created_at %}<p class="kicker">On file since</p>
+      <span class="file-crest">{{ crest(initials(SITE_NAME, 3), 56, "pf") }}</span>
+      {% if player.created_at %}<p class="kicker">Joined</p>
       <span class="file-side-value">{{ localtime(player.created_at, 'date') }}</span>{% endif %}
       {% if see_private and contract %}<span class="file-side-sub">Contract: {{ time_left }}</span>{% endif %}
     </div>
   </section>
 
+  {# --- Tabs: client-side, every panel is in the page; ?tab= opens one first -- #}
+  <nav class="file-tabs" role="tablist" aria-label="Player file sections">
+    {% for key, label in [('overview', 'Overview'), ('record', 'Service record'), ('career', 'Career'), ('attendance', 'Attendance'), ('staff', 'Staff file')] %}
+      <button type="button" role="tab" id="filetab-{{ key }}" aria-controls="file-{{ key }}" data-file-tab="{{ key }}"
+              aria-selected="{{ 'true' if key == active_tab else 'false' }}"{% if key != active_tab %} tabindex="-1"{% endif %}
+              class="{{ 'active' if key == active_tab }}">{{ label }}</button>
+    {% endfor %}
+  </nav>
+
+  <div id="file-overview" class="file-panel{{ ' active' if active_tab == 'overview' }}" role="tabpanel" aria-labelledby="filetab-overview" tabindex="0">
   <div class="dash-grid player-grid">
     <div class="dash-left">
       {% if honours or potm_months %}
@@ -53,8 +81,6 @@
           </ul>
         </section>
       {% endif %}
-
-      {% if see_private %}{% include "_development.html" %}{% endif %}
 
       {# --- About: theirs to write ---------------------------------------- #}
       <section class="panel">
@@ -111,7 +137,6 @@
     </div>
 
     <div class="dash-main">
-      {# --- Stats: everyone can see these --------------------------------- #}
       <section class="panel" id="season">
         <header class="panel-head"><h2>Season</h2>{% if window %}<span class="muted">played out of {{ span_text(usage_meta, window) }}</span>{% endif %}</header>
         <div class="panel-body">
@@ -197,8 +222,206 @@
           </div>
         {% endif %}
       </section>
+    </div>
 
-      {# --- Coach notes: staff only, never the player ---------------------- #}
+    <div class="dash-side">
+      {% if see_private and match_ratings %}
+        <section class="panel">
+          <header class="panel-head"><h2>Match ratings</h2><span>{{ 'Yours' if is_self else 'Player & staff' }}</span></header>
+          <div class="table-scroll">
+            <table class="league-table">
+              <thead><tr><th scope="col">Match</th><th scope="col" class="lt-num">Self</th>
+                <th scope="col" class="lt-num">Coach</th></tr></thead>
+              <tbody>
+                {% for m in match_ratings %}
+                  <tr>
+                    <td><a href="/events/{{ m.event.id }}/report">{{ m.event.title }}</a>
+                      <span class="squad-sub">{{ localtime(m.event.scheduled_at, 'date') }}{% if m.event.result %} · {{ m.event.result }}{% endif %}</span>
+                      {% if m.rating.coach_comment %}<span class="squad-sub">{{ m.rating.coach_comment }}</span>{% endif %}</td>
+                    <td class="lt-num">{{ m.rating.self_rating or '—' }}</td>
+                    <td class="lt-num"><span class="lt-rating">{{ m.rating.coach_rating or '—' }}</span></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      {% endif %}
+      {% if not see_private %}
+        <section class="panel">
+          <header class="panel-head"><h2>Match ratings</h2><span class="muted">Player &amp; staff</span></header>
+          <div class="panel-body">{{ redacted('Player & staff', 3) }}</div>
+        </section>
+      {% endif %}
+    </div>
+  </div>
+  </div>
+
+  <div id="file-record" class="file-panel{{ ' active' if active_tab == 'record' }}" role="tabpanel" aria-labelledby="filetab-record" tabindex="0">
+    <section class="panel" id="service-record">
+      <header class="panel-head"><h2>Service record</h2><span class="muted">{{ timeline | length }} entr{{ 'y' if timeline | length == 1 else 'ies' }}</span></header>
+      <div class="panel-body">
+        {% if timeline_groups %}
+          <div class="category-pills record-filter" role="group" aria-label="Filter the service record">
+            <button type="button" class="pill active" data-record-filter="all" aria-pressed="true">All</button>
+            {% for key, label in timeline_groups %}<button type="button" class="pill" data-record-filter="{{ key }}" aria-pressed="false">{{ label }}</button>{% endfor %}
+          </div>
+        {% endif %}
+        {% if timeline %}
+          <ol class="timeline">
+            {% for e in timeline %}
+              {% if e.redacted %}
+                <li class="timeline-item is-redacted" data-group="{{ e.group }}">
+                  <span class="timeline-date">—</span>
+                  <div class="timeline-body">{{ redacted(e.clearance, 1) }}<span class="visually-hidden">{{ e.what }}</span></div>
+                </li>
+              {% else %}
+                <li class="timeline-item kind-{{ e.kind }}" data-group="{{ e.group }}">
+                  <span class="timeline-date">{% if e.at %}{{ localtime(e.at, 'date') }}{% else %}—{% endif %}</span>
+                  <div class="timeline-body">
+                    <p class="timeline-title">
+                      {% if e.kind == 'warning' %}<span class="role-pill timeline-tag tag-warning">Warning</span>
+                      {% elif e.kind == 'note' %}<span class="role-pill timeline-tag tag-note">Staff note</span>
+                      {% elif e.kind == 'commendation' %}<span class="role-pill timeline-tag tag-commendation">Commendation</span>
+                      {% else %}{{ e.title }}{% endif %}
+                    </p>
+                    {% if e.detail %}<p class="timeline-detail">{{ e.detail }}</p>{% endif %}
+                    {% if e.entry_id %}
+                      <div class="note-meta">
+                        <span>{{ e.author }}{% if e.kind == 'warning' %} · player &amp; staff only{% elif e.kind == 'note' %} · staff only{% endif %}</span>
+                        {% if e.deletable %}
+                          <form method="post" action="/players/{{ player.discord_id }}/service/{{ e.entry_id }}/delete"
+                                onsubmit="return confirm('Delete this entry?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                            <button type="submit" class="btn-link">Delete</button>
+                          </form>
+                        {% endif %}
+                      </div>
+                    {% endif %}
+                  </div>
+                </li>
+              {% endif %}
+            {% endfor %}
+          </ol>
+          <p class="muted panel-empty record-empty" hidden>Nothing of that kind on file.</p>
+        {% else %}
+          <p class="muted panel-empty">Nothing on the record yet. Milestones appear as matches are recorded.</p>
+        {% endif %}
+        <p class="field-hint">Milestones are counted from the matches this site has recorded, and dated by the match.</p>
+      </div>
+    </section>
+
+    {% if can_add_entry %}
+      <section class="panel" id="add-entry">
+        <header class="panel-head panel-staff"><h2>Add an entry</h2><span class="muted">Staff</span></header>
+        <div class="panel-body">
+          <form method="post" action="/players/{{ player.discord_id }}/service" class="stack-form" data-loading="Saving…">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <div class="field-row">
+              <div class="field">
+                <label for="entry-kind">Type</label>
+                <select id="entry-kind" name="kind">
+                  <option value="COMMENDATION">Commendation (everyone sees it)</option>
+                  <option value="WARNING">Warning (the player and the staff)</option>
+                  <option value="NOTE">Note (staff only)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="entry-date">Date <span class="muted">(optional)</span></label>
+                <input id="entry-date" type="date" name="occurred_on" max="{{ today }}" />
+              </div>
+            </div>
+            <label class="visually-hidden" for="entry-body">Entry</label>
+            <textarea id="entry-body" name="body" rows="3" maxlength="1000" required placeholder="What happened, in a sentence or two."></textarea>
+            <div class="form-actions"><button type="submit" class="btn staff">Add to the record</button></div>
+          </form>
+        </div>
+      </section>
+    {% endif %}
+  </div>
+
+  <div id="file-career" class="file-panel{{ ' active' if active_tab == 'career' }}" role="tabpanel" aria-labelledby="filetab-career" tabindex="0">
+    <div class="dash-grid player-grid">
+      <div class="dash-main">
+        <section class="panel">
+          <header class="panel-head"><h2>Career</h2><span class="muted">Recorded matches</span></header>
+          <div class="panel-body">
+            {% if career_totals.apps %}
+              <div class="tile-row tile-row--small">
+                <div class="tile"><span class="tile-value">{{ career_totals.apps }}</span><span class="tile-label">Apps</span></div>
+                <div class="tile"><span class="tile-value">{{ career_totals.goals }}</span><span class="tile-label">Goals</span></div>
+                <div class="tile"><span class="tile-value">{{ career_totals.assists }}</span><span class="tile-label">Assists</span></div>
+                <div class="tile"><span class="tile-value">{{ '%.1f' % career_totals.rating if career_totals.rating is not none else '—' }}</span><span class="tile-label">Avg rating</span></div>
+                <div class="tile"><span class="tile-value">{{ career_totals.motm }}</span><span class="tile-label">EA MOTM</span></div>
+                <div class="tile"><span class="tile-value">{{ career_totals.clean_sheets }}</span><span class="tile-label">Clean sheets</span></div>
+              </div>
+            {% else %}
+              <p class="muted panel-empty">{% if gamertag %}No recorded matches for {{ gamertag }} yet.{% else %}No gamertag linked, so there are no matches to total up.{% endif %}</p>
+            {% endif %}
+          </div>
+          {% if career_months %}
+            <div class="table-scroll">
+              <table class="league-table">
+                <thead><tr><th scope="col">Month</th><th scope="col" class="lt-num">Apps</th><th scope="col" class="lt-num">G</th>
+                  <th scope="col" class="lt-num">A</th><th scope="col" class="lt-num">Rating</th><th scope="col" class="lt-num">MOTM</th></tr></thead>
+                <tbody>
+                  {% for r in career_months %}
+                    <tr><td>{{ r.label }}</td><td class="lt-num">{{ r.apps }}</td><td class="lt-num">{{ r.goals }}</td>
+                      <td class="lt-num">{{ r.assists }}</td>
+                      <td class="lt-num"><span class="lt-rating">{{ '%.1f' % r.rating if r.rating is not none else '—' }}</span></td>
+                      <td class="lt-num">{{ r.motm }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <p class="field-hint panel-note">EA starts the stats over with each new title, so this is the current one, month by month. Ribbons and Player of the Month awards carry on.</p>
+          {% endif %}
+        </section>
+      </div>
+      <div class="dash-side">
+        {% if see_private %}{% include "_development.html" %}
+        {% else %}
+        <section class="panel">
+          <header class="panel-head"><h2>Development</h2><span class="muted">Player &amp; staff</span></header>
+          <div class="panel-body">{{ redacted('Player & staff', 3) }}</div>
+        </section>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div id="file-attendance" class="file-panel{{ ' active' if active_tab == 'attendance' }}" role="tabpanel" aria-labelledby="filetab-attendance" tabindex="0">
+    <div class="dash-grid player-grid">
+      <div class="dash-main">
+        {% if see_private %}
+        <section class="panel">
+          <header class="panel-head"><h2>Attendance</h2></header>
+          <div class="panel-body">
+            {% if attendance and attendance.has_history %}
+              <dl class="kv">
+                {% if attendance.rate is not none %}<div><dt>Turned up</dt><dd>{{ attendance.rate }}%</dd></div>{% endif %}
+                <div><dt>Present</dt><dd>{{ attendance.present }}</dd></div>
+                <div><dt>Absent</dt><dd>{{ attendance.absent }}</dd></div>
+                {% if attendance.excused %}<div><dt>Excused</dt><dd>{{ attendance.excused }}</dd></div>{% endif %}
+              </dl>
+            {% else %}
+              <p class="muted panel-empty">No attendance marked yet.</p>
+            {% endif %}
+          </div>
+        </section>
+        {% else %}
+        <section class="panel">
+          <header class="panel-head"><h2>Attendance</h2><span class="muted">Player &amp; staff</span></header>
+          <div class="panel-body">{{ redacted('Player & staff', 3) }}</div>
+        </section>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div id="file-staff" class="file-panel{{ ' active' if active_tab == 'staff' }}" role="tabpanel" aria-labelledby="filetab-staff" tabindex="0">
+    <div class="dash-grid player-grid">
+      <div class="dash-main">
       {% if notes_visible %}
         <section class="panel" id="coach-notes">
           <header class="panel-head panel-staff"><h2>Coach notes</h2><span class="muted">Staff only</span></header>
@@ -232,34 +455,15 @@
             {% endif %}
           </div>
         </section>
-      {% endif %}
-    </div>
-
-    <div class="dash-side">
-      {% if match_ratings %}
+      {% else %}
         <section class="panel">
-          <header class="panel-head"><h2>Match ratings</h2><span>{{ 'Yours' if is_self else 'Player & staff' }}</span></header>
-          <div class="table-scroll">
-            <table class="league-table">
-              <thead><tr><th scope="col">Match</th><th scope="col" class="lt-num">Self</th>
-                <th scope="col" class="lt-num">Coach</th></tr></thead>
-              <tbody>
-                {% for m in match_ratings %}
-                  <tr>
-                    <td><a href="/events/{{ m.event.id }}/report">{{ m.event.title }}</a>
-                      <span class="squad-sub">{{ localtime(m.event.scheduled_at, 'date') }}{% if m.event.result %} · {{ m.event.result }}{% endif %}</span>
-                      {% if m.rating.coach_comment %}<span class="squad-sub">{{ m.rating.coach_comment }}</span>{% endif %}</td>
-                    <td class="lt-num">{{ m.rating.self_rating or '—' }}</td>
-                    <td class="lt-num"><span class="lt-rating">{{ m.rating.coach_rating or '—' }}</span></td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
+          <header class="panel-head"><h2>Coach notes</h2><span class="muted">Staff</span></header>
+          <div class="panel-body">{{ redacted('Staff', 3) }}</div>
         </section>
-      {% endif %}
-
-      {% if see_private %}
+        {% endif %}
+      </div>
+      <div class="dash-side">
+        {% if see_private %}
         <section class="panel">
           <header class="panel-head"><h2>Contract</h2>{% if not is_self %}<span class="muted">Player &amp; staff</span>{% endif %}</header>
           <div class="panel-body">
@@ -283,24 +487,12 @@
             {% endif %}
           </div>
         </section>
-
+        {% else %}
         <section class="panel">
-          <header class="panel-head"><h2>Attendance</h2></header>
-          <div class="panel-body">
-            {% if attendance and attendance.has_history %}
-              <dl class="kv">
-                {% if attendance.rate is not none %}<div><dt>Turned up</dt><dd>{{ attendance.rate }}%</dd></div>{% endif %}
-                <div><dt>Present</dt><dd>{{ attendance.present }}</dd></div>
-                <div><dt>Absent</dt><dd>{{ attendance.absent }}</dd></div>
-                {% if attendance.excused %}<div><dt>Excused</dt><dd>{{ attendance.excused }}</dd></div>{% endif %}
-              </dl>
-            {% else %}
-              <p class="muted panel-empty">No attendance marked yet.</p>
-            {% endif %}
-          </div>
+          <header class="panel-head"><h2>Contract</h2><span class="muted">Player &amp; staff</span></header>
+          <div class="panel-body">{{ redacted('Player & staff', 3) }}</div>
         </section>
-      {% endif %}
-
+        {% endif %}
       {% if can_set_role %}
         <section class="panel">
           <header class="panel-head panel-staff"><h2>Club role</h2></header>
@@ -318,7 +510,6 @@
           </div>
         </section>
       {% endif %}
-
       {# On your own file the About panel already asks for the gamertag. #}
       {% if can_fix_gamertag and not (is_self and not gamertag) %}
         <section class="panel">
@@ -338,26 +529,9 @@
           </div>
         </section>
       {% endif %}
-
-      {% if see_private and moves %}
-        <section class="panel">
-          <header class="panel-head"><h2>History</h2></header>
-          <ul class="plain-list history-list">
-            {% for m in moves %}
-              <li>
-                <span class="muted">{{ localtime(m.announced_at, 'date') }}</span>
-                {% if m.kind == 'offer' %}Offered a contract{% if m.position %} ({{ m.position }}){% endif %}
-                {% elif m.kind == 'staff_offer' %}Offered the {{ m.position }} role
-                {% elif m.kind == 'renewal' %}Offered a renewal
-                {% else %}Left the club{% endif %}
-                {%- if m.response == 'accepted' %} — accepted{% elif m.response == 'declined' %} — declined{% endif %}
-                {%- if m.confirmed_at %}, confirmed{% endif %}
-              </li>
-            {% endfor %}
-          </ul>
-        </section>
-      {% endif %}
+      </div>
     </div>
   </div>
 </div>
 {% endblock %}
+{% block scripts %}<script src="/static/js/player-file.js?v={{ asset_version('js/player-file.js') }}" defer></script>{% endblock %}
