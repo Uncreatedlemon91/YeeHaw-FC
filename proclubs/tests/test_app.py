@@ -2989,3 +2989,116 @@ def test_an_appointment_never_asks_for_a_gamertag(client, roster_ready, discord_
     html = client.get("/roster").text
     assert "Confirm appointment" in html
     assert f'id="gt-{move_id}"' not in html
+
+
+# --------------------------------------------------------------------------- #
+# Managing a contract from the player's own file (Staff file tab)
+# --------------------------------------------------------------------------- #
+_BACK = "/players/42?tab=staff"
+
+
+def test_the_profile_offers_contract_forms_to_management_only(client, roster_ready):
+    _login_staff(client)
+    _record_contract(client, discord_id="42")
+    with database.get_session() as session:
+        cid = services.live_contract_for(session, "42").id
+    html = client.get("/players/42").text
+    assert f'action="/roster/contracts/{cid}/renew"' in html
+    assert f'action="/roster/contracts/{cid}/release"' in html
+    assert f'name="next" value="{_BACK}"' in html
+
+    _login_fan(client)
+    html = client.get("/players/42").text
+    assert "/renew" not in html and "/release" not in html
+    assert "Manage contract" not in html
+
+
+def test_the_profile_of_an_uncontracted_player_offers_or_records(client, roster_ready):
+    _login_staff(client)
+    _record_contract(client, discord_id="42")
+    with database.get_session() as session:
+        services.end_contract(session, services.live_contract_for(session, "42"), ended_by_name="x")
+    html = client.get("/players/42").text
+    assert 'action="/roster/announce"' in html and 'formaction="/roster/contracts"' in html
+    assert 'name="discord_id" value="42"' in html
+    _login_fan(client)
+    assert 'action="/roster/announce"' not in client.get("/players/42").text
+
+
+def test_offering_from_the_profile_redirects_back_and_shows_the_waiting_state(client, roster_ready):
+    _login_staff(client)
+    _record_contract(client, discord_id="42")
+    with database.get_session() as session:
+        services.end_contract(session, services.live_contract_for(session, "42"), ended_by_name="x")
+    token = _csrf(client, "/players/42")
+    r = client.post("/roster/announce", data={
+        "discord_id": "42", "kind": "offer", "contract_weeks": "8", "squad_status": "Starter",
+        "position": "Striker", "next": _BACK, "csrf_token": token,
+    }, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == _BACK
+    html = client.get("/players/42").text
+    assert "Waiting on" in html and 'action="/roster/announce"' not in html
+
+
+def test_recording_from_the_profile_redirects_back(client, roster_ready):
+    _login_staff(client)
+    token = _csrf(client, "/roster")
+    r = client.post("/roster/contracts", data={
+        "discord_id": "42", "contract_weeks": "8", "squad_status": "Rotation",
+        "position": "Winger", "next": _BACK, "csrf_token": token,
+    }, follow_redirects=False)
+    assert r.headers["location"] == _BACK
+    with database.get_session() as session:
+        assert services.live_contract_for(session, "42") is not None
+
+
+def test_renewing_from_the_profile_redirects_back_and_hides_the_form(client, roster_ready):
+    _login_staff(client)
+    _record_contract(client, discord_id="42")
+    with database.get_session() as session:
+        cid = services.live_contract_for(session, "42").id
+    token = _csrf(client, "/players/42")
+    r = client.post(f"/roster/contracts/{cid}/renew", data={
+        "contract_weeks": "6", "squad_status": "Rotation", "position": "", "note": "",
+        "next": _BACK, "csrf_token": token,
+    }, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == _BACK
+    html = client.get("/players/42").text
+    assert "to answer a renewal" in html
+    assert f'action="/roster/contracts/{cid}/renew"' not in html
+    assert f'action="/roster/contracts/{cid}/release"' in html
+
+
+def test_releasing_from_the_profile_redirects_back(client, roster_ready):
+    _login_staff(client)
+    _record_contract(client, discord_id="42")
+    with database.get_session() as session:
+        cid = services.live_contract_for(session, "42").id
+    token = _csrf(client, "/players/42")
+    r = client.post(f"/roster/contracts/{cid}/release", data={
+        "note": "Thanks", "next": _BACK, "csrf_token": token,
+    }, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == _BACK
+    with database.get_session() as session:
+        assert services.live_contract_for(session, "42") is None
+
+
+@pytest.mark.parametrize("nxt,expected", [
+    ("/players/42", "/players/42"),
+    ("/players/42?tab=staff", "/players/42?tab=staff"),
+    ("https://evil.example", "/roster"),
+    ("//evil.example", "/roster"),
+    ("/players/42/../../admin", "/roster"),
+    ("/players/abc", "/roster"),
+    ("/players/42?x=1", "/roster"),
+    ("/players/42\n", "/roster"),
+    ("", "/roster"),
+])
+def test_next_on_contract_routes_only_accepts_a_player_file(client, roster_ready, nxt, expected):
+    _login_staff(client)
+    token = _csrf(client, "/roster")
+    r = client.post("/roster/contracts", data={
+        "discord_id": "42", "contract_weeks": "8", "squad_status": "Rotation",
+        "position": "Winger", "next": nxt, "csrf_token": token,
+    }, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == expected

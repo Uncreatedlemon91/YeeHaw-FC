@@ -493,6 +493,166 @@
           <div class="panel-body">{{ redacted('Player & staff', 3) }}</div>
         </section>
         {% endif %}
+      {% if can_manage_contract %}
+        {% set back = '/players/' ~ player.discord_id ~ '?tab=staff' %}
+        <section class="panel" id="manage-contract">
+          <header class="panel-head panel-staff"><h2>Manage contract</h2><span class="muted">Management</span></header>
+          <div class="panel-body">
+            {% if not roster_enabled %}
+              <p class="field-hint">Squad announcements aren't configured, so contracts can't be changed from here.</p>
+            {% elif contract %}
+              <p class="field-hint">
+                {{ contract.squad_status }}{% if contract.position %} · {{ contract.position }}{% if contract.secondary_position %} / {{ contract.secondary_position }}{% endif %}{% endif %}
+                · {{ weeks_label(contract.weeks) }} · {{ 'expired' if contract_state == 'expired' else 'ends' }} {{ localtime(contract.expires_at, 'date') }}
+              </p>
+              {% if open_renewal %}
+                <p class="field-hint">
+                  Waiting on {{ player.display_name }} to answer a renewal of
+                  {{ weeks_label(open_renewal.contract_weeks) }} in Discord.
+                </p>
+              {% else %}
+                <details class="contract-renew">
+                  <summary class="btn secondary">Renew</summary>
+                  <form method="post" action="/roster/contracts/{{ contract.id }}/renew" class="stack-form" data-loading="Sending…">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                    <input type="hidden" name="next" value="{{ back }}" />
+                    <div class="field-row">
+                      <div class="field">
+                        <label for="pc-renew-weeks">Additional weeks</label>
+                        <input id="pc-renew-weeks" name="contract_weeks" type="number" inputmode="numeric"
+                               min="{{ min_weeks }}" max="{{ max_weeks }}" step="1" value="{{ contract.weeks }}" required />
+                      </div>
+                      <div class="field">
+                        <label for="pc-renew-status">Squad status</label>
+                        <select id="pc-renew-status" name="squad_status" required>
+                          {% for st in squad_statuses %}
+                            <option value="{{ st }}" {% if st == contract.squad_status %}selected{% endif %}>{{ st }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                    </div>
+                    <div class="field-row">
+                      <div class="field">
+                        <label for="pc-renew-pos">Primary position</label>
+                        <select id="pc-renew-pos" name="position" required>
+                          {% if contract.position and contract.position not in pitch_positions %}
+                            <option value="{{ contract.position }}" selected>{{ contract.position }}</option>
+                          {% elif not contract.position %}
+                            <option value="" disabled selected>Choose…</option>
+                          {% endif %}
+                          {% for pos in pitch_positions %}
+                            <option value="{{ pos }}" {% if pos == contract.position %}selected{% endif %}>{{ pos }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                      <div class="field">
+                        <label for="pc-renew-sec">Secondary position</label>
+                        <select id="pc-renew-sec" name="secondary_position">
+                          <option value="">None</option>
+                          {% for pos in pitch_positions %}
+                            <option value="{{ pos }}" {% if pos == contract.secondary_position %}selected{% endif %}>{{ pos }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label for="pc-renew-note">Note <span class="muted">(optional)</span></label>
+                      <input id="pc-renew-note" name="note" maxlength="1000" />
+                    </div>
+                    <p class="field-hint">Posted to Discord for {{ player.display_name }} to accept or decline. The new weeks are added from the current end date{% if contract_state == 'expired' %} — or from today, since this one has already run out{% endif %}.</p>
+                    <div class="form-actions"><button type="submit" class="btn">Offer renewal</button></div>
+                  </form>
+                </details>
+              {% endif %}
+              <details class="contract-renew">
+                <summary class="btn danger">Release</summary>
+                <form method="post" action="/roster/contracts/{{ contract.id }}/release" class="stack-form" data-loading="Releasing…"
+                      onsubmit='return confirm({{ ("End " ~ player.display_name ~ "’s contract and publish a departure announcement?") | tojson }});'>
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                  <input type="hidden" name="next" value="{{ back }}" />
+                  <div class="field">
+                    <label for="pc-release-note">Note <span class="muted">(optional)</span></label>
+                    <input id="pc-release-note" name="note" maxlength="1000" />
+                  </div>
+                  <p class="field-hint">Ends the contract and posts a departure announcement to Discord.</p>
+                  <div class="form-actions"><button type="submit" class="btn danger">Release</button></div>
+                </form>
+              </details>
+            {% elif open_offer %}
+              <p class="field-hint">
+                {% if awaits_confirmation(open_offer) %}
+                  {{ player.display_name }} accepted an offer of {{ weeks_label(open_offer.contract_weeks) }}{% if open_offer.squad_status %} · {{ open_offer.squad_status }}{% endif %}. Confirm to publish the signing and start the contract.
+                {% else %}
+                  Waiting on {{ player.display_name }} to answer an offer of {{ weeks_label(open_offer.contract_weeks) }}{% if open_offer.squad_status %} · {{ open_offer.squad_status }}{% endif %}{% if open_offer.position %} · {{ open_offer.position }}{% endif %} in Discord.
+                {% endif %}
+              </p>
+              {% if awaits_confirmation(open_offer) %}
+                <form method="post" action="/roster/{{ open_offer.id }}/confirm" class="stack-form" data-loading="Confirming…">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                  <input type="hidden" name="next" value="{{ back }}" />
+                  <div class="field">
+                    <label for="pc-confirm-gamertag">Gamertag <span class="muted">{{ '(linked)' if gamertag else '(so playing time is tracked)' }}</span></label>
+                    <input id="pc-confirm-gamertag" name="player_name" maxlength="64" autocomplete="off"
+                           value="{{ gamertag or '' }}" placeholder="Their EA gamertag" />
+                  </div>
+                  <div class="form-actions"><button type="submit" class="btn">Confirm signing</button></div>
+                </form>
+              {% endif %}
+            {% else %}
+              <p class="field-hint">Not under contract.</p>
+              <form method="post" action="/roster/announce" class="stack-form" data-loading="Sending…">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <input type="hidden" name="next" value="{{ back }}" />
+                <input type="hidden" name="discord_id" value="{{ player.discord_id }}" />
+                <div class="field-row">
+                  <div class="field">
+                    <label for="pc-position">Primary position</label>
+                    <select id="pc-position" name="position" required>
+                      <option value="" disabled selected>Choose…</option>
+                      {% for pos in pitch_positions %}<option value="{{ pos }}">{{ pos }}</option>{% endfor %}
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="pc-secondary">Secondary position <span class="muted">(optional)</span></label>
+                    <select id="pc-secondary" name="secondary_position">
+                      <option value="">None</option>
+                      {% for pos in pitch_positions %}<option value="{{ pos }}">{{ pos }}</option>{% endfor %}
+                    </select>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field">
+                    <label for="pc-weeks">Contract length</label>
+                    <div class="input-suffix">
+                      <input id="pc-weeks" name="contract_weeks" type="number" inputmode="numeric"
+                             min="{{ min_weeks }}" max="{{ max_weeks }}" step="1" placeholder="e.g. 8" required />
+                      <span>weeks</span>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label for="pc-status">Squad status</label>
+                    <select id="pc-status" name="squad_status" required>
+                      <option value="" disabled selected>Choose…</option>
+                      {% for st in squad_statuses %}<option value="{{ st }}">{{ st }}</option>{% endfor %}
+                    </select>
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="pc-note">Note from the staff <span class="muted">(optional, offer only)</span></label>
+                  <textarea id="pc-note" name="note" rows="2" maxlength="1000"
+                            placeholder="A line about the signing — appears in the announcement."></textarea>
+                </div>
+                <div class="form-actions">
+                  <button type="submit" name="kind" value="offer" class="btn">Offer contract</button>
+                  <button type="submit" formaction="/roster/contracts" class="btn secondary"
+                          title="For somebody already in the squad — records the terms, posts nothing.">Record existing contract</button>
+                </div>
+                <p class="field-hint"><strong>Record existing contract</strong> is for players who were in the squad before contracts were tracked — it saves the terms without an offer or an announcement.</p>
+              </form>
+            {% endif %}
+          </div>
+        </section>
+      {% endif %}
       {% if can_set_role %}
         <section class="panel">
           <header class="panel-head panel-staff"><h2>Club role</h2></header>

@@ -1590,6 +1590,12 @@ def _publish_move(staff: dict, member: dict, *, kind: str, position: str | None,
     return None
 
 
+# Where a contract action may send staff back to: /roster (the default) or one
+# player's file. Anything else -- another site, another path -- is ignored.
+def _back_to(next: str | None) -> str:
+    return next if re.fullmatch(r"/players/[0-9]+(\?tab=[a-z]+)?", next or "") else "/roster"
+
+
 @app.post("/roster/announce")
 def roster_announce(request: Request, discord_id: str = Form(""), kind: str = Form(""),
                     position: str = Form(""), secondary_position: str = Form(""),
@@ -1597,6 +1603,7 @@ def roster_announce(request: Request, discord_id: str = Form(""), kind: str = Fo
                     contract_weeks: str = Form(""), squad_status: str = Form(""),
                     staff_role: str = Form(""), staff_note: str = Form(""),
                     release_position: str = Form(""), release_note: str = Form(""),
+                    next: str = Form(""),
                     csrf_token: str = Form(...), staff=Depends(auth.require_management)):
     """Publishes one squad announcement.
 
@@ -1665,7 +1672,7 @@ def roster_announce(request: Request, discord_id: str = Form(""), kind: str = Fo
         _flash(request, f"Departure announced for {member['name']}.")
         discord_roster.invalidate_members_cache()
     _sync_roles(request, member["id"])
-    return RedirectResponse("/roster", status_code=303)
+    return RedirectResponse(_back_to(next), status_code=303)
 
 
 @app.post("/roster/{move_id}/confirm")
@@ -1785,7 +1792,7 @@ def roster_confirm(request: Request, move_id: int, csrf_token: str = Form(...),
         _flash(request, f"{name} has no gamertag linked yet — link it on the Squad page "
                         f"so their playing time is tracked.", "warn")
     _sync_roles(request, confirmed_id)
-    back = next if re.fullmatch(r"/recruitment/\d+", next or "") else "/roster"
+    back = next if re.fullmatch(r"/recruitment/\d+", next or "") else _back_to(next)
     return RedirectResponse(back, status_code=303)
 
 
@@ -1833,7 +1840,8 @@ def recruitment_offer(request: Request, prospect_id: int, position: str = Form("
 def roster_record_contract(request: Request, discord_id: str = Form(""),
                            position: str = Form(""), secondary_position: str = Form(""),
                            contract_weeks: str = Form(""),
-                           squad_status: str = Form(""), csrf_token: str = Form(...),
+                           squad_status: str = Form(""), next: str = Form(""),
+                           csrf_token: str = Form(...),
                            staff=Depends(auth.require_management)):
     """Records a contract for somebody who is already in the squad.
 
@@ -1861,14 +1869,14 @@ def roster_record_contract(request: Request, discord_id: str = Form(""),
                     f"{discord_roster.weeks_label(weeks)}, {status}, "
                     f"until {until.strftime('%b %-d, %Y')}.")
     _sync_roles(request, member["id"])
-    return RedirectResponse("/roster", status_code=303)
+    return RedirectResponse(_back_to(next), status_code=303)
 
 
 @app.post("/roster/contracts/{contract_id}/renew")
 def roster_renew_contract(request: Request, contract_id: int,
                           contract_weeks: str = Form(""), squad_status: str = Form(""),
                           position: str = Form(""), secondary_position: str = Form(""),
-                          note: str = Form(""),
+                          note: str = Form(""), next: str = Form(""),
                           csrf_token: str = Form(...), staff=Depends(auth.require_management)):
     """Offers the player a new contract, which they accept or decline in
     Discord exactly like the original offer.
@@ -1914,12 +1922,13 @@ def roster_renew_contract(request: Request, contract_id: int,
         _flash(request, f"The renewal didn't send: {failure}", level="error")
     else:
         _flash(request, f"Renewal sent to {member['name']} — waiting on their answer in Discord.")
-    return RedirectResponse("/roster", status_code=303)
+    return RedirectResponse(_back_to(next), status_code=303)
 
 
 @app.post("/roster/contracts/{contract_id}/release")
 def roster_release_contract(request: Request, contract_id: int,
-                            note: str = Form(""), csrf_token: str = Form(...),
+                            note: str = Form(""), next: str = Form(""),
+                            csrf_token: str = Form(...),
                             staff=Depends(auth.require_management)):
     """Ends a contract and announces the departure -- Let Go, started
     from the contract rather than the member picker, so it works for
@@ -1945,7 +1954,7 @@ def roster_release_contract(request: Request, contract_id: int,
     else:
         _flash(request, f"{member['name']} released — departure announced.")
     _sync_roles(request, member["id"])
-    return RedirectResponse("/roster", status_code=303)
+    return RedirectResponse(_back_to(next), status_code=303)
 
 
 # --------------------------------------------------------------------------- #
@@ -2124,6 +2133,18 @@ def player_page(request: Request, discord_id: str):
         # anyone else they are not even read (service_record.build_timeline).
         contracts = history
         all_moves = services.moves_for(session, discord_id, limit=200) if see_private else []
+    manage = auth.is_management(user)
+    # What the profile's contract panel needs: the renewal or offer already
+    # waiting on the player, if any (the forms give way to that state).
+    open_renewal = open_offer = None
+    if manage:
+        with get_session() as session:
+            if contract is not None:
+                open_renewal = services.open_renewals(session).get(contract.id)
+            open_offer = next((m for m in services.moves_for(session, discord_id)
+                               if m.kind == discord_roster.MOVE_OFFER
+                               and (services.offer_is_open(m) or services.offer_awaits_confirmation(m))),
+                              None)
     gamertag = link.player_name if link else None
     usage = _squad_usage(request)
     recent = []
@@ -2174,6 +2195,12 @@ def player_page(request: Request, discord_id: str):
         club_roles=roles.CLUB_ROLES, preferred_feet=services.PREFERRED_FEET,
         form_label=squad.form_label, weeks_label=discord_roster.weeks_label,
         can_fix_gamertag=auth.is_management(user),
+        can_manage_contract=manage, open_renewal=open_renewal, open_offer=open_offer,
+        awaits_confirmation=services.offer_awaits_confirmation,
+        roster_enabled=config.ROSTER_MOVES_ENABLED,
+        pitch_positions=discord_roster.PITCH_POSITIONS,
+        squad_statuses=discord_roster.SQUAD_STATUSES,
+        min_weeks=discord_roster.CONTRACT_MIN_WEEKS, max_weeks=discord_roster.CONTRACT_MAX_WEEKS,
         gamertag_options=_gamertag_options(u["name"] for u in usage["players"].values())
         if (is_self and not gamertag) or auth.is_management(user) else [],
     ))
