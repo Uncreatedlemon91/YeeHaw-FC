@@ -66,6 +66,15 @@ enum RequestStatus {
   CANCELLED
 }
 
+// Who may read a library folder or document: anyone, any operator, squad
+// leadership (plus instructors and Command), or Command only.
+enum LibraryClearance {
+  PUBLIC
+  UNIT
+  LEADERSHIP
+  COMMAND
+}
+
 enum ApplicationStatus {
   PENDING
   APPROVED
@@ -109,6 +118,11 @@ model User {
   documentsEdited      Qualification[]
   requests             PersonnelRequest[]       @relation("Requester")
   reviewedRequests     PersonnelRequest[]       @relation("RequestReviewer")
+  libraryDocsCreated   LibraryDocument[]        @relation("LibraryDocCreator")
+  libraryDocsUpdated   LibraryDocument[]        @relation("LibraryDocUpdater")
+  libraryRevisions     LibraryRevision[]
+  libraryAcks          LibraryAcknowledgement[]
+  libraryImages        LibraryImage[]
 }
 
 model ServiceRecord {
@@ -177,6 +191,7 @@ model Qualification {
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt
   holders     UserQualification[]
+  libraryDocs LibraryDocument[]
 }
 
 model UserQualification {
@@ -247,4 +262,115 @@ model Setting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+// --- Document library (src/lib/library.ts) -------------------------------- //
+
+// Nested folders. A folder's clearance is never looser than its parent's,
+// nor a document's looser than its folder's (enforced in the actions).
+model LibraryFolder {
+  id        String            @id @default(cuid())
+  name      String
+  parentId  String?
+  parent    LibraryFolder?    @relation("FolderTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children  LibraryFolder[]   @relation("FolderTree")
+  clearance LibraryClearance  @default(UNIT)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  documents LibraryDocument[]
+
+  @@index([parentId])
+}
+
+model LibraryDocument {
+  id        String           @id @default(cuid())
+  slug      String           @unique
+  title     String
+  summary   String           @default("")
+  content   String           @default("")
+  clearance LibraryClearance @default(UNIT)
+  // Null = top level of the library.
+  folderId  String?
+  folder    LibraryFolder?   @relation(fields: [folderId], references: [id], onDelete: Restrict)
+  // Number of the newest LibraryRevision.
+  revision  Int              @default(1)
+
+  // Required reading. `required` switches it on; the targets are additive:
+  // everyone, or anyone matching a rank (requiredRanks, or at/above
+  // requiredMinRank), a billet (requiredRoles) or a squad (requiredSquads).
+  // Members acknowledge the current ackVersion; a major edit bumps it so
+  // everyone must acknowledge again.
+  required         Boolean  @default(false)
+  ackVersion       Int      @default(1)
+  requiredEveryone Boolean  @default(false)
+  requiredMinRank  String?
+  requiredRanks    String[] @default([])
+  requiredRoles    String[] @default([])
+  requiredSquads   String[] @default([])
+
+  createdById String?
+  createdBy   User?    @relation("LibraryDocCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById String?
+  updatedBy   User?    @relation("LibraryDocUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  revisions        LibraryRevision[]
+  acknowledgements LibraryAcknowledgement[]
+  images           LibraryImage[]
+  // Related vault qualifications.
+  qualifications   Qualification[]
+  // Full-text search: a GIN expression index on to_tsvector('english',
+  // title || ' ' || content) lives in the migration (Prisma can't model it).
+
+  @@index([folderId])
+  @@index([clearance, updatedAt])
+}
+
+// A snapshot taken on every title/summary/content change, restores included.
+model LibraryRevision {
+  id         String          @id @default(cuid())
+  documentId String
+  document   LibraryDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  number     Int
+  title      String
+  summary    String          @default("")
+  content    String
+  note       String?
+  // Major edit of a required document (everyone re-acknowledges).
+  major      Boolean         @default(false)
+  authorId   String?
+  author     User?           @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt  DateTime        @default(now())
+
+  @@unique([documentId, number])
+}
+
+model LibraryAcknowledgement {
+  id             String          @id @default(cuid())
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId     String
+  document       LibraryDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  ackVersion     Int
+  acknowledgedAt DateTime        @default(now())
+
+  @@unique([userId, documentId, ackVersion])
+  @@index([documentId, ackVersion])
+}
+
+// An uploaded image file on disk (LIBRARY_UPLOAD_DIR). The file is named
+// by id; `filename` is the original name.
+model LibraryImage {
+  id         String           @id @default(cuid())
+  filename   String
+  mime       String
+  size       Int
+  uploaderId String?
+  uploader   User?            @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+  documentId String?
+  document   LibraryDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  createdAt  DateTime         @default(now())
+
+  @@index([documentId])
 }

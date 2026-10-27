@@ -65,6 +65,15 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   write the debrief and mark who actually attended, was excused or no-showed.
 - **Qualification vault.** Markdown SOPs, versioned on each content edit.
   Instructors award qualifications from a member's dossier.
+- **Document library (`/library`).** Markdown documents in nested folders,
+  with four clearance tiers: Public (anyone, listed on the landing page),
+  Unit (any operator), Leadership (squad leaders, instructors, Command) and
+  Command. A folder's clearance is a floor: documents and subfolders can be
+  equal or stricter, never looser. Readers only see what they're cleared
+  for, and search is PostgreSQL full-text. Instructors and Command publish
+  and organise folders; only Command deletes documents or a non-empty
+  folder. Every title or content edit keeps a revision: view, compare two
+  (line diff) or restore (which writes a new revision).
 - **Public landing page** at `/` with the Enlist Now call to action.
 
 ### Permissions
@@ -120,6 +129,8 @@ src/lib/discord.ts           Discord REST client
 src/lib/recruitment.ts       approve / deny pipeline (shared by web and Discord)
 src/lib/personnel.ts         clearance, billets, leave, and the S1 request pipeline (shared by web and Discord)
 src/lib/career.ts            promotion criteria checklist
+src/lib/library.ts           library clearance, folder tree and search
+src/lib/diff.ts              line diff for library revisions
 src/lib/role-config.ts       Discord role mapping (Admin page; .env fallback)
 src/lib/member-sync.ts       personnel files generated from Discord roles
 src/app/api/discord/interactions/route.ts   slash commands, buttons, modals

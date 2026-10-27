@@ -1,4 +1,4 @@
-import { ChevronRight, Crosshair, Radio, ShieldCheck } from "lucide-react";
+import { ChevronRight, Crosshair, FileText, Radio, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { Container } from "@/components/container";
 import { Logo } from "@/components/logo";
@@ -33,8 +33,21 @@ async function stats() {
   }
 }
 
+async function publicDocs() {
+  try {
+    return await prisma.libraryDocument.findMany({
+      where: { clearance: "PUBLIC" },
+      orderBy: { title: "asc" },
+      take: 12,
+      select: { slug: true, title: true, summary: true },
+    });
+  } catch {
+    return [];
+  }
+}
+
 export default async function Home() {
-  const s = await stats();
+  const [s, docs] = await Promise.all([stats(), publicDocs()]);
 
   return (
     <>
@@ -119,6 +132,21 @@ export default async function Home() {
           </div>
         </Container>
       </section>
+
+      {docs.length > 0 && (
+        <Container className="py-16">
+          <SectionTitle eyebrow="Library" title="Open documents" />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {docs.map((d) => (
+              <Link key={d.slug} href={`/library/${d.slug}`} className="group flex flex-col gap-2 rounded-lg border bg-card p-4 hover:border-accent/50">
+                <FileText className="size-5 text-muted-foreground group-hover:text-accent" />
+                <div className="font-display text-lg font-semibold uppercase">{d.title}</div>
+                {d.summary && <p className="text-sm text-muted-foreground">{d.summary}</p>}
+              </Link>
+            ))}
+          </div>
+        </Container>
+      )}
 
       {UNIT.media.length > 0 && (
         <Container className="py-16">

@@ -15,6 +15,7 @@ const ITEMS: Item[] = [
   { href: "/roster", label: "Roster", perm: "OPERATOR" },
   { href: "/personnel", label: "S1 Desk", perm: "OPERATOR" },
   { href: "/vault", label: "Vault", perm: "OPERATOR" },
+  { href: "/library", label: "Library", perm: "OPERATOR" },
   { href: "/recruitment", label: "Recruitment", perm: "RECRUITER" },
   { href: "/admin", label: "Admin", perm: "ADMIN" },
   { href: "/apply", label: "Enlist", guestOnly: true },
