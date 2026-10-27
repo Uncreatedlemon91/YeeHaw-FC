@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily YeeHaw FC season job
+
+[Timer]
+# Early morning club time is mid-morning UTC at the latest; the job is
+# idempotent, so a missed day is caught up on the next run.
+OnCalendar=*-*-* 09:20:00
+RandomizedDelaySec=5m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -41,6 +41,7 @@
   --warning: #e39a3b;
   --pitch: #12351f; /* the squad pitch's grass, kept dark so shirts read */
   --pitch-line: rgb(255 255 255 / 0.18);
+  --gold: #e3b84a; /* Player of the Month ribbons */
 
   --radius: 0.25rem;
 }

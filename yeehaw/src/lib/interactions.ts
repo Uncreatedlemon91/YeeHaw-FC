@@ -8,7 +8,7 @@ import { getRoleConfig } from "./role-config";
 
 export const EPHEMERAL = 64;
 export const T = { PING: 1, COMMAND: 2, COMPONENT: 3, MODAL_SUBMIT: 5 } as const;
-export const R = { PONG: 1, MESSAGE: 4, DEFERRED_MESSAGE: 5, MODAL: 9 } as const;
+export const R = { PONG: 1, MESSAGE: 4, DEFERRED_MESSAGE: 5, UPDATE_MESSAGE: 7, MODAL: 9 } as const;
 
 export type Interaction = {
   type: number;
@@ -25,6 +25,9 @@ export type Interaction = {
 
 export const reply = (content: string, extra: object = {}) =>
   NextResponse.json({ type: R.MESSAGE, data: { content, flags: EPHEMERAL, allowed_mentions: { parse: [] }, ...extra } });
+
+/** Answer a button press by rewriting the message the button was on. */
+export const updateMessage = (data: object) => NextResponse.json({ type: R.UPDATE_MESSAGE, data });
 
 export const modal = (data: object) => NextResponse.json({ type: R.MODAL, data });
 export const deferred = () => NextResponse.json({ type: R.DEFERRED_MESSAGE, data: { flags: EPHEMERAL } });

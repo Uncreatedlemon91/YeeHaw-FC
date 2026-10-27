@@ -1,0 +1,16 @@
+[Unit]
+Description=YeeHaw FC daily season job (re-signing window, end reminder, season end and start)
+After=network-online.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=yeehaw
+Group=yeehaw
+WorkingDirectory=/opt/yeehaw/yeehaw
+EnvironmentFile=/opt/yeehaw/yeehaw/.env
+Environment=NODE_ENV=production
+# Small and short-lived, but keep it from squeezing Ravenfall HQ.
+Environment=NODE_OPTIONS=--max-old-space-size=256
+MemoryMax=384M
+ExecStart=/usr/bin/env node_modules/.bin/tsx scripts/season-job.ts
