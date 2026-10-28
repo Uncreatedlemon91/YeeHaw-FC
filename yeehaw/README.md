@@ -218,7 +218,7 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   from the period's facts: results, per-player totals, skill rating and division
   movement, league position, and the roster's signings, appointments and
   departures. Port of `proclubs/weekly_article.py`; see "The AI roundup" below.
-- **Staff tools** *(planned)*. The club profile.
+- **Club profile** *(built)*. `/admin/club` (management) edits the headline, about text, match nights, region, platform, play style and recruiting note (stored as the `profile` setting, `src/lib/club-profile.ts`). `/club` is the public overview: those words plus the live squad size, record and form, next fixture and staff, with links to Stats and the League table.
 
 Dropped from the old site: Discord clips, Twitch live streams, coach notes,
 article comments and likes, development goals and reviews.
@@ -306,6 +306,7 @@ src/lib/ea-poll.ts           the poll's writers: snapshots, matches, squad, tota
 src/lib/ea-job.ts            the hourly EA job's steps (poll, link, milestones, Player of the Month)
 src/lib/ea-season.ts         a new EA club id: find, archive, erase, rewrite .env (scripts/ea-season.ts)
 src/lib/stats-rules.ts       form, record, head to head, player totals (pure)
+src/lib/club-profile.ts      the club's own words for /club (the "profile" setting)
 src/lib/club-stats.ts        what /club/stats and /club/league read
 src/lib/recognition-rules.ts milestones, the vote, Player of the Month ties, their embeds (pure)
 src/lib/recognition.ts       evaluating and announcing milestones, awarding the month

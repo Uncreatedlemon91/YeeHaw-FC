@@ -52,7 +52,7 @@ describe("eaGet via ea_fetch.py", () => {
 
   it("reports a 403 as a plain HTTP error", async () => {
     stub([{ code: 10, stderr: "status=403 retry_after=-" }]);
-    const err = await eaGet("clubs/info", { platform: "common-gen5" }).catch((e) => e);
+    const err = (await eaGet("clubs/info", { platform: "common-gen5" }).catch((e) => e)) as EaError;
     expect(err).toBeInstanceOf(EaError);
     expect(err.status).toBe(403);
   });
