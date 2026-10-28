@@ -243,6 +243,27 @@ export async function relinkPlayers(): Promise<number> {
 }
 
 /**
+ * Re-point one player's match lines after their gamertag changed: lines
+ * under another name are let go, lines under the new one (case-insensitive)
+ * are claimed. The hub reads lines by playerId, so this keeps a newly linked
+ * gamertag's history showing at once instead of after the next poll.
+ */
+export async function relinkPlayer(playerId: string, gamertag: string | null): Promise<void> {
+  await prisma.$transaction([
+    prisma.$executeRaw`
+      UPDATE "EaMatchPlayer" SET "playerId" = NULL
+      WHERE "playerId" = ${playerId} AND (${gamertag}::text IS NULL OR lower("playerName") <> lower(${gamertag}::text))`,
+    ...(gamertag
+      ? [
+          prisma.$executeRaw`
+            UPDATE "EaMatchPlayer" SET "playerId" = ${playerId}
+            WHERE "playerId" IS NULL AND lower("playerName") = lower(${gamertag})`,
+        ]
+      : []),
+  ]);
+}
+
+/**
  * Set EaMatch.eventId for our club's matches played inside an event's
  * window (see eventForMatch). Matches already linked are left alone.
  */

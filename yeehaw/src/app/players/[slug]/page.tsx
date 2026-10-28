@@ -31,7 +31,8 @@ export default async function PlayerHub({
 }) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
   const user = await getSessionUser();
-  const hub = await loadPlayerHub(slug, user);
+  const asked = (["overview", "contracts", "record", "attendance", "manage"] as const).find((t) => t === sp.tab) ?? "overview";
+  const hub = await loadPlayerHub(slug, user, asked);
   if (!hub) notFound();
   const { player, current, viewer } = hub;
 

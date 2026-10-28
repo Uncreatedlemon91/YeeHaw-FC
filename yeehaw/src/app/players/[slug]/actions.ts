@@ -8,6 +8,7 @@ import { afterResponse, changeContract, offerContracts, releaseContract, respond
 import { hasPerm } from "@/lib/permissions";
 import { prefixErrors, readTerms } from "@/lib/form-terms";
 import { parseAbout } from "@/lib/lineup-rules";
+import { relinkPlayer } from "@/lib/ea-poll";
 import { prisma } from "@/lib/prisma";
 import { fromInput } from "@/lib/time";
 
@@ -85,6 +86,7 @@ export async function linkGamertag(_: ActionState, data: FormData): Promise<Acti
     if (clash) return { error: `${clash.displayName} already has that gamertag.`, fieldErrors: { gamertag: "Already linked to someone else." } };
   }
   await prisma.player.update({ where: { id: playerId }, data: { gamertag: tag || null } });
+  await relinkPlayer(playerId, tag || null);
   refresh();
   return { ok: tag ? "Gamertag linked." : "Gamertag cleared." };
 }

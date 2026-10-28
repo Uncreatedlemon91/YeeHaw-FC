@@ -86,12 +86,13 @@ export type PlayerHub = {
 
 const LIVE_SEASONS: SeasonState[] = ["WINDOW", "ACTIVE"];
 
-async function loadMatches(player: { id: string; gamertag: string | null }): Promise<MatchLine[]> {
+// By playerId only, which is indexed. The poll links lines to players by
+// gamertag (case-insensitive) and a gamertag change relinks at once
+// (ea-poll.ts relinkPlayer), so a name match here would only add a scan of
+// every league club's lines.
+async function loadMatches(player: { id: string }): Promise<MatchLine[]> {
   const rows = await prisma.eaMatchPlayer.findMany({
-    where: {
-      OR: [{ playerId: player.id }, ...(player.gamertag ? [{ playerName: { equals: player.gamertag, mode: "insensitive" as const } }] : [])],
-      ...(env.eaClubId ? { match: { clubId: env.eaClubId } } : {}),
-    },
+    where: { playerId: player.id, ...(env.eaClubId ? { match: { clubId: env.eaClubId } } : {}) },
     include: { match: { select: { matchId: true, playedAt: true, oppName: true, usScore: true, oppScore: true } } },
   });
   // One line per match even if both a link and a name matched it.
@@ -117,11 +118,21 @@ async function loadMatches(player: { id: string; gamertag: string | null }): Pro
   return lines.sort((a, b) => (a.playedAt?.getTime() ?? Infinity) - (b.playedAt?.getTime() ?? Infinity));
 }
 
-export async function loadPlayerHub(slug: string, user: SessionUser | null): Promise<PlayerHub | null> {
+/** The hub's tabs. Only the open tab's data is loaded beyond the header. */
+export type HubTab = "overview" | "contracts" | "record" | "attendance" | "manage";
+
+export async function loadPlayerHub(slug: string, user: SessionUser | null, tab: HubTab = "overview"): Promise<PlayerHub | null> {
   const p = await prisma.player.findUnique({ where: { slug } });
   if (!p) return null;
   const viewer = viewerOf(user, p.id);
   const priv = viewer.isSelf || viewer.isStaff;
+  // The page shows Overview to anyone asking for Manage without the access.
+  if (tab === "manage" && !viewer.isManagement) tab = "overview";
+  // The header (contracts, totals, form, ribbons) is on every tab; the rest
+  // only where it's drawn. Signups feed both objectives and attendance.
+  const record = tab === "record";
+  const marks = priv && (tab === "overview" || tab === "attendance");
+  const away_ = priv && tab === "attendance";
 
   const [contractRows, matches, milestones, potm, written, moves, eaMoves, signups, pattern, away, seasons] = await Promise.all([
     prisma.contract.findMany({
@@ -132,14 +143,16 @@ export async function loadPlayerHub(slug: string, user: SessionUser | null): Pro
     loadMatches(p),
     prisma.milestone.findMany({ where: { playerId: p.id }, orderBy: { achievedAt: "asc" } }),
     prisma.potmWinner.findMany({ where: { playerId: p.id }, include: { potm: true } }),
-    prisma.serviceEntry.findMany({
-      where: { playerId: p.id, kind: { in: (["COMMENDATION", "WARNING", "NOTE"] as const).filter((k) => canView(k, viewer)) } },
-    }),
-    priv ? prisma.rosterMove.findMany({ where: { playerId: p.id }, include: { season: { select: { name: true } } } }) : [],
-    priv && p.gamertag
+    record
+      ? prisma.serviceEntry.findMany({
+          where: { playerId: p.id, kind: { in: (["COMMENDATION", "WARNING", "NOTE"] as const).filter((k) => canView(k, viewer)) } },
+        })
+      : [],
+    priv && record ? prisma.rosterMove.findMany({ where: { playerId: p.id }, include: { season: { select: { name: true } } } }) : [],
+    priv && record && p.gamertag
       ? prisma.eaSquadMove.findMany({ where: { playerName: { equals: p.gamertag, mode: "insensitive" }, ...(env.eaClubId ? { clubId: env.eaClubId } : {}) } })
       : [],
-    priv
+    marks
       ? prisma.eventSignup.findMany({
           where: { playerId: p.id, attendance: { not: null } },
           include: { event: { select: { title: true, startsAt: true } } },
@@ -147,11 +160,11 @@ export async function loadPlayerHub(slug: string, user: SessionUser | null): Pro
           take: 300,
         })
       : [],
-    priv ? prisma.availabilityPattern.findUnique({ where: { playerId: p.id } }) : null,
-    priv
+    away_ ? prisma.availabilityPattern.findUnique({ where: { playerId: p.id } }) : null,
+    away_
       ? prisma.availabilityAway.findMany({ where: { playerId: p.id, endsOn: { gte: new Date() } }, orderBy: { startsOn: "asc" } })
       : [],
-    viewer.isManagement ? prisma.season.findMany({ where: { state: { in: LIVE_SEASONS } }, orderBy: { startsAt: "asc" } }) : [],
+    viewer.isManagement && tab === "manage" ? prisma.season.findMany({ where: { state: { in: LIVE_SEASONS } }, orderBy: { startsAt: "asc" } }) : [],
   ]);
 
   const rows: ContractRow[] = contractRows
@@ -187,7 +200,7 @@ export async function loadPlayerHub(slug: string, user: SessionUser | null): Pro
   const synthetic = contractRows
     .filter((c) => !moved.has(c.id) && (c.state === "ACTIVE" || c.state === "ENDED" || c.state === "RELEASED"))
     .map((c) => ({ kind: "ACCEPT" as const, at: c.respondedAt ?? c.offeredAt, seasonName: c.season.name, position: c.position, note: null as string | null }));
-  const timeline = buildTimeline({
+  const timeline = !record ? [] : buildTimeline({
     matches,
     potm: potm.map((w) => ({ month: w.potm.month, votes: w.potm.votes, awardedAt: w.potm.awardedAt })),
     moves: [
@@ -199,7 +212,7 @@ export async function loadPlayerHub(slug: string, user: SessionUser | null): Pro
     viewer,
   });
 
-  const attendance = priv ? attendanceRecord(signups.map((s) => s.attendance)) : null;
+  const attendance = marks ? attendanceRecord(signups.map((s) => s.attendance)) : null;
   let objectives: PlayerHub["objectives"] = null;
   if (priv) {
     objectives = [];
@@ -236,7 +249,7 @@ export async function loadPlayerHub(slug: string, user: SessionUser | null): Pro
     ribbons: ribbons(milestones, potm.map((w) => w.potm.month)),
     timeline,
     objectives,
-    attendance: attendance
+    attendance: attendance && tab === "attendance"
       ? {
           record: attendance,
           recent: signups.slice(0, 10).map((s) => ({ id: s.id, title: s.event.title, startsAt: s.event.startsAt, attendance: s.attendance as Attendance })),

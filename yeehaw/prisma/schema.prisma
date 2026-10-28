@@ -911,6 +911,7 @@ model EaMatchPlayer {
 
   @@unique([matchRef, playerName])
   @@index([playerName])
+  // Plus lower("playerName"), raw SQL in 20261030120000_match_player_name_lower.
   @@index([playerId])
 }
 
