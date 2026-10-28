@@ -3,7 +3,7 @@
 // (SITE_*), roles.py (SQUAD_STATUSES), discord_roster.py (PITCH_POSITIONS),
 // setpieces.py and recruitment.py.
 
-import type { ClubRole, ObjectiveKind, Position, ProspectStage, SquadStatus } from "@prisma/client";
+import type { Attendance, ClubRole, EventType, ObjectiveKind, Position, ProspectStage, SignupStatus, SquadStatus, SuggestionStatus } from "@prisma/client";
 
 export const CLUB = {
   // The club. Write it without "the": "Sign for YeeHaw FC".
@@ -104,3 +104,29 @@ export const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as con
 export function positionLabel(p: Position | null | undefined): string {
   return p ? POSITION_LABEL[p] : "";
 }
+
+export const EVENT_TYPES: readonly EventType[] = ["MATCH", "SCRIM", "TOURNAMENT", "COMMUNITY", "TRAINING", "THEORY"];
+
+export const EVENT_TYPE_LABEL: Record<EventType, string> = {
+  MATCH: "Match",
+  SCRIM: "Scrim",
+  TOURNAMENT: "Tournament",
+  COMMUNITY: "Community",
+  TRAINING: "Training",
+  THEORY: "Theory",
+};
+
+/** Fixtures that get a team sheet and a report; community nights and sessions don't. */
+export const MATCH_TYPES: readonly EventType[] = ["MATCH", "SCRIM", "TOURNAMENT"];
+/** Training and theory sessions carry a plan (objective, role briefs, review). */
+export const SESSION_TYPES: readonly EventType[] = ["TRAINING", "THEORY"];
+
+export const SIGNUP_LABEL: Record<SignupStatus, string> = { GOING: "Going", MAYBE: "Maybe", OUT: "Can't make it" };
+export const ATTENDANCE_LABEL: Record<Attendance, string> = { PRESENT: "Present", ABSENT: "Absent", EXCUSED: "Excused" };
+
+export const SUGGESTION_STATUS_LABEL: Record<SuggestionStatus, string> = {
+  OPEN: "New",
+  PLANNED: "Planned",
+  DONE: "Worked on",
+  DECLINED: "Not now",
+};

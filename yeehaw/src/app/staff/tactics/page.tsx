@@ -29,7 +29,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ f
     return (
       <Container>
         <PageHeader
-          eyebrow="Staff"
+          eyebrow="Matchday"
           title="Tactics"
           description="Who plays where in each formation. Each formation remembers its own board; Save replaces the one you're on and makes it the active shape."
         />

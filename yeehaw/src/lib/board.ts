@@ -15,6 +15,8 @@ export type BoardPlayer = {
   captaincy?: Captaincy;
   position?: Position | null;
   status?: SquadStatus;
+  /** Small print under the name in the editor's roster, instead of the position (e.g. "Going"). */
+  hint?: string;
 };
 
 export type BoardSlots = Record<string, BoardPlayer | null | undefined>;

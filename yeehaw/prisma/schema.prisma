@@ -392,7 +392,10 @@ model EventSeries {
   startsOn        DateTime  @db.Date
   endsOn          DateTime? @db.Date
   // How far ahead occurrences are kept generated.
-  generateAheadDays Int     @default(21)
+  generateAheadDays Int     @default(28)
+  // Post each occurrence's RSVP announcement this many days before it starts
+  // (the notify job does it). Null: staff announce by hand.
+  announceDaysBefore Int?
   // The last date occurrences were generated up to, so a run resumes.
   generatedThrough DateTime? @db.Date
   active          Boolean   @default(true)

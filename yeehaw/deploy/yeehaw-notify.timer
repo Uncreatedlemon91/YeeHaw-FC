@@ -1,0 +1,12 @@
+[Unit]
+Description=Hourly YeeHaw FC notify job
+
+[Timer]
+# On the hour (plus a little jitter): reminders go out within an hour of the
+# 24-hours-before mark, and every message is recorded so it is sent once.
+OnCalendar=hourly
+RandomizedDelaySec=2m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

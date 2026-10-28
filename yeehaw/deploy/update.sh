@@ -28,9 +28,10 @@ echo "== Building (takes a few minutes on a small droplet)"
 as_app env NODE_OPTIONS=--max-old-space-size=1536 npm run build
 
 cp deploy/yeehaw.service deploy/yeehaw-gateway.service deploy/yeehaw-backup.service deploy/yeehaw-backup.timer \
-   deploy/yeehaw-season-job.service deploy/yeehaw-season-job.timer /etc/systemd/system/
+   deploy/yeehaw-season-job.service deploy/yeehaw-season-job.timer \
+   deploy/yeehaw-notify.service deploy/yeehaw-notify.timer /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now yeehaw-backup.timer yeehaw-season-job.timer
+systemctl enable --now yeehaw-backup.timer yeehaw-season-job.timer yeehaw-notify.timer
 systemctl enable yeehaw yeehaw-gateway
 systemctl restart yeehaw
 systemctl restart yeehaw-gateway
@@ -39,4 +40,5 @@ systemctl --no-pager --lines=5 status yeehaw yeehaw-gateway || true
 echo
 echo "Logs: journalctl -u yeehaw -f"
 echo "      journalctl -u yeehaw-gateway -f"
+echo "      journalctl -u yeehaw-notify       (the hourly notify job: recurring events, reminders; run now: systemctl start yeehaw-notify)"
 echo "      journalctl -u yeehaw-season-job   (the daily season job; run now: systemctl start yeehaw-season-job)"

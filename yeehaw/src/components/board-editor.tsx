@@ -247,7 +247,7 @@ export function BoardEditor({ formations, initialFormation, initialSlots, rememb
                     <Avatar discordId={p.discordId} avatar={p.avatar} name={p.name} size={28} className="rounded-full" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium">{p.name}</span>
-                      {(p.position || p.slug === undefined) && <span className="block truncate text-xs text-muted-foreground">{p.position ? POSITION_LABEL[p.position] : "Name only"}</span>}
+                      {(p.hint || p.position || p.slug === undefined) && <span className="block truncate text-xs text-muted-foreground">{p.hint ?? (p.position ? POSITION_LABEL[p.position] : "Name only")}</span>}
                     </span>
                     {p.number != null && <span className="tnum font-display text-sm font-bold text-accent">#{p.number}</span>}
                     {p.captaincy && p.captaincy !== "NONE" && <span className="rounded-sm bg-warning px-1 text-[0.65rem] font-extrabold text-black">{p.captaincy === "CAPTAIN" ? "C" : "V"}</span>}

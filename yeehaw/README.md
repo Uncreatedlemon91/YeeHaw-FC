@@ -94,18 +94,69 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   EA squad changes, Player of the Month and staff entries (commendation,
   warning, note). Management get a **Manage** tab: offer, change terms,
   release, withdraw an offer, link a gamertag.
-- **Events** *(planned)*. Fixtures, scrims, training and recurring series
-  announced in Discord with RSVP buttons, sign-ups by formation slot,
-  reminder DMs, and a match report linking the EA matches played in the
-  event's window.
+- **Events** *(built)*. `/fixtures` (public) lists upcoming events with
+  going / maybe counts, your own answer and recent results, or shows them on a
+  month calendar (`?view=calendar`). Staff schedule events (`/fixtures/new`):
+  match, scrim, tournament, community night, training or theory session, each
+  with a length (that window is what EA matches are linked to for the report)
+  and an optional formation. `/fixtures/[id]` is the event page: answer going /
+  maybe / can't make it (and up to three preferred positions), or, when the
+  event has a formation, **sign up by position** on the same pitch and bench
+  as the lineup (tap an open position to take it, yours to give it up; taking
+  a position *is* signing up, Maybe or Out gives it up, one player per
+  position enforced by a partial unique index; `src/lib/event-rules.ts`,
+  port of `claim_slot` / `set_signup`). Sign-ups stop when the event is over
+  or staff close them. Staff also see who under contract hasn't answered
+  (with whether it's one of their usual nights), mark **attendance** once it
+  has started (present / absent / excused; excused isn't held against
+  reliability), edit the **team sheet** on the shared board from the squad
+  and sign-ups (publishing posts it in Discord and DMs each player their
+  position once), and edit a training session's **plan** (objective, plan, a
+  brief per position, afterwards a review). The match report card lists the
+  EA matches linked to the event (`EaMatch.eventId`); phase 5 fills it.
+  **Recurring series** (`/fixtures/series`): weekdays + a wall-clock time in
+  the club timezone; occurrences are ordinary events generated four weeks
+  ahead by the hourly notify job, at the same local time across clock
+  changes (`src/lib/recurrence.ts`). Editing a series rewrites its upcoming
+  nights (a night somebody has answered is never deleted: if it no longer
+  fits it stays as a one-off), a series can be paused or deleted, and it can
+  announce each night in Discord a set number of days ahead.
+  **The announcement** is an embed with RSVP controls (buttons, or a position
+  picker plus Maybe / Can't make it for an event with a formation) posted in
+  the events channel from the Admin page; pressing a control, or answering
+  on the site, updates the same roster and rewrites the post. The `rsvp:`
+  buttons need the clicker to be a club member. Staged tier invites (the old
+  private-thread ladder) were not ported.
+- **Training** *(built)*. `/training` (members): upcoming sessions with their
+  objective, recent ones with the review, and the suggestion box (a member
+  suggests what to work on; staff and that member see it; staff reply with a
+  status and a note). A session is an event of type Training or Theory, so it
+  has everything above; the plan is edited on its event page.
+- **Availability** *(built)*. `/availability` (members): the squad night by
+  night for two weeks (a fixture's own answer overrides the usual night; being
+  away overrides both), your usual nights and your away dates. Each player
+  only ever writes their own. Shown on the hub's Attendance tab and on each
+  event for staff. On Mondays the notify job DMs contracted players who have
+  never set their usual nights.
+- **Recruitment** *(built)*. `/staff/recruitment` (staff; port of
+  `recruitment.py`): files move Prospect, On trial, Offered, Signed (or Not
+  for us). Staff move files between Prospect, On trial and Not for us; Offered
+  and Signed follow the contract, so **Offer contract** (management; the same
+  `offerContracts` as the hub) moves the file to Offered, and the player
+  accepting moves it to Signed (accepting needs no staff confirmation here).
+  Trial notes (rating 1 to 10, optionally from a match) are copied to the
+  recruitment channel, and a note from a match puts a prospect on trial. New
+  arrivals in the server (joined in 30 days, no file, contract or title) can be
+  started as a file or dismissed. Signed prospects get the settling-in
+  checklist (contract, gamertag and usual nights are read from the data;
+  invited to the EA club and welcome message are ticked, the latter by the
+  DM button). The Trialist role follows On trial and Offered.
 - **EA stats** *(planned)*. An hourly Node script polls EA into Postgres
   (club record, matches, per-player lines, the league table); stats and
   league pages read it.
 - **News** *(planned)*. Staff articles and an AI roundup every 48 hours
   (Claude Code CLI, headless, tools disabled), announced in Discord.
-- **Staff tools** *(planned)*. Training sessions
-  and suggestions, availability, the recruitment pipeline (prospects →
-  contract offer), Player of the Month, club profile.
+- **Staff tools** *(planned)*. Player of the Month and the club profile.
 
 Dropped from the old site: Discord clips, Twitch live streams, coach notes,
 article comments and likes, development goals and reviews.
@@ -115,9 +166,9 @@ article comments and likes, development goals and reviews.
 | Level | From | Can |
 |---|---|---|
 | MANAGEMENT | Management roles, Club President or Head Coach (or `ADMIN_USER_IDS`) | everything, plus seasons, contracts, offers, releases and the Admin pages |
-| STAFF | Staff roles, or Coach | the lineup, tactics, set pieces, recruitment, events, news |
-| MEMBER | Member roles (any server member until one is mapped) | Training and Availability, the fuller squad view, their own hub |
-| guest | not signed in, or not in the server | the public pages |
+| STAFF | Staff roles, or Coach | the lineup, tactics and set pieces (edit), recruitment, events and series, attendance, team sheets, training plans, news |
+| MEMBER | Member roles (any server member until one is mapped) | sign up for events, Training and Availability, read Tactics and Set pieces, the fuller squad view, their own hub |
+| guest | not signed in, or not in the server | the public pages (including Fixtures and who has signed up) |
 
 MANAGEMENT includes STAFF includes MEMBER. Every server action and route
 checks on the server (`assertPerm`); hiding a link is never the control.
@@ -125,7 +176,8 @@ The old site's `DISCORD_STAFF_ROLE_ID` is just a Management role here.
 
 ### The bot
 
-Slash commands (`/fixtures`, `/squad`) and button presses come in as signed
+Slash commands (`/fixtures`, `/squad`) and button presses (`ct:` contract
+offers, `rsvp:` event sign-ups) come in as signed
 HTTP requests to `/api/discord/interactions`, and roles, DMs and embeds go
 out over Discord's REST API. Those work on their own. Button custom ids are
 `<namespace>:<action>:<id>`; each feature adds one namespace to the route.
@@ -165,6 +217,21 @@ src/lib/lineup-rules.ts      team-sheet rules: slots, one place each, contracted
 src/lib/lineups.ts           lineup editor: draft / publish
 src/lib/squad.ts             the live squad and the published XI
 src/lib/tactics.ts           tactics board persistence, tacticsRoles()
+src/lib/recurrence.ts        recurring series: occurrences, generation range, editing plan (pure, DST-safe)
+src/lib/event-rules.ts       event / series forms, sign-up rules, reminder targeting (pure)
+src/lib/event-messages.ts    the RSVP announcement, team sheet, reminder DM (pure builders)
+src/lib/events.ts            events: create / edit / delete, sign-ups, attendance, announce, team sheet
+src/lib/event-series.ts      series: create / edit / pause / delete, generate ahead, announce due
+src/lib/event-interactions.ts   the "rsvp:" buttons and position picker
+src/lib/event-page.ts        what the event page shows, with each viewer's clearance applied
+src/lib/notify-job.ts        the hourly notify job's steps
+src/lib/availability-rules.ts   day state, away dates, the grid, ISO week (pure)
+src/lib/availability.ts      usual nights, away, the grid and who is away
+src/lib/training-rules.ts    session plan / review / suggestion rules (pure)
+src/lib/training.ts          sessions, plans, reviews, suggestions
+src/lib/recruitment-rules.ts stage moves, forms, onboarding, new arrivals, notes (pure)
+src/lib/recruitment-stages.ts   Offered / Signed following the contract (called by contracts.ts)
+src/lib/recruitment.ts       the pipeline: files, notes, arrivals, offer, settling in
 src/lib/set-piece-rules.ts   set-piece form rules (pure)
 src/components/pitch.tsx     pitch, bench and player token (drawing only)
 src/components/board-editor.tsx  the editable board shared by lineup and tactics
@@ -176,6 +243,7 @@ src/app/api/discord/interactions/route.ts   slash commands, buttons, modals
 src/app/api/internal/*       endpoints the gateway process calls
 scripts/gateway.mjs          gateway connection: bot presence + member events
 scripts/season-job.ts        the daily season job (npm run season:job)
+scripts/notify-job.ts        the hourly notify job (npm run notify:job)
 src/app/*                    pages; each folder's actions.ts holds its server actions
 prisma/schema.prisma         data model (every feature)
 prisma/migrations/*          hand-written; the init one carries the partial unique indexes
@@ -186,7 +254,7 @@ deploy/                      systemd units, update and backup scripts
 
 `Player` is the one file per person, keyed by Discord ID. Around it:
 `Season` → `Contract` (+ `ContractObjective`, `RosterMove` history);
-`Event` (+ `EventSeries`, `EventSignup`, `EventLineup`, `EventTierInvite`,
+`Event` (+ `EventSeries`, `EventSignup`, `EventLineup`, `EventTierInvite` (unused so far),
 `MatchRating`, `MotmVote`, `Notification`); `Lineup` / `LineupSlot`,
 `TacticsBoard` / `TacticsSlot`, `SetPiece`, `TrainingSuggestion`;
 `AvailabilityPattern` / `AvailabilityAway`; `ServiceEntry`, `Milestone`,
@@ -222,7 +290,7 @@ as a redirect on the Discord application and set
 
 `npm run typecheck`, `npm run test` and `npm run build` are the checks. The
 tests are fast and need no database (permissions, role config, formations,
-signature verification, the migration's indexes, contract and season rules, role sync, the service record's visibility, lineup and set-piece rules); logic that needs the
+signature verification, the migration's indexes, contract and season rules, role sync, the service record's visibility, lineup and set-piece rules, recurring series across clock changes, sign-up rules, reminder targeting, availability, training and recruitment stage rules); logic that needs the
 database takes the Prisma client as an argument so it can be tested with a
 stub.
 
@@ -273,8 +341,8 @@ sudo bash /opt/yeehaw/yeehaw/deploy/update.sh
 
 `update.sh` installs dependencies, runs migrations, builds (with
 `NODE_OPTIONS=--max-old-space-size=1536`, using swap), installs the
-`yeehaw`, `yeehaw-gateway`, `yeehaw-backup` and `yeehaw-season-job` units
-(the last two on timers), and (re)starts the site
+`yeehaw`, `yeehaw-gateway`, `yeehaw-backup`, `yeehaw-season-job` and
+`yeehaw-notify` units (the last three on timers), and (re)starts the site
 on `127.0.0.1:8001`, the port Caddy already proxies yeehaw-fc.club to. The
 old `yeehaw-fc.service` (gunicorn on the same port) must be stopped first;
 the cutover steps, the data migration and the removal of the old app are
@@ -299,6 +367,20 @@ site and the bot's Manage Roles permission. Run it now with
 `sudo systemctl start yeehaw-season-job`, read the result with
 `journalctl -u yeehaw-season-job`.
 
+## The hourly notify job
+
+`yeehaw-notify.timer` runs `scripts/notify-job.ts` every hour
+(`Persistent=true`). It needs the same `.env` as the site and the bot token.
+Four steps, each failing on its own: keep every recurring series generated
+four weeks ahead; post the RSVP announcement for series that announce N days
+ahead; DM contracted players who haven't answered an event starting within 24
+hours (not those away that day); and, on Mondays from 10:00 club time, DM
+contracted players who never set their usual nights. Every DM is recorded in
+`Notification` (once per event and player, or per player per ISO week), so
+running it twice, or every hour, sends each once, and a closed inbox isn't
+retried. Run it now with `sudo systemctl start yeehaw-notify`, read the result
+with `journalctl -u yeehaw-notify`.
+
 ## Troubleshooting
 
 - **Sign-in fails**: the redirect registered on Discord must be exactly
@@ -317,4 +399,8 @@ site and the bot's Manage Roles permission. Run it now with
   `journalctl -u yeehaw-gateway`.
 - **Buttons say "This interaction failed"**: the interactions endpoint URL
   isn't set, or `DISCORD_PUBLIC_KEY` is wrong (every request gets a 401).
+- **"No events channel is set"** when announcing: pick the events channel on
+  Admin → Discord roles & channels.
+- **Reminders or announcements never arrive**: `journalctl -u yeehaw-notify`
+  (is the timer enabled? `systemctl list-timers yeehaw-notify`).
 - **Build killed partway**: out of memory. Add swap.

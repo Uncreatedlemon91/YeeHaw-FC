@@ -17,6 +17,8 @@ export type Interaction = {
   data?: {
     name?: string;
     custom_id?: string;
+    /** A select menu's chosen option values. */
+    values?: string[];
     components?: { components: { custom_id: string; value: string }[] }[];
   };
   member?: { roles: string[]; nick?: string | null; user: { id: string; username: string; global_name?: string | null; avatar?: string | null } };

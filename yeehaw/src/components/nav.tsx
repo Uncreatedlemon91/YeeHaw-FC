@@ -29,7 +29,11 @@ export async function Nav({ user }: { user: SessionUser | null }) {
       Next · {fmt(next.startsAt, "EEE HH:mm")}
     </Link>
   );
-  const items: NavItem[] = NAV.filter((i) => !i.perm || hasPerm(user?.perms, i.perm));
+  const items: NavItem[] = NAV.filter((i) => !i.perm || hasPerm(user?.perms, i.perm))
+    .map((i) => (i.children ? { ...i, children: i.children.filter((c) => !c.perm || hasPerm(user?.perms, c.perm)) } : i))
+    // A menu with one entry left is just that link.
+    .map((i) => (i.children?.length === 1 ? { href: i.children[0].href, label: i.children[0].label } : i))
+    .filter((i) => !i.children || i.children.length > 0);
 
   const desktop = items.map((i) =>
     i.children ? (

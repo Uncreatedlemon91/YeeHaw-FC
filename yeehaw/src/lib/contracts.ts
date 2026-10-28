@@ -20,6 +20,7 @@ import {
 import { getChannelConfig } from "./channel-config";
 import { dm, dmMessage, editMessage, explain, sendMessage } from "./discord";
 import { prisma } from "./prisma";
+import { prospectAnswered, prospectOffered } from "./recruitment-stages";
 import { syncQuietly } from "./role-sync";
 
 // Contract lifecycle: offer, accept / decline, mid-season changes, release,
@@ -188,6 +189,8 @@ export async function offerContracts(seasonId: string, rows: OfferRow[], actor: 
 
   const outcomes: OfferOutcome[] = [];
   for (const [i, id] of ids.entries()) outcomes.push(await deliverOffer(id, actor, !!rows[i].previousContractId));
+  // A recruitment file for the player follows the offer (Prospect / On trial -> Offered).
+  await prospectOffered(rows.map((r) => r.playerId)).catch((e) => console.error("recruitment file not updated", e));
   await syncQuietly(...rows.map((r) => r.playerId));
   const warnings = outcomes.flatMap((o) => (o.warning ? [`${o.name}: ${o.warning}`] : []));
   return { ok: true, warnings, outcomes };
@@ -236,6 +239,8 @@ export async function respondToContract(contractId: string, actorDiscordId: stri
   const done = await prisma.contract.updateMany({ where: { id: c.id, state: "OFFERED" }, data: { state, respondedAt: new Date() } });
   if (done.count === 0) return { ok: false, error: "This offer has already been answered." };
   await recordMove({ kind: decision === "accept" ? "ACCEPT" : "DECLINE", contract: c, displayName: c.player.displayName, actor: { id: c.playerId, name: c.player.displayName } });
+  // Accepting signs the recruitment file (accepting needs no staff confirmation here).
+  await prospectAnswered(c.playerId, decision).catch((e) => console.error("recruitment file not updated", e));
   return { ok: true, contract: { ...c, state } };
 }
 
