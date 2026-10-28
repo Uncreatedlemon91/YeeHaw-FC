@@ -562,7 +562,7 @@ export function buildPlan(raw: RawData, opts: ImportOptions, existing: Existing 
   if (anyRole) addSetting("roles", roles);
 
   const channels = {
-    events: idOnly(env.EVENTS_ANNOUNCE_CHANNEL_ID ?? env.MATCHDAY_CHANNEL_ID ?? ""),
+    events: idOnly(env.EVENTS_ANNOUNCE_CHANNEL_ID || env.MATCHDAY_CHANNEL_ID || env.EVENT_THREAD_CHANNEL_ID || ""),
     news: idOnly(env.NEWS_ANNOUNCE_CHANNEL_ID ?? ""),
     roster: idOnly(env.ROSTER_ANNOUNCE_CHANNEL_ID || env.NEWS_ANNOUNCE_CHANNEL_ID || ""),
     recruitment: idOnly(env.RECRUITMENT_CHANNEL_ID ?? ""),
