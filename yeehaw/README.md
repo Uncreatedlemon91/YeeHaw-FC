@@ -329,6 +329,9 @@ scripts/notify-job.ts        the hourly notify job (npm run notify:job)
 scripts/ea-poll.ts           the hourly EA poll (npm run ea:poll)
 scripts/ea-season.ts         switch to a new EA club id (npm run ea:season)
 scripts/article-job.ts       the AI roundup (npm run article:job)
+scripts/ea_fetch.py          one EA request through curl_cffi (Chrome TLS fingerprint)
+scripts/migrate-from-proclubs.ts  one-off import of the old site's SQLite data (npm run migrate:proclubs)
+src/lib/proclubs-import.ts   the old-to-new mapping behind it (pure)
 src/app/*                    pages; each folder's actions.ts holds its server actions
 prisma/schema.prisma         data model (every feature)
 prisma/migrations/*          hand-written; the init one carries the partial unique indexes
@@ -551,6 +554,59 @@ The token lasts about a year; when it expires `journalctl -u yeehaw-article`
 shows the failure and `claude setup-token` fixes it. The CLI is a Node program and
 needs a few hundred MB: the service is capped at 700 MB, which needs the swap the
 build already requires.
+
+## Migrating from the old site
+
+`scripts/migrate-from-proclubs.ts` (`npm run migrate:proclubs`) carries the old
+Python site's `site.db` and `history.db` into an **empty** Postgres database, once,
+at cutover (`deploy/CUTOVER.md` has the full sequence). It reads the SQLite files
+read-only with Node's built-in `node:sqlite` (Node 22.5+, no native build; Node
+prints an "experimental" notice) and writes everything in a single transaction, so
+a failure leaves nothing behind. `--dry-run` reads and maps everything and prints
+counts without writing (it works without a database too); a database that already
+has players, seasons, events, articles or EA matches is refused unless `--force`,
+which reuses existing players by Discord ID and keeps settings already saved.
+
+```
+npm run migrate:proclubs -- --site /opt/valorlink/proclubs/data/site.db \
+    --history /opt/valorlink/proclubs/data/history.db \
+    --old-env /opt/valorlink/proclubs/.env --dry-run
+```
+
+What becomes what (the mapping is `src/lib/proclubs-import.ts`, tested without a
+database in `proclubs-import.test.ts`):
+
+- **Players** one per Discord ID seen anywhere; gamertags from the link table
+  (a gamertag two accounts share stays on the first and is reported); slugs from
+  gamertag or name; avatar URLs become Discord avatar hashes; club roles map to
+  President / Head Coach / Coach.
+- **Contracts**: every live contract (not released) becomes an ACTIVE contract in
+  **Season 2** (starts 2026-10-20, ends 12 weeks later: a placeholder, edit it on
+  Admin), with **no shirt number** (staff assign them). Expired or released
+  contracts are not carried; **roster moves** come over as history (an offer
+  that was accepted and confirmed becomes OFFER, ACCEPT and SIGNING rows).
+- **Service entries, milestones** (all recorded as already announced, plus the
+  `milestones/initialised` marker so the first poll announces nothing),
+  **Player of the Month** (one winner row per Discord ID in a tie, announced).
+- **Articles**: format HTML; the AI roundup byline (`WEEKLY_ARTICLE_AUTHOR`)
+  becomes source AI; a slug `new` is renamed `new-article`; covers (data URIs) are
+  written to `UPLOAD_DIR/articles/<32 hex>.webp` with a `-thumb` file.
+- **Events** with their sign-ups (slot keys kept), team sheets, ratings, Man of
+  the Match votes, review and vote fields, training plans, tier invites; sent
+  reminders and votes are remapped so nothing is re-sent. Discord message ids are
+  kept, so the new site edits the old announcements (their buttons start working
+  again once edited).
+- **Tactics** (names are matched to players by gamertag, otherwise kept as text),
+  set pieces, training suggestions, availability, recruitment prospects and notes.
+- **Settings**: the club profile, the role mapping (`discord_role:*` rows, and the
+  old `.env` role ids when `--old-env` is given; `DISCORD_STAFF_ROLE_ID` becomes the
+  Management role), channels from the old `.env` (news, events, roster,
+  recruitment), the recruitment dismissals.
+- **EA history**: snapshots, matches (`W`/`L`/`D`, epoch seconds to dates), player
+  lines (lowercase positions, linked to players by gamertag), league roster,
+  member totals, squad moves.
+- **Left behind**: clips, streamers, coach notes, comments, likes, development
+  goals and reviews, event images. The old files stay on disk as the record.
 
 ## Troubleshooting
 

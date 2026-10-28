@@ -12,6 +12,7 @@
     "season:job": "tsx --env-file=.env scripts/season-job.ts",
     "notify:job": "tsx --env-file=.env scripts/notify-job.ts",
     "ea:poll": "tsx --env-file=.env scripts/ea-poll.ts",
+    "migrate:proclubs": "tsx --env-file=.env scripts/migrate-from-proclubs.ts",
     "ea:season": "tsx --env-file=.env scripts/ea-season.ts",
     "article:job": "tsx --env-file=.env scripts/article-job.ts",
     "discord:register": "tsx --env-file=.env scripts/register-commands.ts",
