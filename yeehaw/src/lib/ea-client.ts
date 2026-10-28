@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import path from "node:path";
 import { promisify } from "node:util";
 import { divisionLabel } from "./ea-rules";
 
@@ -8,11 +9,11 @@ import { divisionLabel } from "./ea-rules";
 //
 // EA's edge (Akamai Bot Manager) fingerprints the TLS handshake and 403s
 // plain scripted traffic that a browser gets through. The Python client used
-// curl_cffi, which impersonates Chrome's handshake. Node's own fetch can't, so
-// there are two ways in:
-//   default       fetch() with a browser's headers (may be refused with 403)
-//   EA_CURL_BIN   a curl-impersonate binary (e.g. curl_chrome124) used instead,
-//                 which carries Chrome's handshake. Set it if the poll logs 403.
+// curl_cffi, which impersonates Chrome's handshake; Node's own fetch can't. So:
+//   EA_FETCHER=curl_cffi (default)  each request runs scripts/ea_fetch.py with the
+//                                   python in EA_PYTHON (the venv update.sh builds)
+//   EA_FETCHER=fetch                fetch() with a browser's headers; EA will 403 it,
+//                                   only useful from a network EA does not filter
 // Calls are spaced out and retried politely on 429 / 5xx.
 
 const execFileP = promisify(execFile);
@@ -45,16 +46,23 @@ export class EaError extends Error {
   }
 }
 
+type Raw = { status: number; text: string; retryAfter?: number };
+type Exec = (file: string, args: string[], opts: { timeout: number; maxBuffer: number }) => Promise<{ stdout: string; stderr: string }>;
+
+// Swapped by the tests, which stub the subprocess and the waits.
+export const deps: { exec: Exec; sleep: (ms: number) => Promise<void>; fetcher: () => "curl_cffi" | "fetch" } = {
+  exec: (file, args, opts) => execFileP(file, args, opts),
+  sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+  fetcher: () => (process.env.EA_FETCHER === "fetch" ? "fetch" : "curl_cffi"),
+};
+
 let last = 0;
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function pace() {
   const wait = last + MIN_GAP_MS - Date.now();
-  if (wait > 0) await sleep(wait);
+  if (wait > 0) await deps.sleep(wait);
   last = Date.now();
 }
-
-type Raw = { status: number; text: string; retryAfter?: number };
 
 async function viaFetch(url: string): Promise<Raw> {
   const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS), cache: "no-store" });
@@ -62,42 +70,62 @@ async function viaFetch(url: string): Promise<Raw> {
   return { status: res.status, text: await res.text(), retryAfter: Number.isFinite(ra) && ra > 0 ? ra : undefined };
 }
 
-async function viaCurl(bin: string, url: string): Promise<Raw> {
-  const args = ["-sS", "--max-time", String(TIMEOUT_MS / 1000), "-w", "\n%{http_code}"];
-  for (const [k, v] of Object.entries(HEADERS)) if (k !== "User-Agent") args.push("-H", `${k}: ${v}`);
-  args.push(url);
-  const { stdout } = await execFileP(bin, args, { maxBuffer: 16 * 1024 * 1024 });
-  const i = stdout.lastIndexOf("\n");
-  return { status: Number(stdout.slice(i + 1)) || 0, text: stdout.slice(0, Math.max(i, 0)) };
+/** The python that has curl_cffi: EA_PYTHON, else the venv update.sh makes in production. */
+export function eaPython() {
+  return process.env.EA_PYTHON || (process.env.NODE_ENV === "production" ? "/opt/yeehaw/venv/bin/python" : "python3");
+}
+
+/** scripts/ea_fetch.py's exit codes become a Raw (see the script's docstring). */
+async function viaCurlCffi(base: string, params: Record<string, string>): Promise<Raw> {
+  const script = path.join(process.cwd(), "scripts", "ea_fetch.py");
+  const args = [script, base, ...Object.entries(params).map(([k, v]) => `${k}=${v}`)];
+  try {
+    const { stdout } = await deps.exec(eaPython(), args, { timeout: TIMEOUT_MS + 5_000, maxBuffer: 16 * 1024 * 1024 });
+    return { status: 200, text: stdout };
+  } catch (e) {
+    const err = e as { code?: number | string; stderr?: string; message?: string };
+    const stderr = (err.stderr ?? "").trim();
+    if (err.code === 10) {
+      const m = /status=(\d+) retry_after=(\S+)/.exec(stderr);
+      const ra = Number(m?.[2]);
+      return { status: Number(m?.[1]) || 0, text: "", retryAfter: Number.isFinite(ra) && ra > 0 ? ra : undefined };
+    }
+    if (err.code === 12) throw new EaError(`${stderr || "curl_cffi is not installed"} (EA_PYTHON=${eaPython()})`, 500);
+    if (err.code === 11) throw new Error(stderr || "request failed");
+    if (err.code === "ENOENT") throw new EaError(`cannot run ${eaPython()}: set EA_PYTHON to the venv's python (update.sh creates /opt/yeehaw/venv)`, 500);
+    throw new Error(stderr || err.message || "ea_fetch.py failed");
+  }
 }
 
 /** EA read. Null for the empty 200 EA sends for "no data" (a club with no matches, a bad id). */
-export async function eaGet(path: string, params: Record<string, string | number>): Promise<unknown> {
+export async function eaGet(apiPath: string, params: Record<string, string | number>): Promise<unknown> {
   const platform = String(params.platform ?? "");
   if (!platform) throw new EaError("platform is required", 400);
   if (!(platform in PLATFORMS)) throw new EaError(`unknown platform '${platform}'`, 400);
-  const url = BASE_URL + path + "?" + new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString();
-  const curl = process.env.EA_CURL_BIN;
+  const strParams = Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]));
+  const base = BASE_URL + apiPath;
+  const fetcher = deps.fetcher();
 
   let failure = new EaError("could not reach EA's API");
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     await pace();
     let raw: Raw;
     try {
-      raw = curl ? await viaCurl(curl, url) : await viaFetch(url);
+      raw = fetcher === "fetch" ? await viaFetch(base + "?" + new URLSearchParams(strParams).toString()) : await viaCurlCffi(base, strParams);
     } catch (e) {
+      if (e instanceof EaError) throw e;
       failure = new EaError(`could not reach EA's API: ${e instanceof Error ? e.message : e}`);
-      if (attempt < MAX_ATTEMPTS) await sleep(2000 * attempt);
+      if (attempt < MAX_ATTEMPTS) await deps.sleep(2000 * attempt);
       continue;
     }
     if (raw.status === 404) throw new EaError("not found: check the club ID / name and platform", 404);
     if (raw.status === 429 || raw.status >= 500) {
       failure = new EaError(`EA API returned HTTP ${raw.status}`, raw.status);
-      if (attempt < MAX_ATTEMPTS) await sleep(Math.min((raw.retryAfter ?? 2 * attempt) * 1000, 30_000));
+      if (attempt < MAX_ATTEMPTS) await deps.sleep(Math.min((raw.retryAfter ?? 2 * attempt) * 1000, 30_000));
       continue;
     }
     if (raw.status < 200 || raw.status >= 300) {
-      const hint = raw.status === 403 && !curl ? " (EA's edge blocks plain requests; set EA_CURL_BIN to a curl-impersonate binary)" : "";
+      const hint = raw.status === 403 && fetcher === "fetch" ? " (EA's edge blocks plain requests; use EA_FETCHER=curl_cffi)" : "";
       throw new EaError(`EA API returned HTTP ${raw.status}${hint}`, raw.status);
     }
     if (!raw.text.trim()) return null;

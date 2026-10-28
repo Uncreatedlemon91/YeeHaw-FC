@@ -20,6 +20,12 @@ install -d -o yeehaw -g yeehaw -m 750 "${UPLOADS:-/opt/yeehaw/uploads}"
 
 echo "== Installing dependencies"
 as_app npm ci --no-audit --no-fund
+echo "== Python venv for the EA fetcher (curl_cffi)"
+# EA blocks Node's TLS fingerprint; scripts/ea_fetch.py impersonates Chrome via
+# curl_cffi (README, "EA and the TLS fingerprint"). Needs the python3-venv package.
+VENV=/opt/yeehaw/venv
+[[ -x "$VENV/bin/python" ]] || { install -d -o yeehaw -g yeehaw "$VENV"; as_app python3 -m venv "$VENV"; }
+as_app "$VENV/bin/pip" install --quiet --disable-pip-version-check -r scripts/requirements.txt
 echo "== Applying database migrations"
 as_app npx prisma migrate deploy
 echo "== Building (takes a few minutes on a small droplet)"

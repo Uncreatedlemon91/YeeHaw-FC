@@ -300,7 +300,7 @@ src/components/board-editor.tsx  the editable board shared by lineup and tactics
 src/lib/service-record.ts    milestones, timeline, who sees what (pure)
 src/lib/player-stats.ts      totals, attendance reliability, objective progress (pure)
 src/lib/player-hub.ts        loads a hub with clearance applied
-src/lib/ea-client.ts         EA's unofficial API: headers, spacing, retries, optional curl-impersonate
+src/lib/ea-client.ts         EA's unofficial API: spacing, retries, runs scripts/ea_fetch.py (curl_cffi)
 src/lib/ea-rules.ts          parsing EA's matches / member totals, squad diff, league roster, match-to-event linking (pure)
 src/lib/ea-poll.ts           the poll's writers: snapshots, matches, squad, totals, league roster, relinking
 src/lib/ea-job.ts            the hourly EA job's steps (poll, link, milestones, Player of the Month)
@@ -481,14 +481,20 @@ API and not a failed run; a step that crashes exits non-zero. Run it now with
 `sudo systemctl start yeehaw-ea-poll`, read the result with
 `journalctl -u yeehaw-ea-poll`.
 
-EA's edge (Akamai Bot Manager) fingerprints the TLS handshake and answers plain
-scripted requests with a 403 that a browser doesn't get. The old site used
-`curl_cffi` to look like Chrome; Node's `fetch` can't. The poll sends a browser's
-headers, spaces its requests 400 ms apart and retries 429 / 5xx up to three times
-(honouring `Retry-After`), but **if the journal shows `HTTP 403`**, install a
-[curl-impersonate](https://github.com/lexiforest/curl-impersonate) build and set
-`EA_CURL_BIN` in `.env` to its binary (for example `/usr/local/bin/curl_chrome124`);
-the poll then uses it for every request.
+**EA and the TLS fingerprint.** EA's edge (Akamai Bot Manager) fingerprints the
+TLS handshake and answers plain scripted requests, Node's `fetch` included, with
+a 403 that a browser doesn't get. The old site used `curl_cffi` to look like
+Chrome, so the poll does the same: each EA request runs `scripts/ea_fetch.py`
+(a few lines: GET with `impersonate="chrome124"`, body on stdout, exit code 10 for
+an HTTP error with `status=` on stderr, 11 for a network failure, 12 if
+`curl_cffi` is missing). `deploy/update.sh` builds the venv `/opt/yeehaw/venv`
+and installs `scripts/requirements.txt` (`curl_cffi`, pinned to the version the
+old site ran) into it; `EA_PYTHON` points at that python (the default in
+production) and `EA_FETCHER=fetch` switches to Node's `fetch`, which only works
+from a network EA doesn't filter. Requests are spaced 400 ms apart and 429 / 5xx
+are retried up to three times (honouring `Retry-After`). If the journal shows
+`curl_cffi is not installed` or `cannot run`, re-run `update.sh` (it needs the
+`python3-venv` package: `apt install python3-venv`).
 
 **New game title, new club id.** EA issues a new club id every title.
 As the `yeehaw` user in `/opt/yeehaw/yeehaw`:
