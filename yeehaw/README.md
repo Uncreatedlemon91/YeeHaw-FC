@@ -230,7 +230,7 @@ article comments and likes, development goals and reviews.
 
 | Level | From | Can |
 |---|---|---|
-| MANAGEMENT | Management roles, Club President or Head Coach (or `ADMIN_USER_IDS`) | everything, plus seasons, contracts, offers, releases and the Admin pages |
+| MANAGEMENT | Management roles, Club President or Head Coach, the fixed admin roles in `config/club.ts` (`ADMIN_ROLE_IDS`), or `ADMIN_USER_IDS` | everything, plus seasons, contracts, offers, releases and the Admin pages |
 | STAFF | Staff roles, or Coach | the lineup, tactics and set pieces (edit), recruitment, events and series, attendance, team sheets, training plans, news |
 | MEMBER | Member roles (any server member until one is mapped) | sign up for events, Training and Availability, read Tactics and Set pieces, the fuller squad view, their own hub |
 | guest | not signed in, or not in the server | the public pages (including Fixtures and who has signed up) |

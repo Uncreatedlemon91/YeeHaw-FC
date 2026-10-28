@@ -16,6 +16,12 @@ describe("permsFromRoles", () => {
     expect(permsFromRoles(["s1"], "1", cfg, none)).toEqual(["STAFF", "MEMBER"]);
     expect(permsFromRoles(["g1"], "1", cfg, none)).toEqual(["MANAGEMENT", "STAFF", "MEMBER"]);
   });
+  it("makes the fixed admin roles Management whatever the mapping says", () => {
+    const empty: PermConfig = { ...cfg, perms: { MEMBER: [], STAFF: [], MANAGEMENT: [] } };
+    for (const id of ["1534767373989711882", "1532475941824102603", "1532469171097567333"])
+      expect(permsFromRoles([id], "1", empty, none)).toEqual(["MANAGEMENT", "STAFF", "MEMBER"]);
+    expect(permsFromRoles(["1534767373989711882"], "1", cfg, { ...none, inGuild: false })).toEqual([]);
+  });
   it("takes the highest level any role grants", () => {
     expect(permsFromRoles(["m1", "g1", "s1"], "1", cfg, none)).toContain("MANAGEMENT");
   });

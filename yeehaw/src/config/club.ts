@@ -18,6 +18,10 @@ export const CLUB = {
   discordInvite: "https://discord.gg/J4d7D5kDX8",
 };
 
+// Discord roles that always make their holders Management (admins), on top
+// of whatever the Admin page maps, so clearing the mapping can't lock them out.
+export const ADMIN_ROLE_IDS: readonly string[] = ["1534767373989711882", "1532475941824102603", "1532469171097567333"];
+
 export const SQUAD_STATUSES: readonly SquadStatus[] = ["STARTER", "ROTATION", "SUBSTITUTE"];
 
 // The short form is for chips; the long form is how the club talks about it.

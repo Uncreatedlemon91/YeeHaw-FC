@@ -1,4 +1,5 @@
 import type { ClubRole } from "@prisma/client";
+import { ADMIN_ROLE_IDS } from "@/config/club";
 import { env } from "./env";
 
 // Who can do what, from proclubs/roles.py. Four access levels, lowest first:
@@ -60,7 +61,8 @@ export function permsFromRoles(
   const has = (p: Perm) => cfg.perms[p].some((id) => roleIds.includes(id));
   const title = clubRoleFromRoles(roleIds, cfg);
   const titlePerm = title ? TITLE_PERM[title] : null;
-  if (has("MANAGEMENT") || titlePerm === "MANAGEMENT") return ["MANAGEMENT", "STAFF", "MEMBER"];
+  const fixedAdmin = ADMIN_ROLE_IDS.some((id) => roleIds.includes(id));
+  if (fixedAdmin || has("MANAGEMENT") || titlePerm === "MANAGEMENT") return ["MANAGEMENT", "STAFF", "MEMBER"];
   if (has("STAFF") || titlePerm === "STAFF") return ["STAFF", "MEMBER"];
   if (has("MEMBER") || cfg.perms.MEMBER.length === 0) return ["MEMBER"];
   return [];
