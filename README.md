@@ -1,77 +1,63 @@
-# YeeHaw FC
+# YeeHaw FC and Ravenfall HQ
 
-The club's website and Discord integration for EA Sports FC 27 Pro Clubs.
-
-Everything lives in **[`proclubs/`](proclubs/)** — a FastAPI + Jinja2 +
-SQLAlchemy app serving [yeehaw-fc.club](https://yeehaw-fc.club): news,
-fixtures and sign-ups, squad moves, a clips page, a Twitch showcase, a
-tactics board, and an EA Pro Clubs stats dashboard locked to our own club.
-
-There is no separate bot process. Every Discord feature runs from the web
-app plus a handful of systemd timers, over Discord's REST API and a signed
-interactions webhook — no gateway connection, nothing to keep online.
+Two unrelated sites that share one DigitalOcean droplet, one Caddy reverse
+proxy, and the same Next.js, Prisma and PostgreSQL stack.
 
 ```
-proclubs/      the application  — see proclubs/README.md
-deploy/        systemd units, Caddy config, install/backup/restore
-ravenfall/     a second, unrelated site on the same droplet: Ravenfall HQ,
-               a milsim unit portal (ravenfallpmc.com) — see ravenfall/README.md
-design-fc27/   the earlier broadcast design canvas (superseded by the
-               management UI described in proclubs/README.md)
+yeehaw/        YeeHaw FC — the club site and Discord companion for an
+               EA FC Pro Clubs side (yeehaw-fc.club) — see yeehaw/README.md
+ravenfall/     Ravenfall HQ — a milsim unit portal (ravenfallpmc.com)
+               — see ravenfall/README.md
+deploy/        the Caddyfile that serves both domains
 ```
 
-## What it does
+Each app is self-contained: its own `package.json`, Prisma schema and
+migrations, `.env`, systemd units (`<app>/deploy/`), OS user, database and
+checkout on the droplet. They share only the machine, Caddy and the swapfile.
 
-- **Members only** — a public splash page promotes the club; everything
-  else needs signing in with Discord as a member of the club's server.
-- **Player files** — one record per person: profile, positions, match
-  stats, contract, attendance and squad-move history, plus coach notes
-  only staff see. Every member sees everyone's stats.
-- **Club roles** — Club President and Head Coach run contracts and the
-  squad; Coaches run matchday and coach notes. Assigned on the site.
-- **News** — rich-text articles with cover images, comments and likes,
-  announced to Discord on publish; reactions there count toward the
-  article's like total.
-- **Events** — fixtures created on the site, posted to Discord as a staged
-  private thread that widens its audience as kick-off approaches. Players
-  pick a position from the site or from the Discord post; both stay in
-  step. Times render in each viewer's own timezone.
-- **Squad moves** — pick a member out of the Discord server, offer them a
-  position or announce a departure. An offer carries a contract length in
-  weeks and a squad status (Starter / Rotation / Substitute), with Accept /
-  Decline buttons only that player can press; accepting adds the squad
-  role, and staff then confirm the signing to publish the announcement and
-  start the contract. Expired contracts are flagged for staff to renew
-  (the player accepts again) or release.
-- **Stats** — the club's EA figures, with a locally-accumulated history
-  (EA only exposes a rolling window, so the trend data has to be collected
-  over time).
-- **Clips**, **Live** (Twitch) and a drag-and-drop **tactics board**.
+| | YeeHaw FC | Ravenfall HQ |
+|---|---|---|
+| Domain | yeehaw-fc.club | ravenfallpmc.com |
+| Port | 8001 | 8002 |
+| Checkout | `/opt/yeehaw` | `/opt/ravenfall` |
+| OS user, database | `yeehaw` | `ravenfall` |
+| Deploy | `sudo bash /opt/yeehaw/yeehaw/deploy/update.sh` | `sudo bash /opt/ravenfall/ravenfall/deploy/update.sh` |
 
-## Running it
+## YeeHaw FC
 
-Local development and every setting are documented in
-**[`proclubs/README.md`](proclubs/README.md)**; production deployment in
-**[`deploy/README.md`](deploy/README.md)**.
+Next.js 15, Tailwind v4, Prisma, NextAuth with Discord. Seasons and
+contracts, the squad and its first-choice XI, player hubs with service
+records, events with RSVPs through Discord, EA stats polled hourly, news with
+an AI-written roundup, recruitment, tactics and set pieces, all managed from an
+Admin page that maps Discord roles and channels. Setup, permissions, the code
+map and operations: **[`yeehaw/README.md`](yeehaw/README.md)**. Moving the live
+domain from the old Python site: **[`yeehaw/deploy/CUTOVER.md`](yeehaw/deploy/CUTOVER.md)**.
+
+## Ravenfall HQ
+
+Operations portal and Discord companion for a milsim community. See **[`ravenfall/README.md`](ravenfall/README.md)**.
+
+## Working on either
 
 ```bash
-cd proclubs
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-cp .env.example .env        # fill it in
-.venv/bin/python3 -m uvicorn app:app --reload
+cd yeehaw            # or ravenfall
+npm install
+cp .env.example .env # fill it in; needs a PostgreSQL database
+npx prisma migrate deploy
+npm run dev
+npm run typecheck && npm run test && npm run build
 ```
 
-Tests:
+Never run `prisma migrate dev` in `yeehaw/`: its migrations carry raw SQL
+(partial unique indexes) that `migrate dev` would drop. See its README.
+
+## Caddy
+
+`deploy/Caddyfile` replaces `/etc/caddy/Caddyfile` wholesale, so it carries
+every site the droplet serves:
 
 ```bash
-cd proclubs && python3 -m pytest tests/ -q
+cp /opt/yeehaw/deploy/Caddyfile /etc/caddy/Caddyfile && systemctl reload caddy
 ```
-
-## A note on names
-
-The deployment still lives at `/opt/valorlink` and runs as a `valorlink`
-system user. That is the leftover of a different project this repo used to
-hold, kept deliberately: renaming a live path and uid buys nothing and
-risks an outage. The code, the units and the domain are all YeeHaw FC.
 
 Unofficial fan-run project. Not affiliated with EA.

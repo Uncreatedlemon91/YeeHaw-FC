@@ -1,5 +1,5 @@
-# Reverse proxy for every site on the droplet: YeeHaw FC (port 8001) and
-# Ravenfall HQ (port 8002, see ravenfall/README.md). Caddy fetches and renews
+# Reverse proxy for every site on the droplet: YeeHaw FC (port 8001, see
+# yeehaw/README.md) and Ravenfall HQ (port 8002, see ravenfall/README.md). Caddy fetches and renews
 # a free Let's Encrypt certificate for each domain automatically, then
 # proxies HTTPS traffic to the sites, which listen only on localhost.
 #
@@ -15,7 +15,7 @@ yeehaw-fc.club {
     reverse_proxy 127.0.0.1:8001
 }
 
-# www -> apex. The apex is the canonical host: SITE_BASE_URL and the Discord
+# www -> apex. The apex is the canonical host: NEXTAUTH_URL and the Discord
 # OAuth redirect URI both name it, and Discord rejects a callback whose host
 # doesn't match the registered redirect exactly -- so www must never serve
 # the site itself, only redirect. It still needs its own A record for Caddy

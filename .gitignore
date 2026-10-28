@@ -5,5 +5,3 @@ __pycache__/
 .venv/
 venv/
 
-# Generated design-canvas bundle (rebuilt from design-fc27/*.dc.html)
-design-fc27/yeehaw-fc-broadcast-redesign.html
