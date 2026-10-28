@@ -2,6 +2,7 @@ import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth";
 import DiscordProvider from "next-auth/providers/discord";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { getMember, getOwnMember, type GuildMember } from "./discord";
 import { env } from "./env";
 import { displayNameOf, importMember } from "./member-sync";
@@ -12,6 +13,24 @@ import { getRoleConfig } from "./role-config";
 // Discord roles are re-read this often, so a promotion or removal on Discord
 // reaches the site without the person having to sign out and back in.
 const ROLE_REFRESH_MS = 5 * 60 * 1000;
+
+// The re-read is remembered here, per member, not just in the token: a page
+// render can't write the session cookie, so a refreshed `rolesAt` is never
+// saved and every request after the first five minutes would ask Discord
+// again (several times per render), run into its rate limit and stall the
+// page. Concurrent requests share one lookup. A failed one is kept for 30
+// seconds (the token's last known roles stand meanwhile), so an outage or a
+// rate limit isn't answered with more requests.
+const memberCache = new Map<string, { at: number; member: Promise<GuildMember | null> }>();
+
+function cachedMember(discordId: string): Promise<GuildMember | null> {
+  const hit = memberCache.get(discordId);
+  if (hit && Date.now() - hit.at < ROLE_REFRESH_MS) return hit.member;
+  const member = getMember(discordId);
+  memberCache.set(discordId, { at: Date.now(), member });
+  member.catch(() => memberCache.set(discordId, { at: Date.now() - ROLE_REFRESH_MS + 30_000, member }));
+  return member;
+}
 
 type DiscordProfile = { id: string; username: string; global_name?: string | null; avatar?: string | null };
 
@@ -60,7 +79,7 @@ export const authOptions: NextAuthOptions = {
 
       if (token.discordId && env.botToken && Date.now() - (token.rolesAt ?? 0) > ROLE_REFRESH_MS) {
         try {
-          const member = await getMember(token.discordId);
+          const member = await cachedMember(token.discordId);
           token.perms = permsFromRoles(member?.roles ?? [], token.discordId, await getRoleConfig(), { inGuild: !!member });
           token.inGuild = !!member;
         } catch {
@@ -98,10 +117,11 @@ export type SessionUser = {
   inGuild: boolean;
 };
 
-export async function getSessionUser(): Promise<SessionUser | null> {
+/** The signed-in user, read once per request however many components ask. */
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const session = await getServerSession(authOptions);
   return (session?.user as SessionUser | undefined) ?? null;
-}
+});
 
 /** For pages: send guests to sign in, and the unauthorised to /denied. */
 export async function requireUser(perm: Perm = "MEMBER", callbackUrl = "/"): Promise<SessionUser> {
