@@ -46,10 +46,13 @@ describe("validateLineup", () => {
   it("applies the contract check to the bench too", () => {
     expect(validateLineup("4-3-3", { SUB2: "ghost" }, everyone)).toHaveLength(1);
   });
-  it("publishing needs all eleven pitch slots, not the bench", () => {
+  it("publishing takes a short XI but not an empty pitch", () => {
     expect(validateLineup("4-3-3", full(), everyone, { publish: true })).toEqual([]);
     const { ST: _st, ...ten } = full();
-    expect(validateLineup("4-3-3", ten, everyone, { publish: true })[0]).toMatch(/empty: ST/);
+    expect(validateLineup("4-3-3", ten, everyone, { publish: true })).toEqual([]);
+    expect(validateLineup("4-3-3", { GK: full().GK }, everyone, { publish: true })).toEqual([]);
+    expect(validateLineup("4-3-3", { SUB1: full().GK }, everyone, { publish: true })[0]).toMatch(/at least one player on the pitch/);
+    expect(validateLineup("4-3-3", {}, everyone, { publish: true })).toHaveLength(1);
   });
   it("reports duplicates and strangers together", () => {
     expect(validateLineup("4-3-3", { GK: "x", ST: "x" }, everyone)).toHaveLength(2);

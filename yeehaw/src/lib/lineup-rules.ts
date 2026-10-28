@@ -47,8 +47,9 @@ export function checkSlotMap(formation: string, slots: SlotMap): string[] {
 
 /**
  * A lineup's rules: valid shape, only players under contract (`eligible` is
- * the set of their ids), and, to publish, all eleven pitch slots filled. A
- * draft may be half done. `nameOf` only makes the messages friendlier.
+ * the set of their ids), and, to publish, at least one player on the pitch
+ * (a short XI can go out; open positions show as empty). A draft may be
+ * empty. `nameOf` only makes the messages friendlier.
  */
 export function validateLineup(
   formation: string,
@@ -61,8 +62,7 @@ export function validateLineup(
   const strangers = [...new Set(Object.values(slots).filter((id) => id && !eligible.has(id)))];
   if (strangers.length) errors.push(`${strangers.map(nameOf).join(", ")} ${strangers.length === 1 ? "isn't" : "aren't"} under contract, so can't be picked.`);
   if (opts.publish && FORMATIONS[formation]) {
-    const missing = pitchKeys(formation).filter((k) => !slots[k]);
-    if (missing.length) errors.push(`Fill every pitch position before publishing (empty: ${missing.map((k) => slotLabel(formation, k)).join(", ")}).`);
+    if (!pitchKeys(formation).some((k) => slots[k])) errors.push("Put at least one player on the pitch before publishing.");
   }
   return errors;
 }

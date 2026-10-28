@@ -7,7 +7,7 @@ import { readSlotMap } from "@/lib/board-input";
 import { saveLineup } from "@/lib/lineups";
 
 // The lineup editor's one write. Staff only; the rules (contracted players,
-// one per slot, real slot keys, eleven to publish) are re-checked here.
+// one per slot, real slot keys, someone on the pitch to publish) are re-checked here.
 export async function saveLineupAction(input: { formation: string; slots: unknown; intent: string }): Promise<SaveOutcome> {
   const user = await assertPerm("STAFF");
   const slots = readSlotMap(input.slots);

@@ -61,8 +61,8 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   **The lineup editor** (`/staff/lineup`, staff) picks a formation and places
   contracted players on the pitch and the seven bench slots: tap a name then a
   slot (phone friendly), or drag; tap a placed player to move or swap them.
-  *Save draft* keeps work in progress; *Publish* needs all eleven pitch slots
-  and writes a new Published lineup (older ones stay as history, the site
+  *Save draft* keeps work in progress; *Publish* needs at least one player on
+  the pitch (open positions show as empty) and writes a new Published lineup (older ones stay as history, the site
   shows the newest). Only players with a live contract can be picked, one
   player per slot, slot keys must belong to the formation: checked on the
   server (`src/lib/lineup-rules.ts`), not just in the browser.
