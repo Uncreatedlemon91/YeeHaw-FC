@@ -49,6 +49,10 @@ export function Avatar({
       width={size}
       height={size}
       onError={() => setFailed(true)}
+      // The server-rendered <img> can fail before React hydrates, and then onError never fires.
+      ref={(el) => {
+        if (el?.complete && el.naturalWidth === 0) setFailed(true);
+      }}
       className={cn("shrink-0 rounded-sm border bg-muted", className)}
     />
   );
