@@ -29,3 +29,15 @@ if [[ -d "$UPLOADS" ]]; then
     echo "Wrote $up ($(du -h "$up" | cut -f1))"
     ls -1t "$DIR"/yeehaw-uploads-*.tar.gz | tail -n +"$((KEEP + 1))" | xargs -r rm --
 fi
+
+# Optional off-box copy: BACKUP_REMOTE is an rclone target such as
+# "spaces:yeehaw-backups" (apt install rclone; rclone config, as the yeehaw user).
+# A lost droplet takes its own backups with it, so keep one copy elsewhere.
+if [[ -n "${BACKUP_REMOTE:-}" ]]; then
+    if command -v rclone >/dev/null; then
+        rclone copy "$out" "$BACKUP_REMOTE" && echo "Copied $(basename "$out") to $BACKUP_REMOTE"
+        [[ -n "${up:-}" ]] && rclone copy "$up" "$BACKUP_REMOTE" && echo "Copied $(basename "$up") to $BACKUP_REMOTE"
+    else
+        echo "BACKUP_REMOTE is set but rclone is not installed; no off-box copy." >&2
+    fi
+fi

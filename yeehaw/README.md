@@ -1,16 +1,19 @@
 # YeeHaw FC
 
 Club site and Discord companion for **YeeHaw FC**, an EA FC Pro Clubs side,
-served at [yeehaw-fc.club](https://yeehaw-fc.club). It rebuilds the old
-Python site (`proclubs/`) in the same stack as Ravenfall HQ and shares the
-droplet with it, with its own user, directory, database and port.
+served at [yeehaw-fc.club](https://yeehaw-fc.club). It replaces the old
+Python site (`proclubs/`, removed from the repo; it lives on in git history) with
+the same stack as Ravenfall HQ, and shares the droplet with it, with its own
+user, directory, database and port. Source comments that say "port of
+`proclubs/...`" point at that history.
 
 Next.js 15 (App Router, TypeScript), Tailwind v4 with shadcn/ui-style
 components, PostgreSQL via Prisma, NextAuth with Discord.
 
-> **Build status.** The site is being rebuilt in phases. This README marks
-> what each section covers as *built* or *planned*; keep it current as
-> phases land.
+> **Status.** Everything below is built. To move yeehaw-fc.club over from the
+> old Python site, follow [`deploy/CUTOVER.md`](deploy/CUTOVER.md); the old
+> site's data comes across with `npm run migrate:proclubs` (see "Migrating from
+> the old site").
 
 ## What it does
 
@@ -441,8 +444,12 @@ the last phase and will be written up here.
 ## Backups
 
 `yeehaw-backup.timer` runs `deploy/backup.sh` daily: a `pg_dump` of the
-`yeehaw` database to `/opt/yeehaw/backups` (newest 14 kept) and a tar of the
-uploads directory (`UPLOAD_DIR`, default `/opt/yeehaw/uploads`).
+`yeehaw` database to `/opt/yeehaw/backups` (newest 14 kept, `BACKUP_RETENTION`) and a
+tar of the uploads directory (`UPLOAD_DIR`, default `/opt/yeehaw/uploads`). Set
+`BACKUP_REMOTE` in `.env` to an [rclone](https://rclone.org/) target (a
+DigitalOcean Spaces or S3 bucket; `apt install rclone`, then `rclone config` as the
+`yeehaw` user) and each archive is also copied off the droplet, so a lost droplet
+doesn't take the backups with it. Keep at least one copy elsewhere.
 
 ```bash
 sudo -u yeehaw bash /opt/yeehaw/yeehaw/deploy/backup.sh          # one now

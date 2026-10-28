@@ -356,8 +356,9 @@ gunzip -c /opt/ravenfall/backups/ravenfall-XXXX.sql.gz | sudo -u ravenfall psql 
 sudo -u ravenfall tar -xzf /opt/ravenfall/backups/ravenfall-uploads-XXXX.tar.gz -C /opt/ravenfall/uploads   # restore images
 ```
 
-Copy them off the droplet too. `rclone`, set up as in YeeHaw FC's
-`deploy/README.md`, works the same way.
+Copy them off the droplet too, for example with `rclone` (YeeHaw FC's
+`backup.sh` does it when `BACKUP_REMOTE` is set: see "Backups" in
+`yeehaw/README.md`).
 
 ## Troubleshooting
 
