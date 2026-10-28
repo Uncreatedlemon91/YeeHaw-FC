@@ -15,7 +15,9 @@ import { hasPerm } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { fmt } from "@/lib/time";
 import { claimSlotAction, saveSheetAction } from "../actions";
-import { AnswerCard, AttendanceCard, NoPosition, PlanCard, ReportCard, RosterColumns, StaffBar, UnansweredCard } from "./sections";
+import { loadReport } from "@/lib/match-report";
+import { ReportCard } from "./report";
+import { AnswerCard, AttendanceCard, NoPosition, PlanCard, RosterColumns, StaffBar, UnansweredCard } from "./sections";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +30,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function FixturePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getSessionUser();
-  const page = await loadEventPage(id, user);
-  if (!page) notFound();
+  const [page, report] = await Promise.all([loadEventPage(id, user), loadReport(id, user)]);
+  if (!page || !report) notFound();
   const { event } = page;
   const member = hasPerm(user?.perms, "MEMBER");
   const canSign = member && event.signupsOpen && !page.over;
@@ -92,7 +94,7 @@ export default async function FixturePage({ params }: { params: Promise<{ id: st
           )}
 
           {isSession && <PlanCard page={page} signedIn={!!user} />}
-          {isMatch && <ReportCard page={page} />}
+          {isMatch && <ReportCard report={report} member={member} />}
         </div>
 
         <div className="flex flex-col gap-6">

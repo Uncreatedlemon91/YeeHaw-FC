@@ -1,0 +1,16 @@
+[Unit]
+Description=Publish the AI-written roundup (every ROUNDUP_DAYS days)
+
+[Timer]
+# Fires every morning, after the hourly EA poll has picked up last night's
+# games; the job skips the days in between (ROUNDUP_DAYS, default 2). A daily
+# timer rather than "every other day" in systemd, which restarts its count
+# each month and would post on the 31st and the 1st.
+# Eastern time (follows EST/EDT), not the server's UTC clock: keep in step
+# with CLUB_TIMEZONE in .env (the dates the article uses).
+OnCalendar=*-*-* 09:15:00 America/New_York
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

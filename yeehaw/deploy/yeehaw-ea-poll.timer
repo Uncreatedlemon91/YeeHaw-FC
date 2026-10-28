@@ -1,0 +1,11 @@
+[Unit]
+Description=Poll EA for new Pro Clubs data hourly
+
+[Timer]
+OnCalendar=hourly
+# A little jitter so the poll doesn't land on the same second as the notify job.
+RandomizedDelaySec=2m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -9,6 +9,7 @@ import { assertPerm } from "@/lib/auth";
 import { readSlotMap } from "@/lib/board-input";
 import { announceEvent, createEvent, deleteEvent, markAttendance, respond, saveSheet, setPreferences, setSignupsOpen, updateEvent } from "@/lib/events";
 import { parseEvent } from "@/lib/event-rules";
+import { castVote, openVote, publishReport, saveReview as saveMatchReview, setSelfRating } from "@/lib/match-report";
 import { savePlan, saveReview } from "@/lib/training";
 import { prisma } from "@/lib/prisma";
 
@@ -154,4 +155,59 @@ export async function saveReviewAction(_: ActionState, data: FormData): Promise<
   refresh(id);
   revalidatePath("/training");
   return { ok: "Review saved." };
+}
+
+// --- The match report ----------------------------------------------------------- //
+
+/** A member's Man of the Match vote and own rating, from the report card. Either may be left blank. */
+export async function voteAction(_: ActionState, data: FormData): Promise<ActionState> {
+  const user = await assertPerm("MEMBER");
+  const id = str(data, "id");
+  const nominee = str(data, "nominee");
+  const rating = str(data, "rating");
+  if (!nominee && !rating) return { error: "Pick who you're voting for, or rate your game." };
+  const said: string[] = [];
+  if (nominee) {
+    const r = await castVote(id, user.id, nominee);
+    if (!r.ok) return { error: r.error };
+    said.push(`vote for ${r.nominee}`);
+  }
+  if (rating) {
+    const r = await setSelfRating(id, user.id, rating);
+    if (!r.ok) return { error: r.error };
+    said.push(`rating of ${r.rating}/10`);
+  }
+  refresh(id);
+  return { ok: `Thanks: your ${said.join(" and ")} is in. You can change it until voting closes.` };
+}
+
+/** Open the Man of the Match vote before the notify job would (after kick-off). */
+export async function openVoteAction(_: ActionState, data: FormData): Promise<ActionState> {
+  await assertPerm("STAFF");
+  const id = str(data, "id");
+  const r = await openVote(id);
+  if (!r.ok) return { error: r.error };
+  refresh(id);
+  return { ok: "Voting is open.", warnings: r.warnings };
+}
+
+/** Staff: write the report and the coach ratings, and (with intent=publish) publish it. */
+export async function saveReportAction(_: ActionState, data: FormData): Promise<ActionState> {
+  const user = await assertPerm("STAFF");
+  const id = str(data, "id");
+  const coach: Record<string, { rating: string; comment: string }> = {};
+  for (const [k, v] of data.entries()) {
+    if (k.startsWith("rating__")) (coach[k.slice(8)] ??= { rating: "", comment: "" }).rating = String(v);
+    if (k.startsWith("comment__")) (coach[k.slice(9)] ??= { rating: "", comment: "" }).comment = String(v);
+  }
+  const saved = await saveMatchReview(id, { notes: str(data, "notes"), clips: str(data, "clips"), coach }, actor(user));
+  if (!saved.ok) return { error: saved.error };
+  if (str(data, "intent") !== "publish") {
+    refresh(id);
+    return { ok: "Report saved. Coach ratings show on each player's side of the report now; it goes out when you publish." };
+  }
+  const r = await publishReport(id, actor(user));
+  if (!r.ok) return { error: r.error };
+  refresh(id);
+  return { ok: "Report published; voting is closed.", warnings: r.warnings };
 }

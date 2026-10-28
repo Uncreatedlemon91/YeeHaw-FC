@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { contractButton } from "@/lib/contract-interactions";
 import { rsvpComponent } from "@/lib/event-interactions";
 import { linkButton, row } from "@/lib/discord";
+import { motmComponent } from "@/lib/motm-interactions";
 import { verifySignature } from "@/lib/discord-verify";
 import { R, reply, T, type Interaction } from "@/lib/interactions";
 import { env } from "@/lib/env";
@@ -16,7 +17,7 @@ import { discordTime } from "@/lib/time";
 // Button custom_ids are "<namespace>:<action>:<id...>". Later phases add a
 // namespace each to component() and modalSubmit(): "ct" (contract offer
 // Accept / Decline, built), "rsvp" (event sign-up buttons and position
-// picker, built), "motm" (the post-match vote).
+// picker, built), "motm" (the post-match vote and self-rating pickers, built).
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,6 +70,8 @@ async function component(i: Interaction) {
       return contractButton(i);
     case "rsvp":
       return rsvpComponent(i);
+    case "motm":
+      return motmComponent(i);
     default:
       return reply("Unknown button.");
   }

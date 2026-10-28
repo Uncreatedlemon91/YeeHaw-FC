@@ -337,46 +337,6 @@ export function UnansweredCard({ page }: { page: EventPage }) {
   );
 }
 
-// --- The report (phase 5 fills it from EA) ------------------------------------------ //
-
-export function ReportCard({ page }: { page: EventPage }) {
-  const { event, eaMatches } = page;
-  const score = event.usScore != null && event.oppScore != null ? `${event.usScore}–${event.oppScore}` : event.result;
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Match report</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 text-sm">
-        {score && (
-          <p>
-            <span className="field-label mr-2">Result</span>
-            <span className="tnum font-display text-lg font-bold">{score}</span>
-          </p>
-        )}
-        {eaMatches.length > 0 ? (
-          <ul className="divide-y">
-            {eaMatches.map((m) => (
-              <li key={m.id} className="flex items-center gap-3 py-2">
-                <Badge variant={m.outcome === "W" ? "success" : m.outcome === "L" ? "destructive" : "outline"}>{m.outcome}</Badge>
-                <span className="tnum font-bold">
-                  {m.usScore ?? "?"}–{m.oppScore ?? "?"}
-                </span>
-                <span className="text-muted-foreground">vs {m.oppName ?? "Unknown"}</span>
-                {m.playedAt && <span className="ml-auto text-xs text-muted-foreground">{fmt(m.playedAt, "HH:mm")}</span>}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-muted-foreground">
-            {page.started ? "The matches EA recorded in this event's window, with results and ratings, will be listed here once the stats poll has linked them." : "The report appears after the match."}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 // --- Staff controls -------------------------------------------------------------------- //
 
 export function StaffBar({ page, discordUrl }: { page: EventPage; discordUrl: string | null }) {

@@ -1,0 +1,26 @@
+[Unit]
+Description=YeeHaw FC AI-written roundup (publishes every ROUNDUP_DAYS days; skips the days between)
+After=network-online.target postgresql.service
+Wants=postgresql.service
+# Restart=on-failure below retries when Claude couldn't be reached (say, a
+# subscription usage limit): hourly, at most 6 tries per roundup.
+StartLimitIntervalSec=8h
+StartLimitBurst=6
+
+[Service]
+Type=oneshot
+User=yeehaw
+Group=yeehaw
+WorkingDirectory=/opt/yeehaw/yeehaw
+# Needs CLAUDE_CODE_OAUTH_TOKEN (and CLAUDE_BIN if the CLI isn't on the PATH
+# below) in .env; see "The AI roundup" in README.md.
+EnvironmentFile=/opt/yeehaw/yeehaw/.env
+Environment=NODE_ENV=production
+# The Claude Code CLI installs to ~/.local/bin of the yeehaw user (/opt/yeehaw).
+Environment=PATH=/opt/yeehaw/.local/bin:/usr/local/bin:/usr/bin:/bin
+# No NODE_OPTIONS cap: the CLI is a Node program too and needs its heap. The
+# MemoryMax is what keeps it from squeezing Ravenfall HQ (needs swap, as the build does).
+MemoryMax=700M
+ExecStart=/usr/bin/env node_modules/.bin/tsx scripts/article-job.ts
+Restart=on-failure
+RestartSec=1h

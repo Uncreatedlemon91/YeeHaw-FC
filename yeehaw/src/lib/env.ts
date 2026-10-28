@@ -48,7 +48,29 @@ export const env = {
   get eaPlatform() {
     return process.env.EA_PLATFORM || "common-gen5";
   },
+  /** Cap on the auto-built league table (proclubs/config.py LEAGUE_TABLE_MAX_TEAMS). */
+  get eaLeagueMaxTeams() {
+    return Math.max(2, Number.parseInt(process.env.EA_LEAGUE_MAX_TEAMS ?? "25", 10) || 25);
+  },
   get eaClubName() {
     return process.env.EA_CLUB_NAME || "Yeehaw FC";
+  },
+  /** The AI roundup (proclubs/config.py ROUNDUP_DAYS, CLAUDE_*, WEEKLY_ARTICLE_AUTHOR). Off without a token. */
+  get claudeToken() {
+    return process.env.CLAUDE_CODE_OAUTH_TOKEN ?? "";
+  },
+  get claudeBin() {
+    return process.env.CLAUDE_BIN || "claude";
+  },
+  get claudeModel() {
+    return process.env.CLAUDE_MODEL ?? "";
+  },
+  /** How often the roundup goes out, in days, and so how far back each one looks. */
+  get roundupDays() {
+    return Math.max(1, Number.parseInt(process.env.ROUNDUP_DAYS ?? "2", 10) || 2);
+  },
+  /** The byline these articles carry. */
+  get articleAuthor() {
+    return process.env.WEEKLY_ARTICLE_AUTHOR || "YeeHaw FC Desk";
   },
 };

@@ -29,9 +29,11 @@ as_app env NODE_OPTIONS=--max-old-space-size=1536 npm run build
 
 cp deploy/yeehaw.service deploy/yeehaw-gateway.service deploy/yeehaw-backup.service deploy/yeehaw-backup.timer \
    deploy/yeehaw-season-job.service deploy/yeehaw-season-job.timer \
-   deploy/yeehaw-notify.service deploy/yeehaw-notify.timer /etc/systemd/system/
+   deploy/yeehaw-notify.service deploy/yeehaw-notify.timer \
+   deploy/yeehaw-ea-poll.service deploy/yeehaw-ea-poll.timer \
+   deploy/yeehaw-article.service deploy/yeehaw-article.timer /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now yeehaw-backup.timer yeehaw-season-job.timer yeehaw-notify.timer
+systemctl enable --now yeehaw-backup.timer yeehaw-season-job.timer yeehaw-notify.timer yeehaw-ea-poll.timer yeehaw-article.timer
 systemctl enable yeehaw yeehaw-gateway
 systemctl restart yeehaw
 systemctl restart yeehaw-gateway
@@ -41,4 +43,6 @@ echo
 echo "Logs: journalctl -u yeehaw -f"
 echo "      journalctl -u yeehaw-gateway -f"
 echo "      journalctl -u yeehaw-notify       (the hourly notify job: recurring events, reminders; run now: systemctl start yeehaw-notify)"
+echo "      journalctl -u yeehaw-ea-poll      (the hourly EA poll; run now: systemctl start yeehaw-ea-poll)"
+echo "      journalctl -u yeehaw-article      (the AI roundup, daily 09:15 Eastern, publishes every ROUNDUP_DAYS; preview: sudo -u yeehaw npm run article:job -- --dry-run)"
 echo "      journalctl -u yeehaw-season-job   (the daily season job; run now: systemctl start yeehaw-season-job)"

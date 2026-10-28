@@ -5,6 +5,7 @@ import { awayOnDay } from "./availability";
 import { isoWeek } from "./availability-rules";
 import { announceDue, generateAll } from "./event-series";
 import { claimNotification, eventUrl, toView } from "./events";
+import { openDueVotes } from "./match-report";
 import { env } from "./env";
 import { prisma } from "./prisma";
 import { weekdayOf } from "./recurrence";
@@ -17,6 +18,7 @@ import { dayKey } from "./time";
 //   series        keep every recurring series generated four weeks ahead
 //   announce      post the RSVP announcement for series that announce N days ahead
 //   reminders     DM contracted players who haven't answered an event starting within 24 hours
+//   votes         open the Man of the Match vote two hours after a match kicks off, and post it
 //   availability  Mondays: DM contracted players who have never set their usual nights
 //
 // Each message is recorded in Notification (once per event and player, or per
@@ -97,6 +99,13 @@ export async function runNotifyJob(now = new Date()): Promise<JobLine[]> {
       const r = await sendReminders(now);
       return { detail: `${r.sent} reminder${r.sent === 1 ? "" : "s"} for ${r.events} event${r.events === 1 ? "" : "s"}` };
     }],
+    [
+      "votes",
+      async () => {
+        const r = await openDueVotes(now);
+        return { detail: `${r.opened} Man of the Match vote${r.opened === 1 ? "" : "s"} opened`, warnings: r.warnings };
+      },
+    ],
     ["availability", async () => ({ detail: `${(await sendAvailabilityNudges(now)).sent} nudge(s)` })],
   ];
   const log: JobLine[] = [];
