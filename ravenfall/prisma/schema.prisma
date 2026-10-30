@@ -81,6 +81,34 @@ enum ApplicationStatus {
   DENIED
 }
 
+enum AwardKind {
+  MEDAL
+  SERVICE
+  CAMPAIGN
+  UNIT_CITATION
+  COMMENDATION
+}
+
+// What a repeat award adds to the ribbon: an oak leaf or a star per extra
+// award, or a numeral showing the count.
+enum AwardDevice {
+  NONE
+  OAK_LEAF
+  STAR
+  NUMERAL
+}
+
+enum AwardSource {
+  NOMINATION
+  AUTO
+}
+
+enum NominationStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
 model User {
   id              String       @id @default(cuid())
   discordId       String       @unique
@@ -123,6 +151,14 @@ model User {
   libraryRevisions     LibraryRevision[]
   libraryAcks          LibraryAcknowledgement[]
   libraryImages        LibraryImage[]
+  awards               MemberAward[]            @relation("AwardHolder")
+  awardsNominated      MemberAward[]            @relation("AwardNominator")
+  awardsApproved       MemberAward[]            @relation("AwardApprover")
+  awardsRevoked        MemberAward[]            @relation("AwardRevoker")
+  nominationsReceived  AwardNomination[]        @relation("NominationNominee")
+  nominationsMade      AwardNomination[]        @relation("NominationNominator")
+  nominationsDecided   AwardNomination[]        @relation("NominationDecider")
+  awardImages          Award[]                  @relation("AwardImageUploader")
 }
 
 model ServiceRecord {
@@ -140,24 +176,26 @@ model ServiceRecord {
 }
 
 model Event {
-  id          String       @id @default(cuid())
+  id          String            @id @default(cuid())
   title       String
-  description String       @default("")
+  description String            @default("")
   type        EventType
   location    String?
   startTime   DateTime
   endTime     DateTime?
-  mandatory   Boolean      @default(false)
+  mandatory   Boolean           @default(false)
   // After-action report, Markdown. Null until a leader files one.
   debrief     String?
   debriefById String?
-  debriefBy   User?        @relation("EventDebriefer", fields: [debriefById], references: [id], onDelete: SetNull)
+  debriefBy   User?             @relation("EventDebriefer", fields: [debriefById], references: [id], onDelete: SetNull)
   debriefAt   DateTime?
   createdById String?
-  createdBy   User?        @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdBy   User?             @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
   attendances Attendance[]
+  awards      MemberAward[]
+  nominations AwardNomination[]
 
   @@index([startTime])
 }
@@ -262,6 +300,100 @@ model Setting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+// --- Awards & decorations (src/lib/awards.ts) ----------------------------- //
+
+// The catalog. Qualifications are skills; these are honours, shown as a
+// ribbon rack on the personnel file.
+model Award {
+  id          String      @id @default(cuid())
+  slug        String      @unique
+  name        String
+  kind        AwardKind
+  // Lower = higher on the rack.
+  precedence  Int         @default(1000)
+  // Ordered stripes, left to right: [{ "color": "#rrggbb", "width": 3 }, ...].
+  // Validated in src/lib/awards.ts.
+  ribbon      Json        @default("[]")
+  // Optional medal art on disk (LIBRARY_UPLOAD_DIR), named by `medalFile`.
+  medalFile   String?
+  medalMime   String?
+  medalById   String?
+  medalBy     User?       @relation("AwardImageUploader", fields: [medalById], references: [id], onDelete: SetNull)
+  description String      @default("")
+  // Markdown: what earns it.
+  criteria    String      @default("")
+  repeatable  Boolean     @default(false)
+  device      AwardDevice @default(NONE)
+  // Null for awards decided by nomination; otherwise an automatic rule:
+  // {type:"service_days",threshold}, {type:"ops_attended",threshold,every?},
+  // {type:"campaign",tag}, {type:"good_conduct",days}.
+  autoRule    Json?
+  // Retired awards leave the catalog but stay on the racks of those who hold them.
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  holders     MemberAward[]
+  nominations AwardNomination[]
+
+  @@index([precedence])
+}
+
+// One row per time an award was given. A repeat is a new row with the next
+// `sequence`, drawn as a device on the one ribbon. A revoked award keeps its
+// row (so automatic awards aren't re-issued) with revokedAt set.
+model MemberAward {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation("AwardHolder", fields: [userId], references: [id], onDelete: Cascade)
+  awardId       String
+  award         Award       @relation(fields: [awardId], references: [id], onDelete: Cascade)
+  sequence      Int         @default(1)
+  awardedAt     DateTime    @default(now())
+  citation      String      @default("")
+  eventId       String?
+  event         Event?      @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  nominatedById String?
+  nominatedBy   User?       @relation("AwardNominator", fields: [nominatedById], references: [id], onDelete: SetNull)
+  approvedById  String?
+  approvedBy    User?       @relation("AwardApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  source        AwardSource
+  // Set once the Discord announcement has gone out.
+  announcedAt   DateTime?
+  revokedAt     DateTime?
+  revokedById   String?
+  revokedBy     User?       @relation("AwardRevoker", fields: [revokedById], references: [id], onDelete: SetNull)
+  revokeReason  String?
+  createdAt     DateTime    @default(now())
+
+  @@unique([userId, awardId, sequence])
+  @@index([awardId])
+  @@index([eventId])
+}
+
+model AwardNomination {
+  id            String           @id @default(cuid())
+  nomineeId     String
+  nominee       User             @relation("NominationNominee", fields: [nomineeId], references: [id], onDelete: Cascade)
+  awardId       String
+  award         Award            @relation(fields: [awardId], references: [id], onDelete: Cascade)
+  citation      String
+  eventId       String?
+  event         Event?           @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  nominatedById String?
+  nominatedBy   User?            @relation("NominationNominator", fields: [nominatedById], references: [id], onDelete: SetNull)
+  status        NominationStatus @default(PENDING)
+  decidedById   String?
+  decidedBy     User?            @relation("NominationDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt     DateTime?
+  decisionNote  String?
+  createdAt     DateTime         @default(now())
+
+  @@index([status, createdAt])
+  @@index([nomineeId, createdAt])
+  @@index([awardId])
 }
 
 // --- Document library (src/lib/library.ts) -------------------------------- //

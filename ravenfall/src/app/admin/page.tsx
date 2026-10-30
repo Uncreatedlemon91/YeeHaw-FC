@@ -1,7 +1,9 @@
 import { CheckCircle2, TriangleAlert } from "lucide-react";
+import Link from "next/link";
 import { ActionCard, AdminCallout, ChecksCard, type Check } from "@/components/admin-parts";
 import { Container } from "@/components/container";
 import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RANKS, ROLES, SQUADS } from "@/config/unit";
 import { requireUser } from "@/lib/auth";
@@ -20,7 +22,7 @@ const PERM_HELP: Record<Perm, string> = {
   ADMIN: "Everything, including this page.",
   RECRUITER: "Decides applications.",
   INSTRUCTOR: "Runs training and awards qualifications.",
-  OPERATOR: "Unit member: ops, roster, S1 desk, vault.",
+  OPERATOR: "Unit member: ops, roster, S1 desk, library, Hall of Honour.",
 };
 
 // The gateway checks in every 5 minutes; allow for one missed check-in.
@@ -73,7 +75,16 @@ export default async function Admin() {
 
   return (
     <Container>
-      <PageHeader eyebrow="Command" title="Admin" description="Discord integration status and one-off setup actions." />
+      <PageHeader
+        eyebrow="Command"
+        title="Admin"
+        description="Discord integration status and one-off setup actions."
+        actions={
+          <Button asChild variant="outline">
+            <Link href="/admin/awards">Awards editor</Link>
+          </Button>
+        }
+      />
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <ChecksCard checks={checks} />
 

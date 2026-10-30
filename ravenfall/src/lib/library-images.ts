@@ -32,10 +32,16 @@ export function imagePath(filename: string): string {
   return path.join(uploadDir(), filename);
 }
 
-export async function storeImage(bytes: Uint8Array, kind: { ext: ImageExt; mime: string }, uploaderId: string) {
+/** Write an image to disk under a fresh random name and return the name. */
+export async function writeImageFile(bytes: Uint8Array, kind: { ext: ImageExt }): Promise<string> {
   const filename = `${randomBytes(16).toString("hex")}.${kind.ext}`;
   await mkdir(uploadDir(), { recursive: true });
   await writeFile(imagePath(filename), bytes, { flag: "wx" });
+  return filename;
+}
+
+export async function storeImage(bytes: Uint8Array, kind: { ext: ImageExt; mime: string }, uploaderId: string) {
+  const filename = await writeImageFile(bytes, kind);
   try {
     return await prisma.libraryImage.create({
       data: { filename, mime: kind.mime, size: bytes.length, uploaderId },

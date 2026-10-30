@@ -108,7 +108,6 @@ export default async function LibraryDoc({ params }: { params: Promise<{ slug: s
           </p>
         </CardContent>
       </Card>
-      {/* The vault is operator-only, so guests don't get its links. */}
       {viewer && hasPerm(viewer.perms, "OPERATOR") && doc.qualifications.length > 0 && (
         <Card className="mt-6">
           <CardHeader>
@@ -116,9 +115,9 @@ export default async function LibraryDoc({ params }: { params: Promise<{ slug: s
           </CardHeader>
           <CardContent className="flex flex-col gap-1.5">
             {doc.qualifications.map((q) => (
-              <Link key={q.id} href={`/vault/${q.slug}`} className="text-sm hover:text-accent">
+              <span key={q.id} className="text-sm">
                 {q.title}
-              </Link>
+              </span>
             ))}
           </CardContent>
         </Card>

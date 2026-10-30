@@ -70,8 +70,22 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
 - **Operations.** List and month-calendar views, one-click RSVP, optional
   Discord announcement, and an after-action report editor where leaders
   write the debrief and mark who actually attended, was excused or no-showed.
-- **Qualification vault.** Markdown SOPs, versioned on each content edit.
-  Instructors award qualifications from a member's dossier.
+- **Awards & decorations (`/vault`).** A public catalog (visible signed out)
+  of the unit's ribbons and medals in rack order: each award's ribbon, optional
+  medal art, description and criteria. The Hall of Honour on an award's page
+  (who holds it) is for operators only. Command edits the catalog at
+  **Admin → Awards editor** (`/admin/awards`): a stripe builder with a live
+  SVG preview, precedence (move up / down), repeat devices (oak leaf, star or
+  numeral), an optional automatic rule, medal art upload (PNG/JPG/WebP, 5 MB,
+  stored beside the library images) and retire. A starter catalog (service,
+  operations, good conduct, valor, lifesaver, commendations, unit citation) is
+  added by a migration, insert-if-missing by slug.
+- **Qualifications** are skills, not ribbons. They stay as data (billet and
+  rank prerequisites) and their manuals are Library documents, one per
+  qualification in the **Qualification manuals** folder, linked through the
+  document's related qualifications. `/vault/<qualification-slug>` redirects
+  to the manual. Instructors create and edit qualifications from the Awards
+  page and award or revoke them from a member's personnel file.
 - **Document library (`/library`).** Markdown documents in nested folders,
   with four clearance tiers: Public (anyone, listed on the landing page),
   Unit (any operator), Leadership (squad leaders, instructors, Command) and
@@ -108,10 +122,10 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
 
 | Level | From | Can |
 |---|---|---|
-| ADMIN | Command Staff roles (or `ADMIN_USER_IDS`) | everything, plus profile edits, deleting events/docs/records, the Admin page |
+| ADMIN | Command Staff roles (or `ADMIN_USER_IDS`) | everything, plus profile edits, deleting events/docs/records, the Admin page and awards editor |
 | RECRUITER | Recruiter roles | decide applications, add enlistment/note entries |
-| INSTRUCTOR | Instructor / NCO roles | schedule events, file AARs, edit the vault, award qualifications |
-| OPERATOR | Operator roles | dashboard, calendar & RSVP, roster, dossiers, vault |
+| INSTRUCTOR | Instructor / NCO roles | schedule events, file AARs, manage qualifications, award them, publish in the library |
+| OPERATOR | Operator roles | dashboard, calendar & RSVP, roster, dossiers, library, the Hall of Honour |
 | guest / candidate | no mapped role | landing page, `/apply`, their application status |
 
 RECRUITER and INSTRUCTOR each include OPERATOR; one person can hold both.
@@ -157,6 +171,9 @@ src/lib/discord.ts           Discord REST client
 src/lib/recruitment.ts       approve / deny pipeline (shared by web and Discord)
 src/lib/personnel.ts         clearance, billets, leave, and the S1 request pipeline (shared by web and Discord)
 src/lib/career.ts            promotion criteria checklist
+src/lib/awards.ts            ribbon stripe validation, repeat devices, automatic award rules
+src/lib/qualifications.ts    qualification manuals folder and slug helpers
+src/components/ribbon.tsx    the SVG ribbon (stripes and devices)
 src/lib/library.ts           library clearance, folder tree and search
 src/lib/required-reading.ts  who must read what, acknowledgements and compliance
 src/lib/library-notify.ts    library announcement embed and required-reading DMs
@@ -175,8 +192,8 @@ deploy/                      systemd units, update and backup scripts
 Ranks (with promotion criteria), squads (with billet caps), unit roles
 (with qualification prerequisites), the doctrine blurbs and the
 application questions are all in `src/config/unit.ts`. Edit and redeploy.
-Qualification prerequisites refer to vault slugs, so a renamed manual
-needs its slug updated there too.
+Qualification prerequisites refer to qualification slugs, so a renamed
+qualification needs its slug updated there too.
 
 ## Local development
 
@@ -187,7 +204,7 @@ cd ravenfall
 npm install
 cp .env.example .env              # at least DATABASE_URL, NEXTAUTH_SECRET, Discord OAuth
 npx prisma migrate dev            # creates the tables
-npm run db:seed                   # starter qualification manuals
+npm run db:seed                   # starter qualifications (the award catalog comes with the migrations)
 npm run dev                       # http://localhost:3000
 ```
 
