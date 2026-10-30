@@ -80,13 +80,13 @@ export const SQUADS: readonly SquadDef[] = [
   },
   {
     name: "Alpha",
-    callsign: "Wardog 1",
+    callsign: "Talon",
     blurb: "Assault team. Room clearing, close-quarters battle and holding ground.",
     billets: { "Team Leader": 1, "Assistant Team Leader": 1, "Point Man": 1, Assaulter: 4, Breacher: 2, Medic: 1, "Communications / Intelligence Specialist": 1 },
   },
   {
     name: "Bravo",
-    callsign: "Wardog 2",
+    callsign: "Havoc",
     blurb: "Assault team. Fire support and manoeuvre element.",
     billets: { "Team Leader": 1, "Assistant Team Leader": 1, "Point Man": 1, Assaulter: 4, Breacher: 2, Medic: 1, "Communications / Intelligence Specialist": 1 },
   },
