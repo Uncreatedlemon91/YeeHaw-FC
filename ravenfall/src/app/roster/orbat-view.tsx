@@ -2,20 +2,23 @@ import type { User } from "@prisma/client";
 import { CalendarOff, ChevronDown, Plus } from "lucide-react";
 import Link from "next/link";
 import { RankInsignia } from "@/components/insignia";
+import { InterestButton } from "@/components/interest-button";
 import { ReadinessStamp, readiness, StrengthBar, StrengthLegend, type SlotState } from "@/components/roster-strength";
 import { SquadEmblem } from "@/components/squad-emblem";
 import { rankIndex, roleDef, SQUADS, UNIT } from "@/config/unit";
-import { missingQuals, onLeave } from "@/lib/personnel";
+import { type InterestPayload, missingQuals, onLeave } from "@/lib/personnel";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
 
 // The roster by element (the order of battle): every squad's billets as
 // slots, filled or vacant, then everyone without a slot.
 export async function OrbatView({ me }: { me: { id: string } }) {
-  const [members, mine] = await Promise.all([
+  const [members, mine, interests] = await Promise.all([
     prisma.user.findMany({ where: { status: { in: ["ACTIVE", "INACTIVE"] } } }),
     prisma.user.findUnique({ where: { id: me.id }, include: { qualifications: { include: { qualification: true } } } }),
+    prisma.personnelRequest.findMany({ where: { userId: me.id, type: "INTEREST", status: "PENDING" }, select: { payload: true } }),
   ]);
+  const filed = interests.map((r) => r.payload as InterestPayload);
   const away = await onLeave(members.map((m) => m.id));
   const held = mine?.qualifications.map((q) => q.qualification.slug) ?? [];
   const canRequest = mine?.status === "ACTIVE";
@@ -74,7 +77,10 @@ export async function OrbatView({ me }: { me: { id: string } }) {
             {unitCount("loa")} on leave · {unitCount("inactive")} inactive · {unitCount("vacant")} vacant
           </p>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">Vacant slots you&apos;re qualified for link straight to a billet request.</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Vacant slots you&apos;re qualified for link straight to a billet request. For the rest, put your name in with{" "}
+          <span className="uppercase tracking-wider text-accent">Interested</span> and S1 will approve or deny.
+        </p>
       </section>
 
       <div className="grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -103,6 +109,7 @@ export async function OrbatView({ me }: { me: { id: string } }) {
               {s.billets.map((b) => {
                 const role = roleDef(b.role);
                 const qualified = canRequest && !missingQuals(b.role, held).length;
+                const ownSeat = mine?.squad === s.name && mine?.unitRole === b.role;
                 const vacant = Math.max(0, b.cap - b.holders.length);
                 return (
                   <div key={b.role} className="min-w-0">
@@ -153,6 +160,13 @@ export async function OrbatView({ me }: { me: { id: string } }) {
                             ))}
                           </div>
                         </details>
+                        {canRequest && !qualified && !ownSeat && (
+                          <InterestButton
+                            role={b.role}
+                            squads={[s.name]}
+                            filed={filed.filter((f) => f.role === b.role).map((f) => f.squad)}
+                          />
+                        )}
                         {qualified && (
                           <Link
                             href={`/roster/${me.id}?tab=billet&squad=${encodeURIComponent(s.name)}&role=${encodeURIComponent(b.role)}`}

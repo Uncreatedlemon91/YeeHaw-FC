@@ -97,6 +97,23 @@ export function missingQuals(role: string, held: readonly string[]): string[] {
 }
 
 export type RolePayload = { squad: string; primary: string; secondary: string[] };
+/** A member volunteering for a vacant billet. `needs` are the qualification titles they lacked when they filed. */
+export type InterestPayload = { squad: string; role: string; needs: string[] };
+
+/**
+ * Whether `member` may volunteer for `role` in `squad`: the squad has that
+ * billet, it has an open slot, and it isn't the seat they already hold.
+ * Qualifications don't matter here; that's the point of an interest.
+ */
+export function checkInterest(member: Pick<User, "squad" | "unitRole">, squad: string, role: string, fill: Map<string, number>): string | null {
+  const def = squadDef(squad);
+  if (!def) return "Pick a squad.";
+  const cap = def.billets[role] ?? 0;
+  if (!cap) return `${def.name} has no ${role} billet.`;
+  if (member.squad === squad && member.unitRole === role) return "That's the billet you already hold.";
+  if ((fill.get(billetKey(squad, role)) ?? 0) >= cap) return `Every ${role} billet in ${def.name} is filled (${cap}/${cap}).`;
+  return null;
+}
 
 /**
  * Whether `member` may take `want`. `fill` counts current holders; the
@@ -153,6 +170,7 @@ export const REQUEST_LABEL: Record<RequestType, string> = {
   ROLE: "Billet change",
   CALLSIGN: "Callsign change",
   LOA: "Leave of absence",
+  INTEREST: "Billet interest",
 };
 
 /**
@@ -171,6 +189,7 @@ export function canDecide(
   if (req.type === "CALLSIGN") return false;
   if (!requester.squad || !leads(viewerUser, requester.squad)) return false;
   if (req.type === "ROLE") return (req.payload as RolePayload).squad === requester.squad;
+  if (req.type === "INTEREST") return (req.payload as InterestPayload).squad === requester.squad;
   return true;
 }
 
@@ -180,6 +199,10 @@ export function describe(req: Pick<PersonnelRequest, "type" | "payload" | "start
     return `${p.squad} · ${p.primary}${p.secondary.length ? ` (secondary: ${p.secondary.join(", ")})` : ""}`;
   }
   if (req.type === "CALLSIGN") return `New callsign: ${(req.payload as { callsign: string }).callsign}`;
+  if (req.type === "INTEREST") {
+    const p = req.payload as InterestPayload;
+    return `${p.squad} · ${p.role}${p.needs?.length ? ` (needs ${p.needs.join(", ")})` : " (qualified)"}`;
+  }
   return `${req.startDate ? fmtDate(req.startDate) : "?"} – ${req.endDate ? fmtDate(req.endDate) : "?"}`;
 }
 
@@ -335,6 +358,9 @@ export async function decideRequest(opts: {
   const by = opts.reviewerName;
   const records: Prisma.ServiceRecordCreateManyInput[] = [];
   let userUpdate: Prisma.UserUpdateInput | null = null;
+  // Set when an approved interest seats the member, for the Discord sync below.
+  let seated: { squad: string; roles: string[] } | null = null;
+  let followUp: string | null = null;
 
   if (opts.approve && req.type === "ROLE") {
     const want = req.payload as RolePayload;
@@ -374,6 +400,47 @@ export async function decideRequest(opts: {
       description: member.callsign ? `Previously ${member.callsign}. Approved by ${by}.` : `Approved by ${by}.`,
       issuedById: opts.reviewer.id,
     });
+  }
+  if (opts.approve && req.type === "INTEREST") {
+    const want = req.payload as InterestPayload;
+    // Re-checked now: the slot may have filled since they volunteered.
+    const err = checkInterest(member, want.squad, want.role, await billetFill());
+    if (err) return { ok: false, error: err };
+    const held = (await prisma.userQualification.findMany({ where: { userId: member.id }, include: { qualification: true } })).map(
+      (q) => q.qualification.slug,
+    );
+    const missing = missingQuals(want.role, held);
+    if (!missing.length) {
+      // Qualified: approving seats them, keeping any other secondary roles.
+      const secondary = member.secondaryRoles.filter((r) => r !== want.role);
+      userUpdate = { squad: want.squad, unitRole: want.role, secondaryRoles: secondary };
+      seated = { squad: want.squad, roles: [want.role, ...secondary] };
+      records.push({
+        userId: member.id,
+        type: "TRANSFER",
+        title: `Assigned to ${want.squad}, ${want.role}`,
+        description:
+          [
+            member.squad || member.unitRole ? `Previously ${[member.squad, member.unitRole].filter(Boolean).join(", ")}.` : null,
+            `Volunteered for the billet. Approved by ${by}.`,
+          ]
+            .filter(Boolean)
+            .join(" ") || null,
+        issuedById: opts.reviewer.id,
+      });
+    } else {
+      // Not yet qualified: approving selects them for the billet and its training.
+      const titles = await prisma.qualification.findMany({ where: { slug: { in: missing } }, select: { slug: true, title: true } });
+      const needs = missing.map((m) => titles.find((t) => t.slug === m)?.title ?? m);
+      followUp = `Next: complete ${needs.join(", ")}, then request the billet from your file.`;
+      records.push({
+        userId: member.id,
+        type: "NOTE",
+        title: `Selected for ${want.squad}, ${want.role}`,
+        description: `Pending ${needs.join(", ")}. Approved by ${by}.`,
+        issuedById: opts.reviewer.id,
+      });
+    }
   }
   if (opts.approve && req.type === "LOA") {
     records.push({
@@ -428,6 +495,11 @@ export async function decideRequest(opts: {
         )),
       );
     }
+    if (seated) {
+      warnings.push(
+        ...(await syncUnitRoles(member.discordId, { squad: member.squad, roles: heldRoles(member) }, { squad: seated.squad, roles: seated.roles }, reason)),
+      );
+    }
     if (opts.approve && req.type === "CALLSIGN") {
       const callsign = (req.payload as { callsign: string }).callsign;
       await setNickname(member.discordId, nickname(member.rank, callsign), reason).catch((e) =>
@@ -440,8 +512,16 @@ export async function decideRequest(opts: {
       member.discordId,
       `Your ${REQUEST_LABEL[req.type].toLowerCase()} request (${describe(req)}) was **${verdict}** by ${by}.` +
         (note ? `\n> ${note}` : "") +
+        (followUp ? `\n${followUp}` : "") +
         `\n${env.siteUrl}/roster/${member.id}`,
     ).catch(() => {});
   }
-  return { ok: true, message: opts.approve ? "Approved." : "Denied.", warnings };
+  const message = !opts.approve
+    ? "Denied."
+    : seated
+      ? `Approved. ${member.callsign ?? member.discordUsername} now holds ${seated.squad} · ${seated.roles[0]}.`
+      : followUp
+        ? `Approved. They're selected for the billet and still need training; they request it once qualified.`
+        : "Approved.";
+  return { ok: true, message, warnings };
 }

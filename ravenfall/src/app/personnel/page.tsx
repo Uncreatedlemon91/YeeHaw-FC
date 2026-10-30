@@ -124,7 +124,7 @@ export default async function S1Desk() {
         title="S1 Desk"
         description={
           leader
-            ? "Billet, callsign and leave requests waiting on you, plus who's ready for promotion and who's away."
+            ? "Billet, interest, callsign and leave requests waiting on you, plus who's ready for promotion and who's away."
             : "Your personnel actions. File new requests from your personnel file."
         }
         actions={
@@ -145,7 +145,7 @@ export default async function S1Desk() {
                 <CardDescription>
                   {command
                     ? "Everything pending across the unit."
-                    : "Billet changes within your squad and its leave requests. Transfers and callsigns go to Command."}
+                    : "Billet changes and interest in vacant billets within your squad, and its leave requests. Transfers and callsigns go to Command."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col divide-y divide-foreground/10">
@@ -197,6 +197,10 @@ export default async function S1Desk() {
                   None filed. Request a billet, leave or a new callsign from{" "}
                   <Link href={`/roster/${me.id}?tab=billet`} className="text-accent hover:underline">
                     your file
+                  </Link>
+                  , or volunteer for a vacant billet from the{" "}
+                  <Link href="/roster" className="text-accent hover:underline">
+                    roster
                   </Link>
                   .
                 </p>

@@ -8,7 +8,18 @@ import { MAX_SECONDARY_ROLES, WEEKDAYS } from "@/config/unit";
 import { assertPerm } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { CALLSIGN_RE } from "@/lib/recruitment";
-import { billetFill, checkRoleChange, decideRequest, endOfDay, postRequest, refreshBoard, type RolePayload } from "@/lib/personnel";
+import {
+  billetFill,
+  checkInterest,
+  checkRoleChange,
+  decideRequest,
+  endOfDay,
+  type InterestPayload,
+  missingQuals,
+  postRequest,
+  refreshBoard,
+  type RolePayload,
+} from "@/lib/personnel";
 import { fromInput } from "@/lib/time";
 
 const text = (v: FormDataEntryValue | null, max: number) => {
@@ -21,6 +32,7 @@ function refresh(userId: string) {
   revalidatePath("/personnel");
   revalidatePath("/roster");
   revalidatePath("/dashboard");
+  revalidatePath("/about/billets");
 }
 
 // --- The member's own file ----------------------------------------------- //
@@ -74,6 +86,40 @@ export async function requestRole(_: ActionState, data: FormData): Promise<Actio
   const err = checkRoleChange(member, held, want, await billetFill());
   if (err) return { error: err };
   return file(me.id, "ROLE", { payload: want, reason: text(data.get("reason"), 500) });
+}
+
+/** Cap on open interests, so nobody volunteers for every slot at once. */
+const MAX_OPEN_INTERESTS = 3;
+
+/**
+ * Volunteer for a vacant billet, qualified or not. S1 approves (seating a
+ * qualified member, or selecting one who still needs training) or denies.
+ */
+export async function expressInterest(_: ActionState, data: FormData): Promise<ActionState> {
+  const me = await assertPerm("OPERATOR");
+  const member = await prisma.user.findUniqueOrThrow({
+    where: { id: me.id },
+    include: { qualifications: { include: { qualification: true } } },
+  });
+  if (member.status !== "ACTIVE") return { error: "Only active members can volunteer for a billet." };
+  const squad = String(data.get("squad") ?? "");
+  const role = String(data.get("role") ?? "");
+  const err = checkInterest(member, squad, role, await billetFill());
+  if (err) return { error: err };
+  const open = (await prisma.personnelRequest.findMany({ where: { userId: me.id, type: "INTEREST", status: "PENDING" } })).map(
+    (r) => r.payload as InterestPayload,
+  );
+  if (open.some((p) => p.squad === squad && p.role === role)) return { error: "You've already put your name in for that billet." };
+  if (open.length >= MAX_OPEN_INTERESTS) return { error: `Up to ${MAX_OPEN_INTERESTS} open interests at a time. Withdraw one from your file first.` };
+  const missing = missingQuals(role, member.qualifications.map((q) => q.qualification.slug));
+  const titles = await prisma.qualification.findMany({ where: { slug: { in: missing } }, select: { slug: true, title: true } });
+  const payload: InterestPayload = { squad, role, needs: missing.map((m) => titles.find((t) => t.slug === m)?.title ?? m) };
+  const req = await prisma.personnelRequest.create({
+    data: { userId: me.id, type: "INTEREST", payload, reason: text(data.get("reason"), 500) },
+  });
+  const warning = await postRequest(req.id);
+  refresh(me.id);
+  return { ok: `Interest in ${squad} · ${role} filed. S1 has been notified.`, warnings: warning ? [warning] : [] };
 }
 
 export async function requestCallsign(_: ActionState, data: FormData): Promise<ActionState> {

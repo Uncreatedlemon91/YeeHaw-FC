@@ -57,6 +57,7 @@ enum RequestType {
   ROLE
   CALLSIGN
   LOA
+  INTEREST
 }
 
 enum RequestStatus {
@@ -276,6 +277,7 @@ model PersonnelRequest {
   type           RequestType
   status         RequestStatus @default(PENDING)
   // ROLE: { squad, primary, secondary[] }. CALLSIGN: { callsign }. LOA: {}.
+  // INTEREST: { squad, role, needs[] } (needs: qualification titles missing when filed).
   payload        Json          @default("{}")
   // LOA window, inclusive. Kept as columns so "who is on leave" is a query.
   startDate      DateTime?

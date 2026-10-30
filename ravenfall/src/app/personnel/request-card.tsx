@@ -1,5 +1,5 @@
 import type { PersonnelRequest, User } from "@prisma/client";
-import { CalendarOff, IdCard, Shuffle, X } from "lucide-react";
+import { CalendarOff, Hand, IdCard, Shuffle, X } from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { ConfirmButton } from "@/components/confirm-button";
@@ -9,7 +9,7 @@ import { fmtDate } from "@/lib/time";
 import { cancelRequest, endLeave } from "./actions";
 import { DecideForm } from "./decide-form";
 
-const ICON = { ROLE: Shuffle, CALLSIGN: IdCard, LOA: CalendarOff } as const;
+const ICON = { ROLE: Shuffle, CALLSIGN: IdCard, LOA: CalendarOff, INTEREST: Hand } as const;
 const VARIANT = { PENDING: "accent", APPROVED: "success", DENIED: "destructive", CANCELLED: "outline" } as const;
 
 type Req = PersonnelRequest & { user?: User; reviewedBy?: User | null };

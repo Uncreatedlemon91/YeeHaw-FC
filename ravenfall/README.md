@@ -55,7 +55,18 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   roster's default view, **By element**, is the order of battle: the unit
   tree with filled and vacant slots, and a replacement pool for anyone
   without one. A vacant slot the viewer qualifies for links straight to a
-  billet request. (`/orbat` redirects there.)
+  billet request; one they don't has **Interested** instead. (`/orbat`
+  redirects there.)
+- **Billet interest.** Active members put their name in for a vacant slot,
+  qualified or not, from the ORBAT or from a role on `/about/billets`
+  (which lists each role's open slots; signed-out visitors are asked to sign
+  in, guests to enlist). It's a request like any other: it posts to the
+  personnel board, queues on the S1 Desk, and is decided by the same rules
+  as a billet change (squad leadership within their squad, Command for a
+  transfer). Approval re-checks the slot is still open. A qualified member
+  is seated in it (TRANSFER record, Discord roles follow); one who isn't is
+  selected for it (a NOTE naming the training they still need) and told to
+  request the billet once qualified. Up to three open interests at a time.
 - **S1 Desk (`/personnel`).** Members request a billet (one primary, up to
   two secondaries), a callsign change or a leave of absence from their own
   file. Requests post to the personnel board on Discord with Approve / Deny

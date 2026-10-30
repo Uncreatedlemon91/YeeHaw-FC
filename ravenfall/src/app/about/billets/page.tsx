@@ -1,10 +1,16 @@
-import { ShieldCheck } from "lucide-react";
+import { Hand, ShieldCheck } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { AboutCta } from "@/components/about-cta";
+import { InterestButton } from "@/components/interest-button";
 import { SquadEmblem } from "@/components/squad-emblem";
 import { Badge } from "@/components/ui/badge";
 import { ROLES, SQUADS, UNIT, type RoleDef } from "@/config/unit";
 import { qualTitles, squadCap, squadStrength } from "@/lib/about";
+import { getSessionUser } from "@/lib/auth";
+import { hasPerm } from "@/lib/permissions";
+import { billetFill, billetKey, type InterestPayload, missingQuals } from "@/lib/personnel";
+import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
   title: "Billets",
@@ -13,9 +19,35 @@ export const metadata: Metadata = {
 
 const roleId = (r: RoleDef) => `role-${r.code.toLowerCase()}`;
 
+/**
+ * Open slots and, for a signed-in operator, what they've already put their
+ * name in for. Public page: a database hiccup just hides the vacancies.
+ */
+async function vacancies(userId: string | null) {
+  try {
+    const [fill, me, interests] = await Promise.all([
+      billetFill(),
+      userId ? prisma.user.findUnique({ where: { id: userId }, include: { qualifications: { include: { qualification: true } } } }) : null,
+      userId ? prisma.personnelRequest.findMany({ where: { userId, type: "INTEREST", status: "PENDING" }, select: { payload: true } }) : [],
+    ]);
+    const open = (role: string) =>
+      SQUADS.filter((s) => (s.billets[role] ?? 0) > (fill.get(billetKey(s.name, role)) ?? 0)).map((s) => ({
+        name: s.name,
+        free: s.billets[role] - (fill.get(billetKey(s.name, role)) ?? 0),
+      }));
+    return { open, me, filed: interests.map((r) => r.payload as InterestPayload) };
+  } catch {
+    return null;
+  }
+}
+
 export default async function BilletsPage() {
   const slugs = [...new Set(ROLES.flatMap((r) => r.requires))];
-  const [titles, strength] = await Promise.all([qualTitles(slugs), squadStrength()]);
+  const user = await getSessionUser();
+  const operator = !!user && hasPerm(user.perms, "OPERATOR");
+  const [titles, strength, vac] = await Promise.all([qualTitles(slugs), squadStrength(), vacancies(operator ? user.id : null)]);
+  const held = vac?.me?.qualifications.map((q) => q.qualification.slug) ?? [];
+  const active = vac?.me?.status === "ACTIVE";
   const slots = SQUADS.reduce((n, s) => n + squadCap(s.billets), 0);
 
   return (
@@ -80,11 +112,15 @@ export default async function BilletsPage() {
           Find your role
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Each role lists the qualifications you need before you can request it. Training is in the unit&apos;s vault.
+          Each role lists the qualifications you need before you can request it. Training is in the unit&apos;s vault. See an open slot you want? Express
+          interest and S1 will approve or deny, even if you&apos;re not qualified yet.
         </p>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           {ROLES.map((r) => {
             const used = SQUADS.filter((s) => s.billets[r.name]);
+            // Squads with an open slot for this role, minus the seat the viewer already holds.
+            const open = (vac?.open(r.name) ?? []).filter((s) => !(vac?.me?.squad === s.name && vac?.me?.unitRole === r.name));
+            const qualified = !missingQuals(r.name, held).length;
             return (
               <article key={r.code} id={roleId(r)} className="scroll-mt-20 rounded-lg border bg-card p-5">
                 <div className="flex flex-wrap items-center gap-2">
@@ -120,6 +156,55 @@ export default async function BilletsPage() {
                       ))}
                     </ul>
                   </>
+                )}
+                {vac && used.length > 0 && (
+                  <div className="mt-4 border-t pt-4">
+                    <p className="field-label flex items-center gap-1.5">
+                      <Hand className="size-3 text-accent" aria-hidden /> Open slots
+                    </p>
+                    {open.length ? (
+                      <>
+                        <p className="mt-1.5 text-sm text-muted-foreground">
+                          {open.map((s) => `${s.name} ×${s.free}`).join(" · ")}
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          {!user ? (
+                            <Link
+                              href={`/login?callbackUrl=${encodeURIComponent(`/about/billets#${roleId(r)}`)}`}
+                              className="text-sm text-accent underline-offset-4 hover:underline"
+                            >
+                              Sign in to express interest
+                            </Link>
+                          ) : !operator ? (
+                            <Link href="/apply" className="text-sm text-accent underline-offset-4 hover:underline">
+                              Enlist first, then put your name in
+                            </Link>
+                          ) : !active ? (
+                            <p className="text-sm text-muted-foreground">Only active members can volunteer for a billet.</p>
+                          ) : (
+                            <>
+                              <InterestButton
+                                role={r.name}
+                                squads={open.map((s) => s.name)}
+                                filed={vac.filed.filter((f) => f.role === r.name).map((f) => f.squad)}
+                                size="sm"
+                              />
+                              {qualified && (
+                                <Link
+                                  href={`/roster/${user.id}?tab=billet&squad=${encodeURIComponent(open[0].name)}&role=${encodeURIComponent(r.name)}`}
+                                  className="text-sm text-success-fg underline-offset-4 hover:underline"
+                                >
+                                  You&apos;re qualified: request it directly
+                                </Link>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="mt-1.5 text-sm text-muted-foreground">Every slot is filled right now.</p>
+                    )}
+                  </div>
                 )}
               </article>
             );
