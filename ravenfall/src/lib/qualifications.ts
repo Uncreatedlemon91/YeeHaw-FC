@@ -32,3 +32,17 @@ export async function freeQualificationSlug(base: string) {
   for (let n = 2; await taken(slug); n++) slug = `${base || "qualification"}-${n}`;
   return slug;
 }
+
+/** Library manual slug per qualification id, for linking skill badges. */
+export async function manualSlugs(qualificationIds: string[]) {
+  const out = new Map<string, string>();
+  if (!qualificationIds.length) return out;
+  const docs = await prisma.libraryDocument.findMany({
+    where: { qualifications: { some: { id: { in: qualificationIds } } } },
+    select: { slug: true, qualifications: { select: { id: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+  // Oldest wins when several documents are linked, matching manualFor.
+  for (const d of docs) for (const q of d.qualifications) out.set(q.id, d.slug);
+  return out;
+}

@@ -125,3 +125,41 @@ export function describeRule(rule: AutoRule): string {
 export function medalUrl(award: { id: string; medalFile: string | null }): string | null {
   return award.medalFile ? `/api/awards/${award.id}/medal?v=${award.medalFile.slice(0, 8)}` : null;
 }
+
+// --- Rack ---------------------------------------------------------------- //
+
+export const RACK_ROW = 3;
+
+/**
+ * Lays ribbons (already in precedence order) out in rows of three. Real racks
+ * wear the senior ribbon top-left and read left to right, top to bottom; an
+ * incomplete row is the top one and is centred over the full rows below. So the
+ * first `n % 3` ribbons form the short top row and the rest fill rows of three.
+ */
+export function rackRows<T>(items: readonly T[]): T[][] {
+  const short = items.length % RACK_ROW;
+  const rows: T[][] = short ? [items.slice(0, short)] : [];
+  for (let i = short; i < items.length; i += RACK_ROW) rows.push(items.slice(i, i + RACK_ROW));
+  return rows;
+}
+
+/**
+ * Collapses a member's held awards (any order, revoked ones already removed)
+ * to one entry per award, by precedence. The count is the number of rows held,
+ * never max(sequence): revoked repeats leave gaps in the sequence. Devices only
+ * apply to repeatable awards.
+ */
+export function groupHeld<R extends { awardedAt: Date; award: { id: string; precedence: number; repeatable: boolean } }>(rows: readonly R[]) {
+  const by = new Map<string, { award: R["award"]; count: number; latest: R }>();
+  for (const r of rows) {
+    const g = by.get(r.award.id);
+    if (!g) by.set(r.award.id, { award: r.award, count: 1, latest: r });
+    else {
+      g.count++;
+      if (r.awardedAt > g.latest.awardedAt) g.latest = r;
+    }
+  }
+  return [...by.values()]
+    .map((g) => ({ ...g, count: g.award.repeatable ? g.count : 1 }))
+    .sort((a, b) => a.award.precedence - b.award.precedence);
+}

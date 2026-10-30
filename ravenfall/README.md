@@ -38,9 +38,14 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
 - **Roster and personnel files.** One page, two views: by element (the
   ORBAT, below) or a list searchable by callsign, rank, squad, role and
   status. Each member has a personnel jacket: an ID card with service
-  number and rank insignia, a ribbon rack, and tabs for their file
-  (statement, availability, deployment log), a filterable service record,
-  career progress, billet and requests. Changing a member's rank, squad or
+  number and rank insignia, a ribbon rack (awards in real rack order: rows
+  of three, senior ribbon top-left, a short row centred on top, oak leaves,
+  stars or a numeral for repeats; hover a ribbon for its date and citation)
+  with the member's qualifications as skill badges under it (linked to their
+  library manual), and tabs for their file (statement, availability,
+  deployment log), a filterable service record, career progress, billet,
+  **Awards** (every award with citations, credit and op; Command revokes
+  here and sees revoked ones struck through) and requests. Changing a member's rank, squad or
   status writes the PROMOTION / TRANSFER / DISCHARGE entry for you. A new
   rank renames them on Discord to the rank's short form and their callsign
   (`Pvt Viper`, `Cdr Raven`; the short forms are in `unit.ts`). Without a
@@ -87,7 +92,7 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   Awards** with an optional note, and never decides a nomination they made or
   one about themselves. Approval gives the award and writes an Award entry on
   the service record. Command can **revoke** an award (reason required, also
-  on the service record) from the member's Command tab; a revoked award keeps
+  on the service record) from the member's Awards tab; a revoked award keeps
   its row, so an automatic award is never re-issued.
 - **Automatic awards.** Awards with a rule (days of service, operations
   attended, campaign tag, good conduct) are given without a nomination: when
@@ -203,6 +208,7 @@ src/lib/award-evaluator.ts   automatic awards (after an AAR and daily; idempoten
 src/lib/award-notify.ts      award announcement embed, member DMs, nomination heads-up
 src/lib/qualifications.ts    qualification manuals folder and slug helpers
 src/components/ribbon.tsx    the SVG ribbon (stripes and devices)
+src/components/rack.tsx      the personnel-file ribbon rack and qualification skill badges
 src/lib/library.ts           library clearance, folder tree and search
 src/lib/required-reading.ts  who must read what, acknowledgements and compliance
 src/lib/library-notify.ts    library announcement embed and required-reading DMs

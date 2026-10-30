@@ -1,4 +1,4 @@
-import { CalendarOff, CheckCircle2, Circle, Crosshair, Lock, X } from "lucide-react";
+import { Award, CalendarOff, CheckCircle2, Circle, Crosshair, Lock, X } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -9,16 +9,21 @@ import { RankInsignia } from "@/components/insignia";
 import { Redacted, RedactedBar } from "@/components/redacted";
 import { AttendanceBadge, ATTENDANCE_LABEL, MemberStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { MAX_SECONDARY_ROLES, RANKS, rankIndex, rankName, roleDef, ROLES, squadDef, SQUADS, UNIT, UNIT_ROLES, WEEKDAYS } from "@/config/unit";
-import { categoryLabel, CATEGORIES, RIBBON } from "@/components/vault-category";
+import { Rack, SkillBadges } from "@/components/rack";
+import { Ribbon } from "@/components/ribbon";
+import { RIBBON } from "@/components/vault-category";
 import { canNominate } from "@/lib/award-service";
+import { groupHeld, stripesOf } from "@/lib/awards";
 import { requireUser } from "@/lib/auth";
 import { career } from "@/lib/career";
 import { getViewer, viewerLevel } from "@/lib/library";
 import { hasPerm } from "@/lib/permissions";
 import { billetFill, billetKey, canDecide, clearanceFor, missingQuals, onLeave, recordTypesFor, serviceNumber } from "@/lib/personnel";
 import { prisma } from "@/lib/prisma";
+import { manualSlugs } from "@/lib/qualifications";
 import { readingFor } from "@/lib/required-reading";
 import { fmt, fmtDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -68,10 +73,22 @@ export default async function Dossier({ params, searchParams }: { params: Promis
     prisma.qualification.findMany({ orderBy: [{ category: "asc" }, { title: "asc" }] }),
     onLeave([id]),
   ]);
-  // Command revokes from here; the rack and Awards tab read the same rows.
-  const heldAwards = isAdmin
-    ? await prisma.memberAward.findMany({ where: { userId: id, revokedAt: null }, include: { award: true }, orderBy: [{ award: { precedence: "asc" } }, { sequence: "asc" }] })
-    : [];
+  // Every award row of the member: the rack and Awards tab read these. Revoked
+  // rows stay in the table (so automatic awards aren't re-issued) but only
+  // Command sees them, struck through.
+  const [awardRows, manuals] = await Promise.all([
+    prisma.memberAward.findMany({
+      where: { userId: id, ...(isAdmin ? {} : { revokedAt: null }) },
+      include: { award: true, nominatedBy: true, approvedBy: true, revokedBy: true, event: { select: { id: true, title: true } } },
+      orderBy: [{ award: { precedence: "asc" } }, { sequence: "asc" }],
+    }),
+    manualSlugs(member.qualifications.map((q) => q.qualificationId)),
+  ]);
+  const heldAwards = awardRows.filter((r) => !r.revokedAt);
+  const awardGroups = groupHeld(heldAwards);
+  // Awards that Command revoked and the member no longer holds at all.
+  const heldIds = new Set(awardGroups.map((g) => g.award.id));
+  const revokedOnly = [...new Map(awardRows.filter((r) => r.revokedAt && !heldIds.has(r.awardId)).map((r) => [r.awardId, r.award])).values()];
   const n = (s: string) => counted.find((c) => c.status === s)?._count ?? 0;
   const attended = n("ATTENDING");
   const total = attended + n("ABSENT") + n("NOSHOW") + n("EXCUSED");
@@ -101,13 +118,22 @@ export default async function Dossier({ params, searchParams }: { params: Promis
   const primary = roleDef(member.unitRole);
   const sn = serviceNumber(member);
   const name = member.callsign ?? member.discordUsername;
-  // Ribbon rack: grouped by category in a fixed order, capped at RACK_MAX with a "+M" for the rest.
-  const RACK_MAX = 10;
-  const shownRibbons = member.qualifications.slice(0, RACK_MAX);
-  const hiddenRibbons = member.qualifications.length - shownRibbons.length;
-  const rack = CATEGORIES
-    .map((cat) => [cat, shownRibbons.filter((q) => q.qualification.category === cat)] as const)
-    .filter(([, list]) => list.length > 0);
+  const rackItems = awardGroups.map((g) => ({
+    id: g.award.id,
+    slug: g.award.slug,
+    name: g.award.name,
+    stripes: stripesOf(g.award.ribbon),
+    device: g.award.device,
+    count: g.count,
+    latest: fmtDate(g.latest.awardedAt),
+    citation: g.latest.citation,
+  }));
+  const skills = member.qualifications.map((q) => ({
+    id: q.id,
+    title: q.qualification.title,
+    category: q.qualification.category,
+    href: manuals.has(q.qualificationId) ? `/library/${manuals.get(q.qualificationId)}` : null,
+  }));
 
   // --- Header: the jacket's cover sheet ------------------------------------ //
   const header = (
@@ -197,48 +223,29 @@ export default async function Dossier({ params, searchParams }: { params: Promis
               )}
             </div>
 
-            {/* Ribbon rack: one ribbon per qualification, grouped by category. */}
-            <div className="mt-auto">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="field-label">Ribbon rack</div>
-                {mayNominate && (
-                  <Link href={`/roster/${id}/nominate`} className="text-xs text-accent underline-offset-4 hover:underline">
-                    Nominate for an award
-                  </Link>
-                )}
-              </div>
-              {member.qualifications.length ? (
-                <div className="flex flex-col gap-2">
-                  <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
-                    {rack.map(([cat, list]) => (
-                      <div key={cat} role="group" aria-label={`${categoryLabel(cat)} ribbons`} className="flex flex-wrap gap-1">
-                        {list.map((q) => (
-                          <Link
-                            key={q.id}
-                            href={`/vault/${q.qualification.slug}`}
-                            title={`${q.qualification.title} — ${fmtDate(q.awardedAt)}`}
-                            aria-label={`${q.qualification.title}, ${categoryLabel(cat)} ribbon, awarded ${fmtDate(q.awardedAt)}`}
-                            className={cn("h-5 w-14 rounded-[2px] border border-black/50 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", RIBBON[cat])}
-                          />
-                        ))}
-                      </div>
-                    ))}
-                    {hiddenRibbons > 0 && (
-                      <span className="typed text-xs font-semibold text-muted-foreground" title={`${hiddenRibbons} more in the Qualifications list`}>
-                        +{hiddenRibbons}
-                      </span>
+            {/* Ribbon rack (awards), then the skill badges (qualifications). */}
+            <div className="mt-auto flex flex-col gap-3">
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="field-label">Ribbon rack</div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <Link href={`/roster/${id}?tab=awards`} className="text-accent underline-offset-4 hover:underline">
+                      All awards
+                    </Link>
+                    {mayNominate && (
+                      <Link href={`/roster/${id}/nominate`} className="text-accent underline-offset-4 hover:underline">
+                        Nominate
+                      </Link>
                     )}
                   </div>
-                  <ul className="flex flex-wrap gap-x-4 gap-y-1 text-micro uppercase tracking-wider text-muted-foreground" aria-label="Ribbon key">
-                    {rack.map(([cat]) => (
-                      <li key={cat} className="flex items-center gap-1.5">
-                        <span className={cn("inline-block h-2.5 w-5 rounded-[1px] border border-black/40", RIBBON[cat])} aria-hidden /> {categoryLabel(cat)}
-                      </li>
-                    ))}
-                  </ul>
                 </div>
-              ) : (
-                <span className="text-xs text-muted-foreground">No ribbons awarded.</span>
+                <Rack items={rackItems} />
+              </div>
+              {skills.length > 0 && (
+                <div>
+                  <div className="field-label mb-1.5">Qualifications</div>
+                  <SkillBadges skills={skills} />
+                </div>
               )}
             </div>
           </div>
@@ -687,9 +694,97 @@ export default async function Dossier({ params, searchParams }: { params: Promis
     </div>
   );
 
+  // --- Awards ---------------------------------------------------------------- //
+  // Awards are public within the unit; the page itself needs OPERATOR, so
+  // citations and credits show to everyone who gets here.
+  // Numbered by position, not sequence: revoked repeats leave gaps in the sequence.
+  const awardRow = (h: (typeof awardRows)[number], i: number) => {
+    const revoked = !!h.revokedAt;
+    const credit = [
+      h.source === "AUTO" ? "Automatic" : null,
+      h.nominatedBy ? `Nominated by ${h.nominatedBy.callsign ?? h.nominatedBy.discordUsername}` : null,
+      h.approvedBy ? `approved by ${h.approvedBy.callsign ?? h.approvedBy.discordUsername}` : null,
+    ].filter(Boolean);
+    return (
+      <li key={h.id} className="flex flex-col gap-1 py-3 text-sm first:pt-0 last:pb-0">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <span className={cn("flex flex-wrap items-baseline gap-x-2", revoked && "text-muted-foreground line-through")}>
+            {h.award.repeatable && <span className="typed text-xs">Award {i + 1}</span>}
+            <span className="typed text-xs">{fmtDate(h.awardedAt)}</span>
+            {h.event && (
+              <Link href={`/ops/${h.event.id}`} className="text-xs text-accent underline-offset-4 hover:underline">
+                {h.event.title}
+              </Link>
+            )}
+          </span>
+          {isAdmin && !revoked && <RevokeAward memberAwardId={h.id} name={h.award.name} />}
+        </div>
+        {h.citation && <p className={cn("whitespace-pre-wrap text-sm", revoked && "text-muted-foreground line-through")}>{h.citation}</p>}
+        {credit.length > 0 && <p className="text-xs text-muted-foreground">{credit.join(", ")}.</p>}
+        {revoked && (
+          <p className="text-xs text-destructive">
+            Revoked {fmtDate(h.revokedAt!)}
+            {h.revokedBy && ` by ${h.revokedBy.callsign ?? h.revokedBy.discordUsername}`}
+            {h.revokeReason && `: ${h.revokeReason}`}
+          </p>
+        )}
+      </li>
+    );
+  };
+  const awardBlock = (a: (typeof awardRows)[number]["award"], rows: typeof awardRows, opts: { count: number; dim?: boolean; heading: React.ReactNode; span?: string }) => (
+    <section key={a.id} aria-labelledby={`aw-${a.id}`} className="flex flex-col gap-3 sm:flex-row sm:gap-5">
+      <div className={cn("w-28 shrink-0", opts.dim && "opacity-50")}>
+        <Ribbon stripes={stripesOf(a.ribbon)} device={a.device} count={opts.count} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <h3 id={`aw-${a.id}`} className="mb-2 flex flex-wrap items-baseline gap-x-3 border-b border-foreground/10 pb-2 text-sm font-semibold uppercase tracking-label">
+          {opts.heading}
+          {opts.span && <span className="typed ml-auto text-xs font-normal normal-case text-muted-foreground">{opts.span}</span>}
+        </h3>
+        <ul className="flex flex-col divide-y divide-foreground/10">{rows.map(awardRow)}</ul>
+      </div>
+    </section>
+  );
+  const awardsPanel = (
+    <div className="flex min-w-0 flex-col gap-8">
+      {mayNominate && (
+        <div className="flex justify-end">
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/roster/${id}/nominate`}>
+              <Award /> Nominate for an award
+            </Link>
+          </Button>
+        </div>
+      )}
+      {awardGroups.length === 0 && revokedOnly.length === 0 && <Empty>No awards yet.</Empty>}
+      {awardGroups.map((g) => {
+        const rows = awardRows.filter((r) => r.awardId === g.award.id);
+        const firstAt = heldAwards.find((r) => r.awardId === g.award.id)!.awardedAt;
+        return awardBlock(g.award, rows, {
+          count: g.count,
+          heading: (
+            <>
+              <Link href={`/vault/${g.award.slug}`} className="hover:text-accent">
+                {g.award.name}
+              </Link>
+              {g.count > 1 && <span className="typed text-xs normal-case text-muted-foreground">{g.count} times</span>}
+            </>
+          ),
+          span: g.count > 1 ? `${fmtDate(firstAt)} to ${fmtDate(g.latest.awardedAt)}` : fmtDate(firstAt),
+        });
+      })}
+      {revokedOnly.map((a) =>
+        awardBlock(a, awardRows.filter((r) => r.awardId === a.id), {
+          count: 1,
+          dim: true,
+          heading: <span className="text-muted-foreground line-through">{a.name}</span>,
+        }),
+      )}
+    </div>
+  );
+
   // --- Command --------------------------------------------------------------- //
   const command = isAdmin && (
-    <div className="flex flex-col gap-8">
     <div className="grid gap-8 lg:grid-cols-[1fr_280px]">
       <Section title="Edit file">
         <ActionForm action={updateProfile}>
@@ -761,25 +856,6 @@ export default async function Dossier({ params, searchParams }: { params: Promis
         </dl>
       </Section>
     </div>
-      <Section title="Awards held">
-        {heldAwards.length ? (
-          <ul className="flex flex-col divide-y divide-foreground/10">
-            {heldAwards.map((h) => (
-              <li key={h.id} className="flex flex-wrap items-center justify-between gap-3 py-2 text-sm first:pt-0 last:pb-0">
-                <span>
-                  <span className="font-semibold">{h.award.name}</span>
-                  {h.sequence > 1 && h.award.repeatable && <span className="typed ml-2 text-xs text-muted-foreground">award {h.sequence}</span>}
-                  <span className="typed ml-2 text-xs text-muted-foreground">{fmtDate(h.awardedAt)}</span>
-                </span>
-                <RevokeAward memberAwardId={h.id} name={h.award.name} />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <Empty>No awards held.</Empty>
-        )}
-      </Section>
-    </div>
   );
 
   const pendingCount = member.requests.filter((r) => r.status === "PENDING").length;
@@ -793,6 +869,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
           { id: "record", label: "Service record", content: record },
           { id: "career", label: "Career", content: careerPanel },
           { id: "billet", label: "Billet", content: billet },
+          { id: "awards", label: "Awards", content: awardsPanel },
           ...(requests ? [{ id: "requests", label: "Requests", badge: pendingCount, content: requests }] : []),
           ...(command ? [{ id: "command", label: "Command", content: command }] : []),
         ]}
