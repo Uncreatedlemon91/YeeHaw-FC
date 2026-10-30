@@ -10,7 +10,7 @@ export const UNIT = {
   description:
     "A tactical milsim unit running weekly combined-arms operations with a focus on realism, communication and teamwork.",
   // Shown on the landing page. Leave empty to hide the link.
-  discordInvite: "",
+  discordInvite: "https://discord.gg/rRpcCCaBVV",
   // YouTube video IDs for the landing page's media section (the part after
   // "v=" in a watch URL). Empty hides the section.
   media: [] as string[],

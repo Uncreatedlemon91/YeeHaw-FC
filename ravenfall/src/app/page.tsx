@@ -189,11 +189,18 @@ export default async function Home() {
           <p className="max-w-lg text-sm text-muted-foreground">
             All you need is a Discord account and a working microphone. We train you on the rest.
           </p>
-          <Button asChild size="lg" variant="accent">
-            <Link href="/apply">
-              Start your application <ChevronRight />
-            </Link>
-          </Button>
+          <div className="flex flex-wrap justify-center gap-3">
+            <Button asChild size="lg" variant="accent">
+              <Link href="/apply">
+                Start your application <ChevronRight />
+              </Link>
+            </Button>
+            {UNIT.discordInvite && (
+              <Button asChild size="lg" variant="outline">
+                <a href={UNIT.discordInvite}>Join our Discord</a>
+              </Button>
+            )}
+          </div>
         </div>
       </Container>
     </>
