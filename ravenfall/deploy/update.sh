@@ -28,9 +28,10 @@ echo "== Building (takes a few minutes on a small droplet)"
 as_app env NODE_OPTIONS=--max-old-space-size=1536 npm run build
 
 cp deploy/ravenfall.service deploy/ravenfall-gateway.service deploy/ravenfall-backup.service deploy/ravenfall-backup.timer \
+   deploy/ravenfall-awards.service deploy/ravenfall-awards.timer \
    /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now ravenfall-backup.timer
+systemctl enable --now ravenfall-backup.timer ravenfall-awards.timer
 systemctl enable ravenfall ravenfall-gateway
 systemctl restart ravenfall
 systemctl restart ravenfall-gateway

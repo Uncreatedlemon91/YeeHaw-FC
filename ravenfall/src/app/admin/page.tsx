@@ -69,6 +69,7 @@ export default async function Admin() {
     { label: "Ops announcements", ok: !!channels.ops, env: "Channels below", optional: true, hint: "Only needed to announce new operations." },
     { label: "Personnel board", ok: !!channels.personnel, env: "Channels below", optional: true, hint: "Only needed for billet, callsign and leave requests." },
     { label: "Library announcements", ok: !!channels.library, env: "Channels below", optional: true, hint: "Only needed to announce library documents." },
+    { label: "Awards channel", ok: !!channels.awards, env: "Channels below", optional: true, hint: "Only needed to announce awards and decorations." },
     { label: "Recruit role", ok: !!cfg.recruit, env: "Role mapping below", hint: "Map it under Discord role mapping → Recruitment." },
     { label: "Candidate role", ok: !!cfg.candidate, env: "Role mapping below", hint: "Map it under Discord role mapping → Recruitment." },
   ];
@@ -166,6 +167,7 @@ export default async function Admin() {
                 { key: "ops", label: "Ops announcements", help: "New operations, if the scheduler ticks Announce." },
                 { key: "personnel", label: "Personnel board", help: "Billet, callsign and leave requests. Leadership only." },
                 { key: "library", label: "Library announcements", help: "New Public and Unit documents, and major updates to required reading." },
+                { key: "awards", label: "Awards", help: "Awards and decorations as they are given, by nomination or automatically." },
               ]}
             />
           ) : (

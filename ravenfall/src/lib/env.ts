@@ -76,6 +76,10 @@ export const env = {
   get libraryChannelId() {
     return process.env.LIBRARY_ANNOUNCE_CHANNEL_ID ?? "";
   },
+  /** Where awards are announced (optional). */
+  get awardsChannelId() {
+    return process.env.AWARDS_ANNOUNCE_CHANNEL_ID ?? "";
+  },
   /** Discord role per squad name, kept in step with each member's squad. */
   get squadRoleIds() {
     return pairs("ROLE_IDS_SQUADS");

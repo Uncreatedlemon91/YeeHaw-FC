@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarOff, Medal } from "lucide-react";
+import { ArrowRight, Award, CalendarOff, Medal } from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { Container } from "@/components/container";
@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { rankIndex } from "@/config/unit";
+import { canDecideNomination } from "@/lib/award-service";
 import { requireUser } from "@/lib/auth";
 import { career } from "@/lib/career";
 import { hasPerm } from "@/lib/permissions";
@@ -14,6 +15,7 @@ import { canDecide, isLeader, leads } from "@/lib/personnel";
 import { prisma } from "@/lib/prisma";
 import { readingProgress } from "@/lib/required-reading";
 import { fmtDate } from "@/lib/time";
+import { NominationCard } from "./nomination-card";
 import { RequestCard } from "./request-card";
 
 export const metadata = { title: "S1 Desk" };
@@ -28,6 +30,26 @@ export default async function S1Desk() {
   // Members whose files this viewer works: Command sees everyone, leaders
   // their own squad (a Command billet leads every squad).
   const covers = (u: { squad: string | null }) => command || leads(viewer, u.squad);
+
+  // Award nominations: Command works the queue, leaders see how their own fared.
+  const nominationInclude = { award: true, nominee: true, nominatedBy: true, decidedBy: true, event: { select: { id: true, title: true } } } as const;
+  const weekAgo = new Date(now.getTime() - 7 * 864e5);
+  const nominations = command
+    ? await prisma.awardNomination.findMany({
+        where: { OR: [{ status: "PENDING" }, { decidedAt: { gte: weekAgo } }] },
+        include: nominationInclude,
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      })
+    : leader
+      ? await prisma.awardNomination.findMany({
+          where: { nominatedById: me.id, OR: [{ status: "PENDING" }, { decidedAt: { gte: weekAgo } }] },
+          include: nominationInclude,
+          orderBy: { createdAt: "desc" },
+          take: 30,
+        })
+      : [];
+  const nominationsPending = nominations.filter((n) => n.status === "PENDING").length;
 
   const [open, mine, active, leave] = await Promise.all([
     leader
@@ -131,6 +153,33 @@ export default async function S1Desk() {
                   <RequestCard key={r.id} r={r} decidable showNotes showMember flush />
                 ))}
                 {!queue.length && <p className="text-sm text-muted-foreground">Nothing waiting. In-tray clear.</p>}
+              </CardContent>
+            </Card>
+          )}
+
+          {leader && (
+            <Card id="awards" className="scroll-mt-20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Award className="size-4 text-accent" /> Awards
+                  {nominationsPending > 0 && <Badge variant="accent">{nominationsPending}</Badge>}
+                </CardTitle>
+                <CardDescription>
+                  {command
+                    ? "Nominations from squad leadership and Command. You can't decide your own nomination or one about you."
+                    : "Your nominations and how Command decided them. Nominate from a member's personnel file."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col divide-y divide-foreground/10">
+                {nominations.map((n) => (
+                  <NominationCard
+                    key={n.id}
+                    n={n}
+                    decidable={command}
+                    blocked={command && !canDecideNomination(me.perms, me.id, n) ? "Another member of Command has to decide this one." : undefined}
+                  />
+                ))}
+                {!nominations.length && <p className="text-sm text-muted-foreground">{command ? "No nominations waiting." : "No nominations this week."}</p>}
               </CardContent>
             </Card>
           )}

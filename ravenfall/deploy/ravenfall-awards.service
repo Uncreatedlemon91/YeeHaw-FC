@@ -1,0 +1,11 @@
+[Unit]
+Description=Ravenfall HQ automatic awards run
+After=ravenfall.service
+
+[Service]
+Type=oneshot
+User=ravenfall
+Group=ravenfall
+# For NEXTAUTH_SECRET / SITE_PORT, if not already in the file deploy/awards.sh reads.
+EnvironmentFile=-/opt/ravenfall/ravenfall/.env
+ExecStart=/usr/bin/env bash /opt/ravenfall/ravenfall/deploy/awards.sh

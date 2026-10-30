@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ActionState } from "@/components/action-form";
+import { evaluateAwards } from "@/lib/award-evaluator";
+import { announceLater } from "@/lib/award-notify";
 import { assertPerm } from "@/lib/auth";
 import { linkButton, row, sendMessage } from "@/lib/discord";
 import { getChannelConfig } from "@/lib/channel-config";
@@ -142,6 +144,13 @@ export async function saveDebrief(_: ActionState, data: FormData): Promise<Actio
       }),
     ),
   ]);
+  // Automatic awards for the people who were there. Never fails the report.
+  try {
+    const { created } = await evaluateAwards({ userIds: marks.filter((m) => m.status === "ATTENDING").map((m) => m.userId), eventId });
+    announceLater(created);
+  } catch (e) {
+    console.error("[awards] evaluation after AAR failed:", e);
+  }
   revalidatePath(`/ops/${eventId}`);
   redirect(`/ops/${eventId}`);
 }

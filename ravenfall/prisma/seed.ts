@@ -1,5 +1,6 @@
-// Starter vault content: the core qualifications every unit needs, with
-// outline manuals to edit. Re-running only adds what's missing.
+// Starter qualifications every unit needs, with outline manuals (filed in the
+// Library, under "Qualification manuals") to edit. Re-running only adds what's
+// missing. The award catalog comes from a migration.
 //   npm run db:seed
 
 import { PrismaClient, type QualificationCategory } from "@prisma/client";
@@ -87,11 +88,44 @@ Basic Combat Training, rank of Private First Class or above.
   },
 ];
 
+const MANUALS = "Qualification manuals";
+
+// Same shape the awards migration gives an existing database: each
+// qualification's manual as a UNIT library document in a "Qualification
+// manuals" folder, linked to it. Skips any qualification that already has one.
+async function seedManuals() {
+  let folder = await prisma.libraryFolder.findFirst({ where: { name: MANUALS, parentId: null } });
+  folder ??= await prisma.libraryFolder.create({ data: { name: MANUALS, clearance: "UNIT" } });
+  let added = 0;
+  for (const q of await prisma.qualification.findMany({ include: { libraryDocs: { select: { folderId: true } } } })) {
+    if (q.libraryDocs.some((m) => m.folderId === folder.id)) continue;
+    // The qualification's own slug unless the library already uses it.
+    const taken = async (slug: string) => !!(await prisma.libraryDocument.findUnique({ where: { slug } })) || ["new", "f", "compliance", "search"].includes(slug);
+    const slug = !(await taken(q.slug)) ? q.slug : `${q.slug}-manual`;
+    if (await taken(slug)) continue;
+    await prisma.libraryDocument.create({
+      data: {
+        slug,
+        title: q.title,
+        summary: q.summary,
+        content: q.content,
+        clearance: "UNIT",
+        folderId: folder.id,
+        qualifications: { connect: { id: q.id } },
+        revisions: { create: { number: 1, title: q.title, summary: q.summary, content: q.content, note: "Moved from the qualification vault" } },
+      },
+    });
+    added++;
+  }
+  return added;
+}
+
 async function main() {
   for (const d of DOCS) {
     await prisma.qualification.upsert({ where: { slug: d.slug }, create: d, update: {} });
   }
-  console.log(`Vault seeded: ${DOCS.length} documents.`);
+  console.log(`Vault seeded: ${DOCS.length} qualifications.`);
+  console.log(`Library: ${await seedManuals()} qualification manuals added.`);
 }
 
 main().finally(() => prisma.$disconnect());

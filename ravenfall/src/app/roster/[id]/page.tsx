@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { MAX_SECONDARY_ROLES, RANKS, rankIndex, rankName, roleDef, ROLES, squadDef, SQUADS, UNIT, UNIT_ROLES, WEEKDAYS } from "@/config/unit";
 import { categoryLabel, CATEGORIES, RIBBON } from "@/components/vault-category";
+import { canNominate } from "@/lib/award-service";
 import { requireUser } from "@/lib/auth";
 import { career } from "@/lib/career";
 import { getViewer, viewerLevel } from "@/lib/library";
@@ -29,6 +30,7 @@ import { FileTabs } from "./file-tabs";
 import { promotionRanks, RECORD_STYLE } from "./record-style";
 import { RecordTimeline } from "./record-timeline";
 import { RequestForm } from "./request-form";
+import { RevokeAward } from "./revoke-award";
 
 export const metadata = { title: "Personnel file" };
 
@@ -53,6 +55,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
   if (!member) notFound();
 
   const clr = clearanceFor(me, viewer, member);
+  const mayNominate = canNominate(me.perms, viewer, member);
   const isAdmin = hasPerm(me.perms, "ADMIN");
   const isInstructor = hasPerm(me.perms, "INSTRUCTOR");
   const records = member.serviceRecords.filter(
@@ -65,6 +68,10 @@ export default async function Dossier({ params, searchParams }: { params: Promis
     prisma.qualification.findMany({ orderBy: [{ category: "asc" }, { title: "asc" }] }),
     onLeave([id]),
   ]);
+  // Command revokes from here; the rack and Awards tab read the same rows.
+  const heldAwards = isAdmin
+    ? await prisma.memberAward.findMany({ where: { userId: id, revokedAt: null }, include: { award: true }, orderBy: [{ award: { precedence: "asc" } }, { sequence: "asc" }] })
+    : [];
   const n = (s: string) => counted.find((c) => c.status === s)?._count ?? 0;
   const attended = n("ATTENDING");
   const total = attended + n("ABSENT") + n("NOSHOW") + n("EXCUSED");
@@ -192,7 +199,14 @@ export default async function Dossier({ params, searchParams }: { params: Promis
 
             {/* Ribbon rack: one ribbon per qualification, grouped by category. */}
             <div className="mt-auto">
-              <div className="field-label mb-2">Ribbon rack</div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="field-label">Ribbon rack</div>
+                {mayNominate && (
+                  <Link href={`/roster/${id}/nominate`} className="text-xs text-accent underline-offset-4 hover:underline">
+                    Nominate for an award
+                  </Link>
+                )}
+              </div>
               {member.qualifications.length ? (
                 <div className="flex flex-col gap-2">
                   <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
@@ -675,6 +689,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
 
   // --- Command --------------------------------------------------------------- //
   const command = isAdmin && (
+    <div className="flex flex-col gap-8">
     <div className="grid gap-8 lg:grid-cols-[1fr_280px]">
       <Section title="Edit file">
         <ActionForm action={updateProfile}>
@@ -744,6 +759,25 @@ export default async function Dossier({ params, searchParams }: { params: Promis
           <Typed label="Last sign-in" value={member.lastLoginAt ? fmt(member.lastLoginAt, "d MMM yyyy HH:mm") : "Never"} />
           <Typed label="File created" value={fmtDate(member.createdAt)} />
         </dl>
+      </Section>
+    </div>
+      <Section title="Awards held">
+        {heldAwards.length ? (
+          <ul className="flex flex-col divide-y divide-foreground/10">
+            {heldAwards.map((h) => (
+              <li key={h.id} className="flex flex-wrap items-center justify-between gap-3 py-2 text-sm first:pt-0 last:pb-0">
+                <span>
+                  <span className="font-semibold">{h.award.name}</span>
+                  {h.sequence > 1 && h.award.repeatable && <span className="typed ml-2 text-xs text-muted-foreground">award {h.sequence}</span>}
+                  <span className="typed ml-2 text-xs text-muted-foreground">{fmtDate(h.awardedAt)}</span>
+                </span>
+                <RevokeAward memberAwardId={h.id} name={h.award.name} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Empty>No awards held.</Empty>
+        )}
       </Section>
     </div>
   );

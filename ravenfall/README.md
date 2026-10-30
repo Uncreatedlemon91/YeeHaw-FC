@@ -80,6 +80,32 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   stored beside the library images) and retire. A starter catalog (service,
   operations, good conduct, valor, lifesaver, commendations, unit citation) is
   added by a migration, insert-if-missing by slug.
+- **Giving awards.** Squad leaders nominate members of the squads they lead,
+  and Command anyone, from the personnel file (**Nominate for an award**: pick
+  the award with its ribbon, write a citation, optionally pick the op).
+  Nobody nominates themselves. Command approves or denies on the **S1 Desk →
+  Awards** with an optional note, and never decides a nomination they made or
+  one about themselves. Approval gives the award and writes an Award entry on
+  the service record. Command can **revoke** an award (reason required, also
+  on the service record) from the member's Command tab; a revoked award keeps
+  its row, so an automatic award is never re-issued.
+- **Automatic awards.** Awards with a rule (days of service, operations
+  attended, campaign tag, good conduct) are given without a nomination: when
+  an after-action report is filed (for that op's attendees) and once a day by
+  `ravenfall-awards.timer` (about 04:20; `deploy/awards.sh` calls the site's
+  internal `/api/internal/awards` with the same token as the gateway). Runs
+  are idempotent. An operations rule `threshold: 10, every: 10` on a repeatable
+  award owes award n at 10 + 10(n-1) ops. The campaign tag matches the op's
+  title or description (operations have no tag field), case-insensitively.
+  Good conduct needs the member to be active, enlisted that long, with no
+  disciplinary entry in the window. Run one by hand with
+  `sudo -u ravenfall bash /opt/ravenfall/ravenfall/deploy/awards.sh`.
+- **Awards on Discord.** Each award given (approved or automatic) is posted
+  in the awards channel and the member gets a DM. Up to three awards in one
+  run get an embed each; more become one grouped summary, and a member
+  receives one DM per run. If the post fails it is retried on the next run for
+  three days. If a personnel board channel is set, Command is also pinged
+  there when a nomination is filed. Discord never blocks the save.
 - **Qualifications** are skills, not ribbons. They stay as data (billet and
   rank prerequisites) and their manuals are Library documents, one per
   qualification in the **Qualification manuals** folder, linked through the
@@ -172,6 +198,9 @@ src/lib/recruitment.ts       approve / deny pipeline (shared by web and Discord)
 src/lib/personnel.ts         clearance, billets, leave, and the S1 request pipeline (shared by web and Discord)
 src/lib/career.ts            promotion criteria checklist
 src/lib/awards.ts            ribbon stripe validation, repeat devices, automatic award rules
+src/lib/award-service.ts     who may nominate / decide, and the one place an award is granted
+src/lib/award-evaluator.ts   automatic awards (after an AAR and daily; idempotent)
+src/lib/award-notify.ts      award announcement embed, member DMs, nomination heads-up
 src/lib/qualifications.ts    qualification manuals folder and slug helpers
 src/components/ribbon.tsx    the SVG ribbon (stripes and devices)
 src/lib/library.ts           library clearance, folder tree and search
@@ -186,7 +215,7 @@ src/app/api/internal/*       endpoints the gateway process calls
 scripts/gateway.mjs          gateway connection: bot presence + member events
 src/app/*                    pages; each folder's actions.ts holds its server actions
 prisma/schema.prisma         data model
-deploy/                      systemd units, update and backup scripts
+deploy/                      systemd units, update, backup and daily awards scripts
 ```
 
 Ranks (with promotion criteria), squads (with billet caps), unit roles
@@ -240,7 +269,7 @@ Don't reuse YeeHaw FC's: each app has exactly one interactions endpoint.
    you save, so the site has to be running first.
 7. Sign in, open **Admin**. Under **Discord channels**, pick the
    recruitment board, welcome channel and (optionally) the ops, personnel
-   and library announcements channels, and save. Give the bot View Channel, Send Messages
+   library and awards announcements channels, and save. Give the bot View Channel, Send Messages
    and Embed Links in each. Then press **Register commands** and **Post to
    welcome channel**, and pin the welcome message in Discord.
 8. On **Admin → Discord role mapping**, pick which Discord roles grant each
@@ -365,6 +394,11 @@ It also tars the library images (`LIBRARY_UPLOAD_DIR`, default
 `/opt/ravenfall/uploads/library`) to `ravenfall-uploads-*.tar.gz`, with the
 same retention; `update.sh` creates that directory, owned by `ravenfall`.
 `BACKUP_DIR` and `BACKUP_RETENTION` in `.env` change the rest.
+
+`ravenfall-awards.timer` is the other daily job: it evaluates automatic awards
+(see Awards above) at about 04:20. Both timers are installed by `update.sh`.
+`systemctl list-timers ravenfall-awards.timer` shows the next run;
+`journalctl -u ravenfall-awards` the last result.
 
 ```bash
 systemctl list-timers ravenfall-backup.timer
