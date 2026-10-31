@@ -1,5 +1,5 @@
 import type { PersonnelRequest, User } from "@prisma/client";
-import { CalendarOff, Hand, IdCard, Shuffle, X } from "lucide-react";
+import { CalendarOff, ChevronsUp, Hand, IdCard, Shuffle, X } from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { ConfirmButton } from "@/components/confirm-button";
@@ -9,7 +9,7 @@ import { fmtDate } from "@/lib/time";
 import { cancelRequest, endLeave } from "./actions";
 import { DecideForm } from "./decide-form";
 
-const ICON = { ROLE: Shuffle, CALLSIGN: IdCard, LOA: CalendarOff, INTEREST: Hand } as const;
+const ICON = { ROLE: Shuffle, CALLSIGN: IdCard, LOA: CalendarOff, INTEREST: Hand, PROMOTION: ChevronsUp } as const;
 const VARIANT = { PENDING: "accent", APPROVED: "success", DENIED: "destructive", CANCELLED: "outline" } as const;
 
 type Req = PersonnelRequest & { user?: User; reviewedBy?: User | null };
@@ -67,7 +67,7 @@ export function RequestCard({
             {showNotes && r.reviewNote && <p className="mt-1 border-l-2 border-accent pl-2 text-sm text-muted-foreground">{r.reviewNote}</p>}
           </div>
         </div>
-        {own && r.status === "PENDING" && (
+        {own && r.status === "PENDING" && r.type !== "PROMOTION" && (
           <form action={cancelRequest}>
             <input type="hidden" name="requestId" value={r.id} />
             <ConfirmButton message="Withdraw this request?" variant="ghost" size="sm">

@@ -99,7 +99,7 @@ function RuleFields({ rule, error }: { rule: AutoRule | null; error?: string }) 
   const [type, setType] = useState<string>(rule?.type ?? "");
   return (
     <div className="flex flex-col gap-3">
-      <Field label="Awarded" htmlFor="ruleType" help="Nomination: squad leadership nominates and Command decides. Or pick a rule and members earn it automatically." error={error}>
+      <Field label="Awarded" htmlFor="ruleType" help="Nomination: squad leadership nominates and Command decides. Or pick a rule and members who meet it are nominated automatically for Command to approve." error={error}>
         <Select id="ruleType" name="ruleType" value={type} onChange={(e) => setType(e.target.value)}>
           <option value="">By nomination</option>
           {RULE_TYPES.map((t) => (

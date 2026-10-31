@@ -7,8 +7,8 @@ import { env } from "./env";
 import { notifyLater } from "./library-notify";
 import { prisma } from "./prisma";
 
-// Discord side of awards: an embed in the Awards channel and a DM to the
-// member. Runs after the save and never fails it (callers use announceLater).
+// Discord side of awards: once S1 approves one, an embed in the Awards
+// channel and a DM to the member. Runs after the save and never fails it (callers use announceLater).
 // Awards given in one go (the daily evaluator's backlog) are batched into a
 // summary instead of one post each.
 
@@ -139,3 +139,36 @@ export async function announceNomination(nominationId: string) {
 }
 
 export const announceNominationLater = (id: string) => notifyLater("nomination", () => announceNomination(id));
+
+/** One heads-up on the personnel board for a run's automatic nominations, however many. */
+export async function announceAutoNominations(ids: string[]) {
+  if (!env.botToken || !ids.length) return;
+  const { personnel } = await getChannelConfig();
+  if (!personnel) return;
+  const rows = await prisma.awardNomination.findMany({
+    where: { id: { in: ids }, status: "PENDING" },
+    include: { nominee: true, award: true },
+    orderBy: [{ award: { precedence: "asc" } }, { createdAt: "asc" }],
+  });
+  if (!rows.length) return;
+  const lines = rows.map((n) => `**${n.award.name}** for **${callsignOf(n.nominee)}**: ${clip(n.citation, 120)}`);
+  const shown = lines.slice(0, 20);
+  await sendMessage(personnel, {
+    embeds: [
+      {
+        title: rows.length === 1 ? "Automatic award nomination pending" : `${rows.length} automatic award nominations pending`,
+        url: `${env.siteUrl}/personnel#awards`,
+        description: clip(
+          shown.join("\n") + (lines.length > shown.length ? `\nAnd ${lines.length - shown.length} more.` : "") + "\n\nMet an automatic rule. Command approves or denies.",
+          4000,
+        ),
+        color: 0xd4a017,
+        footer: { text: `${UNIT.siteName} · S1 Desk, Awards` },
+      },
+    ],
+    components: [row(linkButton("Decide on the S1 Desk", `${env.siteUrl}/personnel#awards`))],
+    allowed_mentions: { parse: [] },
+  });
+}
+
+export const announceAutoNominationsLater = (ids: string[]) => ids.length && notifyLater("auto-nominations", () => announceAutoNominations(ids));

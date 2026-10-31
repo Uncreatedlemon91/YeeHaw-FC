@@ -80,6 +80,14 @@ export const env = {
   get awardsChannelId() {
     return process.env.AWARDS_ANNOUNCE_CHANNEL_ID ?? "";
   },
+  /** Where promotions are announced (optional). */
+  get promotionsChannelId() {
+    return process.env.PROMOTIONS_ANNOUNCE_CHANNEL_ID ?? "";
+  },
+  /** Where billet assignments are announced (optional). */
+  get assignmentsChannelId() {
+    return process.env.ASSIGNMENTS_ANNOUNCE_CHANNEL_ID ?? "";
+  },
   /** Discord role per squad name, kept in step with each member's squad. */
   get squadRoleIds() {
     return pairs("ROLE_IDS_SQUADS");

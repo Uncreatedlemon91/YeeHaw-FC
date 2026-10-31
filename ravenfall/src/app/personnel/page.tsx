@@ -6,14 +6,13 @@ import { RankInsignia } from "@/components/insignia";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { rankIndex } from "@/config/unit";
 import { canDecideNomination } from "@/lib/award-service";
 import { requireUser } from "@/lib/auth";
-import { career } from "@/lib/career";
 import { hasPerm } from "@/lib/permissions";
 import { canDecide, isLeader, leads } from "@/lib/personnel";
 import { prisma } from "@/lib/prisma";
-import { readingProgress } from "@/lib/required-reading";
+import { promotionStatus } from "@/lib/promotions";
+import { rankIndex } from "@/config/unit";
 import { fmtDate } from "@/lib/time";
 import { NominationCard } from "./nomination-card";
 import { RequestCard } from "./request-card";
@@ -51,7 +50,7 @@ export default async function S1Desk() {
       : [];
   const nominationsPending = nominations.filter((n) => n.status === "PENDING").length;
 
-  const [open, mine, active, leave] = await Promise.all([
+  const [open, mine, status, leave] = await Promise.all([
     leader
       ? prisma.personnelRequest.findMany({
           // Pending, plus anything decided this week, so a decision stays on
@@ -68,15 +67,7 @@ export default async function S1Desk() {
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
-    leader
-      ? prisma.user.findMany({
-          where: { status: "ACTIVE", rank: { not: null } },
-          include: {
-            qualifications: { include: { qualification: { select: { slug: true } } } },
-            serviceRecords: { where: { type: "PROMOTION" }, orderBy: { createdAt: "desc" }, take: 1 },
-          },
-        })
-      : [],
+    leader ? promotionStatus({}, now) : [],
     leader
       ? prisma.personnelRequest.findMany({
           where: { type: "LOA", status: "APPROVED", endDate: { gte: now } },
@@ -90,30 +81,8 @@ export default async function S1Desk() {
   const pending = queue.filter((r) => r.status === "PENDING").length;
 
   // The promotion board: everyone in scope who meets the next rank's criteria.
-  const attended = leader
-    ? await prisma.attendance.groupBy({
-        by: ["userId"],
-        where: { status: "ATTENDING", event: { startTime: { lt: now } }, userId: { in: active.map((u) => u.id) } },
-        _count: true,
-      })
-    : [];
-  const ops = new Map(attended.map((a) => [a.userId, a._count]));
-  const reading = leader ? await readingProgress(active.filter(covers)) : new Map();
-  const board = active
-    .filter(covers)
-    .map((u) => ({
-      u,
-      path: career({
-        rank: u.rank,
-        since: u.rankSince ?? u.serviceRecords[0]?.createdAt ?? u.enlistedAt,
-        enlistedAt: u.enlistedAt,
-        opsAttended: ops.get(u.id) ?? 0,
-        quals: u.qualifications.map((q) => q.qualification.slug),
-        reading: reading.get(u.id),
-        now,
-      }),
-    }))
-    .filter((b) => b.path.eligible && b.u.id !== me.id)
+  const board = status
+    .filter((b) => covers(b.u) && b.path.eligible && b.u.id !== me.id)
     .sort((a, b) => rankIndex(b.u.rank) - rankIndex(a.u.rank));
   const away = leave.filter((l) => covers(l.user));
 
@@ -124,7 +93,7 @@ export default async function S1Desk() {
         title="S1 Desk"
         description={
           leader
-            ? "Billet, interest, callsign and leave requests waiting on you, plus who's ready for promotion and who's away."
+            ? "Billet, interest, callsign, leave and promotion requests waiting on you, plus who's ready for promotion and who's away."
             : "Your personnel actions. File new requests from your personnel file."
         }
         actions={
@@ -145,7 +114,7 @@ export default async function S1Desk() {
                 <CardDescription>
                   {command
                     ? "Everything pending across the unit."
-                    : "Billet changes and interest in vacant billets within your squad, and its leave requests. Transfers and callsigns go to Command."}
+                    : "Billet changes and interest in vacant billets within your squad, and its leave requests. Transfers, callsigns and promotions go to Command."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col divide-y divide-foreground/10">
@@ -166,7 +135,7 @@ export default async function S1Desk() {
                 </CardTitle>
                 <CardDescription>
                   {command
-                    ? "Nominations from squad leadership and Command. You can't decide your own nomination or one about you."
+                    ? "Nominations from squad leadership and Command, and automatic ones from the award rules. You can't decide your own nomination or one about you."
                     : "Your nominations and how Command decided them. Nominate from a member's personnel file."}
                 </CardDescription>
               </CardHeader>
@@ -216,7 +185,7 @@ export default async function S1Desk() {
                 <CardTitle className="flex items-center gap-2">
                   <Medal className="size-4 text-accent" /> Promotion board
                 </CardTitle>
-                <CardDescription>Meets every criterion for the next rank. Sergeant and up also need leadership approval.</CardDescription>
+                <CardDescription>Meets every criterion for the next rank. Each gets a promotion request in the in-tray for Command to approve.</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 {board.map(({ u, path }) => (
@@ -230,7 +199,6 @@ export default async function S1Desk() {
                       <span className="font-semibold">{u.callsign ?? u.discordUsername}</span>
                       <span className="block text-xs text-muted-foreground">
                         {u.rank} → {path.next?.abbr} · {path.daysInGrade} days in grade
-                        {path.needsApproval && " · needs approval"}
                       </span>
                     </span>
                   </Link>

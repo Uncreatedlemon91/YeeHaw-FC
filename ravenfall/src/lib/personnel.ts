@@ -1,5 +1,5 @@
 import type { PersonnelRequest, Prisma, RequestType, ServiceRecordType, User } from "@prisma/client";
-import { MAX_SECONDARY_ROLES, nickname, roleDef, squadDef, stripRank, UNIT_ROLES } from "@/config/unit";
+import { MAX_SECONDARY_ROLES, nickname, rankName, roleDef, squadDef, stripRank, UNIT_ROLES } from "@/config/unit";
 import { addRole, ButtonStyle, dm, editMessage, explain, getMember, linkButton, removeRole, row, sendMessage, setNickname } from "./discord";
 import { env } from "./env";
 import { hasPerm, type Perm } from "./permissions";
@@ -7,6 +7,7 @@ import { prisma } from "./prisma";
 import { getChannelConfig } from "./channel-config";
 import { getRoleConfig } from "./role-config";
 import { fmtDate } from "./time";
+import { announceAssignmentLater, announcePromotionLater } from "./unit-notify";
 
 // The S1 shop: who may see which parts of a personnel file, billet caps,
 // qualification gates, leave, and the request pipeline. Like recruitment,
@@ -97,6 +98,8 @@ export function missingQuals(role: string, held: readonly string[]): string[] {
 }
 
 export type RolePayload = { squad: string; primary: string; secondary: string[] };
+/** A promotion recommended by the system (src/lib/promotions.ts): rank abbreviations. */
+export type PromotionPayload = { from: string; to: string };
 /** A member volunteering for a vacant billet. `needs` are the qualification titles they lacked when they filed. */
 export type InterestPayload = { squad: string; role: string; needs: string[] };
 
@@ -171,12 +174,13 @@ export const REQUEST_LABEL: Record<RequestType, string> = {
   CALLSIGN: "Callsign change",
   LOA: "Leave of absence",
   INTEREST: "Billet interest",
+  PROMOTION: "Promotion",
 };
 
 /**
- * Callsigns are Command's call. Role changes within a squad and leave can
- * be decided by that squad's leadership; transfers between squads go to
- * Command. Nobody decides their own request.
+ * Callsigns and promotions are Command's call. Role changes within a squad
+ * and leave can be decided by that squad's leadership; transfers between
+ * squads go to Command. Nobody decides their own request.
  */
 export function canDecide(
   viewer: { perms: readonly Perm[] },
@@ -186,7 +190,7 @@ export function canDecide(
 ): boolean {
   if (viewerUser?.id === requester.id) return false;
   if (hasPerm(viewer.perms, "ADMIN")) return true;
-  if (req.type === "CALLSIGN") return false;
+  if (req.type === "CALLSIGN" || req.type === "PROMOTION") return false;
   if (!requester.squad || !leads(viewerUser, requester.squad)) return false;
   if (req.type === "ROLE") return (req.payload as RolePayload).squad === requester.squad;
   if (req.type === "INTEREST") return (req.payload as InterestPayload).squad === requester.squad;
@@ -199,6 +203,10 @@ export function describe(req: Pick<PersonnelRequest, "type" | "payload" | "start
     return `${p.squad} · ${p.primary}${p.secondary.length ? ` (secondary: ${p.secondary.join(", ")})` : ""}`;
   }
   if (req.type === "CALLSIGN") return `New callsign: ${(req.payload as { callsign: string }).callsign}`;
+  if (req.type === "PROMOTION") {
+    const p = req.payload as PromotionPayload;
+    return `${rankName(p.from)} → ${rankName(p.to)}`;
+  }
   if (req.type === "INTEREST") {
     const p = req.payload as InterestPayload;
     return `${p.squad} · ${p.role}${p.needs?.length ? ` (needs ${p.needs.join(", ")})` : " (qualified)"}`;
@@ -225,7 +233,11 @@ export function boardMessage(r: WithPeople, decidedBy?: string) {
   ];
   if (r.reason) fields.push({ name: "Reason", value: r.reason.slice(0, 1000), inline: false });
   if (r.status !== "PENDING") {
-    const verb = { APPROVED: "✅ Approved", DENIED: "❌ Denied", CANCELLED: "Withdrawn by the member" }[r.status];
+    const verb = {
+      APPROVED: "✅ Approved",
+      DENIED: "❌ Denied",
+      CANCELLED: r.type === "PROMOTION" ? "Superseded: rank set on the personnel file" : "Withdrawn by the member",
+    }[r.status];
     const by = r.status === "CANCELLED" ? "" : ` by ${decidedBy ?? r.reviewedBy?.callsign ?? r.reviewedBy?.discordUsername ?? "leadership"}`;
     fields.push({ name: "Decision", value: `${verb}${by}${r.reviewNote ? `\n> ${r.reviewNote}` : ""}`, inline: false });
   }
@@ -360,6 +372,7 @@ export async function decideRequest(opts: {
   let userUpdate: Prisma.UserUpdateInput | null = null;
   // Set when an approved interest seats the member, for the Discord sync below.
   let seated: { squad: string; roles: string[] } | null = null;
+  let promoted: PromotionPayload | null = null;
   let followUp: string | null = null;
 
   if (opts.approve && req.type === "ROLE") {
@@ -442,6 +455,20 @@ export async function decideRequest(opts: {
       });
     }
   }
+  if (opts.approve && req.type === "PROMOTION") {
+    const p = req.payload as PromotionPayload;
+    if (member.rank !== p.from)
+      return { ok: false, error: `${member.callsign ?? member.discordUsername} is no longer ${p.from} (now ${member.rank ?? "unranked"}). Deny this one.` };
+    promoted = p;
+    userUpdate = { rank: p.to, rankSince: new Date() };
+    records.push({
+      userId: member.id,
+      type: "PROMOTION",
+      title: `Promoted to ${rankName(p.to)}`,
+      description: `From ${rankName(p.from)}. Recommended automatically, approved by ${by}.`,
+      issuedById: opts.reviewer.id,
+    });
+  }
   if (opts.approve && req.type === "LOA") {
     records.push({
       userId: member.id,
@@ -495,6 +522,14 @@ export async function decideRequest(opts: {
         )),
       );
     }
+    if (promoted) {
+      const roles = heldRoles(member);
+      warnings.push(
+        ...(await syncUnitRoles(member.discordId, { squad: member.squad, roles, rank: promoted.from }, { squad: member.squad, roles, rank: promoted.to }, reason)),
+      );
+      const w = await applyNickname(member.discordId, promoted.to, member.callsign, reason);
+      if (w) warnings.push(w);
+    }
     if (seated) {
       warnings.push(
         ...(await syncUnitRoles(member.discordId, { squad: member.squad, roles: heldRoles(member) }, { squad: seated.squad, roles: seated.roles }, reason)),
@@ -508,17 +543,31 @@ export async function decideRequest(opts: {
     }
     await refreshBoard(req.id, by).catch((e) => warnings.push(`Board post: ${explain(e)}`));
     const verdict = opts.approve ? "approved" : "denied";
-    await dm(
-      member.discordId,
-      `Your ${REQUEST_LABEL[req.type].toLowerCase()} request (${describe(req)}) was **${verdict}** by ${by}.` +
-        (note ? `\n> ${note}` : "") +
-        (followUp ? `\n${followUp}` : "") +
-        `\n${env.siteUrl}/roster/${member.id}`,
-    ).catch(() => {});
+    // A promotion is never asked for, so a denied one isn't news to the member.
+    if (promoted)
+      await dm(member.discordId, `You have been promoted to **${rankName(promoted.to)}**.${note ? `\n> ${note}` : ""}\n${env.siteUrl}/roster/${member.id}?tab=career`).catch(() => {});
+    else if (req.type !== "PROMOTION")
+      await dm(
+        member.discordId,
+        `Your ${REQUEST_LABEL[req.type].toLowerCase()} request (${describe(req)}) was **${verdict}** by ${by}.` +
+          (note ? `\n> ${note}` : "") +
+          (followUp ? `\n${followUp}` : "") +
+          `\n${env.siteUrl}/roster/${member.id}`,
+      ).catch(() => {});
   }
+  // Notices in the promotions and assignments channels.
+  if (promoted) announcePromotionLater(member, promoted.from, promoted.to, by);
+  if (opts.approve && req.type === "ROLE") {
+    const want = req.payload as RolePayload;
+    if (want.squad !== member.squad || want.primary !== member.unitRole)
+      announceAssignmentLater(member, { squad: want.squad, role: want.primary, secondary: want.secondary }, { squad: member.squad, role: member.unitRole }, by);
+  }
+  if (seated) announceAssignmentLater(member, { squad: seated.squad, role: seated.roles[0], secondary: seated.roles.slice(1) }, { squad: member.squad, role: member.unitRole }, by);
   const message = !opts.approve
     ? "Denied."
-    : seated
+    : promoted
+      ? `Approved. ${member.callsign ?? member.discordUsername} is now ${rankName(promoted.to)}.`
+      : seated
       ? `Approved. ${member.callsign ?? member.discordUsername} now holds ${seated.squad} · ${seated.roles[0]}.`
       : followUp
         ? `Approved. They're selected for the billet and still need training; they request it once qualified.`

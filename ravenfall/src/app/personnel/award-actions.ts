@@ -92,12 +92,15 @@ export async function decideNomination(_: ActionState, data: FormData): Promise<
       return grantAward(tx, {
         userId: n.nomineeId,
         award: n.award,
-        source: "NOMINATION",
+        source: n.source,
         citation: n.citation,
         eventId: n.eventId,
         nominatedById: n.nominatedById,
         approvedById: me.id,
-        credit: `${nominator ? `Nominated by ${callsignOf(nominator)}, approved` : "Approved"} by ${me.name}.`,
+        credit:
+          n.source === "AUTO"
+            ? `Recommended automatically, approved by ${me.name}.`
+            : `${nominator ? `Nominated by ${callsignOf(nominator)}, approved` : "Approved"} by ${me.name}.`,
       });
     }),
   );

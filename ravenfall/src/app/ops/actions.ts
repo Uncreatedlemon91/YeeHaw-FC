@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ActionState } from "@/components/action-form";
 import { evaluateAwards } from "@/lib/award-evaluator";
-import { announceLater } from "@/lib/award-notify";
+import { announceAutoNominationsLater } from "@/lib/award-notify";
+import { recommendPromotions } from "@/lib/promotions";
 import { assertPerm } from "@/lib/auth";
 import { linkButton, row, sendMessage } from "@/lib/discord";
 import { getChannelConfig } from "@/lib/channel-config";
@@ -144,10 +145,13 @@ export async function saveDebrief(_: ActionState, data: FormData): Promise<Actio
       }),
     ),
   ]);
-  // Automatic awards for the people who were there. Never fails the report.
+  // Automatic award nominations and promotion recommendations for the people
+  // who were there, for S1 to approve. Never fails the report.
   try {
-    const { created } = await evaluateAwards({ userIds: marks.filter((m) => m.status === "ATTENDING").map((m) => m.userId), eventId });
-    announceLater(created);
+    const attended = marks.filter((m) => m.status === "ATTENDING").map((m) => m.userId);
+    const { created } = await evaluateAwards({ userIds: attended, eventId });
+    announceAutoNominationsLater(created);
+    await recommendPromotions({ userIds: attended });
   } catch (e) {
     console.error("[awards] evaluation after AAR failed:", e);
   }

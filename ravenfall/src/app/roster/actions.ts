@@ -7,9 +7,10 @@ import type { ActionState } from "@/components/action-form";
 import { MAX_SECONDARY_ROLES, RANKS, rankIndex, rankName, squadDef, SQUADS, UNIT_ROLES } from "@/config/unit";
 import { assertPerm } from "@/lib/auth";
 import { hasPerm } from "@/lib/permissions";
-import { applyNickname, billetFill, billetKey, heldRoles, recordTypesFor, syncUnitRoles } from "@/lib/personnel";
+import { applyNickname, billetFill, billetKey, heldRoles, recordTypesFor, refreshBoard, syncUnitRoles } from "@/lib/personnel";
 import { prisma } from "@/lib/prisma";
 import { CALLSIGN_RE } from "@/lib/recruitment";
+import { announceAssignmentLater, announcePromotionLater } from "@/lib/unit-notify";
 
 const opt = (s: FormDataEntryValue | null) => {
   const v = String(s ?? "").trim();
@@ -120,8 +121,30 @@ export async function updateProfile(_: ActionState, data: FormData): Promise<Act
     const w = await applyNickname(prev.discordId, next.rank, next.callsign, `Profile updated by ${me.name}`);
     if (w) warnings.push(w);
   }
+  // Promotions and assignments made here are announced like approved ones.
+  if (next.rank && next.rank !== prev.rank && rankIndex(next.rank) > rankIndex(prev.rank))
+    announcePromotionLater({ ...prev, callsign: next.callsign }, prev.rank, next.rank, me.name);
+  if (next.squad && next.unitRole && (next.squad !== prev.squad || next.unitRole !== prev.unitRole))
+    announceAssignmentLater(
+      { ...prev, callsign: next.callsign },
+      { squad: next.squad, role: next.unitRole, secondary: next.secondaryRoles },
+      { squad: prev.squad, role: prev.unitRole },
+      me.name,
+    );
+  // A rank set by hand settles any promotion recommendation still pending.
+  if (next.rank !== prev.rank) {
+    const stale = await prisma.personnelRequest.findMany({ where: { userId, type: "PROMOTION", status: "PENDING" }, select: { id: true } });
+    for (const r of stale) {
+      await prisma.personnelRequest.update({
+        where: { id: r.id },
+        data: { status: "CANCELLED", decidedAt: new Date(), reviewNote: `Rank set to ${next.rank ?? "none"} by ${me.name}.` },
+      });
+      await refreshBoard(r.id).catch(() => {});
+    }
+  }
   revalidatePath(`/roster/${userId}`);
   revalidatePath("/roster");
+  revalidatePath("/personnel");
   return { ok: records.length ? `Saved. Added ${records.length} service record entr${records.length === 1 ? "y" : "ies"}.` : "Saved.", warnings };
 }
 

@@ -58,6 +58,7 @@ enum RequestType {
   CALLSIGN
   LOA
   INTEREST
+  PROMOTION
 }
 
 enum RequestStatus {
@@ -278,6 +279,7 @@ model PersonnelRequest {
   status         RequestStatus @default(PENDING)
   // ROLE: { squad, primary, secondary[] }. CALLSIGN: { callsign }. LOA: {}.
   // INTEREST: { squad, role, needs[] } (needs: qualification titles missing when filed).
+  // PROMOTION: { from, to } (rank abbreviations), filed by the system for S1 to approve.
   payload        Json          @default("{}")
   // LOA window, inclusive. Kept as columns so "who is on leave" is a query.
   startDate      DateTime?
@@ -386,6 +388,10 @@ model AwardNomination {
   event         Event?           @relation(fields: [eventId], references: [id], onDelete: SetNull)
   nominatedById String?
   nominatedBy   User?            @relation("NominationNominator", fields: [nominatedById], references: [id], onDelete: SetNull)
+  // AUTO: filed by the evaluator because an automatic rule was met. `sequence`
+  // is the repeat it is owed, so the evaluator never files the same one twice.
+  source        AwardSource      @default(NOMINATION)
+  sequence      Int?
   status        NominationStatus @default(PENDING)
   decidedById   String?
   decidedBy     User?            @relation("NominationDecider", fields: [decidedById], references: [id], onDelete: SetNull)
@@ -393,6 +399,7 @@ model AwardNomination {
   decisionNote  String?
   createdAt     DateTime         @default(now())
 
+  @@unique([nomineeId, awardId, sequence])
   @@index([status, createdAt])
   @@index([nomineeId, createdAt])
   @@index([awardId])

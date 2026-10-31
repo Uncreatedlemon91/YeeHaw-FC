@@ -70,6 +70,8 @@ export default async function Admin() {
     { label: "Personnel board", ok: !!channels.personnel, env: "Channels below", optional: true, hint: "Only needed for billet, callsign and leave requests." },
     { label: "Library announcements", ok: !!channels.library, env: "Channels below", optional: true, hint: "Only needed to announce library documents." },
     { label: "Awards channel", ok: !!channels.awards, env: "Channels below", optional: true, hint: "Only needed to announce awards and decorations." },
+    { label: "Promotions channel", ok: !!channels.promotions, env: "Channels below", optional: true, hint: "Only needed to announce promotions." },
+    { label: "Assignments channel", ok: !!channels.assignments, env: "Channels below", optional: true, hint: "Only needed to announce billet assignments." },
     { label: "Recruit role", ok: !!cfg.recruit, env: "Role mapping below", hint: "Map it under Discord role mapping → Recruitment." },
     { label: "Candidate role", ok: !!cfg.candidate, env: "Role mapping below", hint: "Map it under Discord role mapping → Recruitment." },
   ];
@@ -165,9 +167,11 @@ export default async function Admin() {
                 { key: "board", label: "Recruitment board", help: "New applications, with Approve / Deny. Recruiters only." },
                 { key: "welcome", label: "Welcome channel", help: "Where “Post to welcome channel” puts the Enlist Now message." },
                 { key: "ops", label: "Ops announcements", help: "New operations, if the scheduler ticks Announce." },
-                { key: "personnel", label: "Personnel board", help: "Billet, callsign and leave requests. Leadership only." },
+                { key: "personnel", label: "Personnel board", help: "Billet, callsign, leave and promotion requests, and award nominations. Leadership only." },
                 { key: "library", label: "Library announcements", help: "New Public and Unit documents, and major updates to required reading." },
-                { key: "awards", label: "Awards", help: "Awards and decorations as they are given, by nomination or automatically." },
+                { key: "awards", label: "Awards", help: "Awards and decorations once S1 approves them." },
+                { key: "promotions", label: "Promotions", help: "Members promoted, by S1 approval or by Command on the personnel file." },
+                { key: "assignments", label: "Billet assignments", help: "Members assigned to a squad and billet." },
               ]}
             />
           ) : (

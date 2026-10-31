@@ -82,7 +82,19 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   unit: Corporal takes about six months, Staff Sergeant about a year. The career tab shows
   the checklist with an Eligible (or, where approval is needed, Ready for
   review) stamp, and the S1 Desk's promotion board lists who's there.
-  Command still promotes by hand.
+- **Promotions go through S1.** Whoever meets every criterion for the next
+  rank gets a **Promotion** request filed for them automatically (daily, and
+  when an AAR they attended is filed). It posts to the personnel board with
+  Approve / Deny and queues on the S1 Desk; only Command decides, never their
+  own, and the member can't withdraw it. Approval re-checks their rank, sets
+  the new one, writes the PROMOTION record, syncs the rank role and nickname,
+  DMs the member and posts in the **promotions channel**. A denied promotion
+  isn't recommended again for 30 days. Command can still set a rank by hand
+  on the personnel file; that is announced too and settles any pending
+  recommendation.
+- **Billet assignments on Discord.** Every assignment to a squad and billet
+  (an approved billet request, an approved interest that seats the member, or
+  Command editing the personnel file) is posted in the **assignments channel**.
 - **Operations.** List and month-calendar views, one-click RSVP, optional
   Discord announcement, and an after-action report editor where leaders
   write the debrief and mark who actually attended, was excused or no-showed.
@@ -105,18 +117,23 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   the service record. Command can **revoke** an award (reason required, also
   on the service record) from the member's Awards tab; a revoked award keeps
   its row, so an automatic award is never re-issued.
-- **Automatic awards.** Awards with a rule (days of service, operations
-  attended, campaign tag, good conduct) are given without a nomination: when
+- **Automatic award nominations.** Awards with a rule (days of service,
+  operations attended, campaign tag, good conduct) aren't given outright: a
+  member who meets the rule gets an automatic nomination (marked Automatic on
+  the S1 Desk, one heads-up per run on the personnel board) that Command
+  approves or denies like any other. Rules are checked when
   an after-action report is filed (for that op's attendees) and once a day by
   `ravenfall-awards.timer` (about 04:20; `deploy/awards.sh` calls the site's
-  internal `/api/internal/awards` with the same token as the gateway). Runs
-  are idempotent. An operations rule `threshold: 10, every: 10` on a repeatable
+  internal `/api/internal/awards` with the same token as the gateway; the same
+  run files promotion recommendations). Runs are idempotent: an award already
+  held, or already nominated automatically (even if denied), isn't nominated
+  again. An operations rule `threshold: 10, every: 10` on a repeatable
   award owes award n at 10 + 10(n-1) ops. The campaign tag matches the op's
   title or description (operations have no tag field), case-insensitively.
   Good conduct needs the member to be active, enlisted that long, with no
   disciplinary entry in the window. Run one by hand with
   `sudo -u ravenfall bash /opt/ravenfall/ravenfall/deploy/awards.sh`.
-- **Awards on Discord.** Each award given (approved or automatic) is posted
+- **Awards on Discord.** Each award S1 approves is posted
   in the awards channel and the member gets a DM. Up to three awards in one
   run get an embed each; more become one grouped summary, and a member
   receives one DM per run. If the post fails it is retried on the next run for

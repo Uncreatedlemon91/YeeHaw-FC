@@ -1,7 +1,7 @@
 import { RANKS, rankIndex, type RankDef } from "@/config/unit";
 
-// Promotion readiness against the criteria in src/config/unit.ts. This only
-// advises: Command still promotes from the personnel file.
+// Promotion readiness against the criteria in src/config/unit.ts. Meeting
+// them files a promotion request (src/lib/promotions.ts) for Command to approve.
 
 export type Check = {
   label: string;

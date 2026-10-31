@@ -36,8 +36,8 @@ export default async function RanksPage() {
             PMC, your time at the rank below and any qualifications.
           </li>
           <li>
-            <span className="font-semibold text-foreground">Command promotes by hand.</span> Meeting every criterion does not promote you automatically. Command
-            makes the call from your personnel file.
+            <span className="font-semibold text-foreground">S1 approves every promotion.</span> Meeting every criterion puts you up for promotion
+            automatically, and Command approves or denies it on the S1 Desk.
           </li>
           <li>
             <span className="font-semibold text-foreground">Leadership signs off from Corporal up.</span> Ranks marked as needing approval also need leadership to

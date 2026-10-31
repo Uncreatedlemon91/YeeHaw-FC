@@ -1,13 +1,15 @@
 import { Prisma, type Award } from "@prisma/client";
-import { grantAward, unlessDuplicate } from "./award-service";
+import { unlessDuplicate } from "./award-service";
 import { ruleOf, type AutoRule } from "./awards";
 import { prisma } from "./prisma";
 
-// Automatic awards. Evaluated when an after-action report is filed (for that
-// op's attendees) and daily (service days and good conduct only move with
-// the calendar). Idempotent: every award a member is owed is compared with
-// the rows they already have, revoked ones included, so a revoked automatic
-// award is never re-issued and a second run gives nothing new.
+// Automatic award rules. Evaluated when an after-action report is filed (for
+// that op's attendees) and daily (service days and good conduct only move
+// with the calendar). A member who meets a rule gets an automatic nomination,
+// which Command approves or denies on the S1 Desk like any other.
+// Idempotent: every award a member is owed is compared with the awards they
+// hold (revoked ones included) and the automatic nominations already filed
+// (denied ones included), so nothing is recommended twice.
 
 const DAY = 864e5;
 const daysBetween = (from: Date, to: Date) => Math.floor((to.getTime() - from.getTime()) / DAY);
@@ -25,7 +27,7 @@ export type EvaluateOptions = {
 /** The newest sequence and award date each member already has of each award. */
 type Held = Map<string, { sequence: number; at: Date }>;
 
-/** Awards given by this run, as MemberAward ids (for the Discord announcement). */
+/** Nominations filed by this run, as AwardNomination ids (for the S1 heads-up). */
 export async function evaluateAwards(opts: EvaluateOptions = {}): Promise<{ created: string[]; examined: number }> {
   const now = opts.now ?? new Date();
   const awards = (await prisma.award.findMany({ where: { active: true, autoRule: { not: Prisma.DbNull } } }))
@@ -47,6 +49,19 @@ export async function evaluateAwards(opts: EvaluateOptions = {}): Promise<{ crea
     _max: { sequence: true, awardedAt: true },
   });
   for (const r of rows) held.set(`${r.userId}|${r.awardId}`, { sequence: r._max.sequence ?? 0, at: r._max.awardedAt ?? new Date(0) });
+  // Automatic nominations already filed count as handled, whatever S1 decided.
+  const filed = await prisma.awardNomination.groupBy({
+    by: ["nomineeId", "awardId"],
+    where: { nomineeId: { in: ids }, awardId: { in: awards.map((x) => x.a.id) }, source: "AUTO" },
+    _max: { sequence: true, createdAt: true },
+  });
+  for (const f of filed) {
+    const key = `${f.nomineeId}|${f.awardId}`;
+    const h = held.get(key);
+    const seq = f._max.sequence ?? 0;
+    const at = f._max.createdAt ?? new Date(0);
+    held.set(key, { sequence: Math.max(h?.sequence ?? 0, seq), at: h && h.at > at ? h.at : at });
+  }
 
   const owed: Owed[] = [];
   const give = (userId: string, a: Award, sequence: number, citation: string, eventId: string | null = null) =>
@@ -136,10 +151,11 @@ export async function evaluateAwards(opts: EvaluateOptions = {}): Promise<{ crea
 
   const created: string[] = [];
   for (const o of owed) {
+    // The unique (nominee, award, sequence) makes a concurrent run a no-op.
     const made = await unlessDuplicate(() =>
-      prisma.$transaction((tx) =>
-        grantAward(tx, { userId: o.userId, award: o.award, source: "AUTO", citation: o.citation, eventId: o.eventId, sequence: o.sequence, credit: "Awarded automatically." }),
-      ),
+      prisma.awardNomination.create({
+        data: { nomineeId: o.userId, awardId: o.award.id, citation: o.citation, eventId: o.eventId, source: "AUTO", sequence: o.sequence },
+      }),
     );
     if (made) created.push(made.id);
   }

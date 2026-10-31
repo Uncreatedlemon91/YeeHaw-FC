@@ -26,6 +26,7 @@ export function NominationCard({ n, decidable, blocked }: { n: NominationRow; de
               {n.award.name}
             </Link>
             <Badge variant={VARIANT[n.status]}>{n.status}</Badge>
+            {n.source === "AUTO" && <Badge variant="outline">Automatic</Badge>}
           </div>
           <Link href={`/roster/${n.nomineeId}`} className="mt-1 flex items-center gap-2 text-sm hover:text-accent">
             <Avatar discordId={n.nominee.discordId} avatar={n.nominee.avatar} name={callsignOf(n.nominee)} size={18} />
@@ -35,8 +36,8 @@ export function NominationCard({ n, decidable, blocked }: { n: NominationRow; de
           </Link>
           <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">“{n.citation}”</p>
           <div className="typed mt-1 text-micro uppercase text-muted-foreground">
-            Nominated {fmtDate(n.createdAt)}
-            {n.nominatedBy && ` by ${callsignOf(n.nominatedBy)}`}
+            {n.source === "AUTO" ? "Recommended" : "Nominated"} {fmtDate(n.createdAt)}
+            {n.source === "AUTO" ? " by an automatic rule" : n.nominatedBy && ` by ${callsignOf(n.nominatedBy)}`}
             {n.event && (
               <>
                 {" · "}

@@ -151,7 +151,8 @@ export async function cancelRequest(data: FormData) {
   const me = await assertPerm("OPERATOR");
   const id = String(data.get("requestId"));
   const done = await prisma.personnelRequest.updateMany({
-    where: { id, userId: me.id, status: "PENDING" },
+    // Promotions are recommended by the system, not asked for: not the member's to withdraw.
+    where: { id, userId: me.id, status: "PENDING", type: { not: "PROMOTION" } },
     data: { status: "CANCELLED", decidedAt: new Date() },
   });
   if (done.count) await refreshBoard(id).catch(() => {});
