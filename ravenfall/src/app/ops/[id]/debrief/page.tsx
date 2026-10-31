@@ -72,7 +72,8 @@ export default async function Debrief({ params }: { params: Promise<{ id: string
             name: p.callsign ?? p.discordUsername,
             rank: p.rank,
             rsvp: marked.get(p.id) ?? (away.has(p.id) ? "On leave" : null),
-            initial: marked.get(p.id) ?? (away.has(p.id) ? "EXCUSED" : ""),
+            // "Not sure" is an RSVP, not a mark: the leader decides.
+            initial: (marked.get(p.id) !== "TENTATIVE" && marked.get(p.id)) || (away.has(p.id) ? "EXCUSED" : ""),
           }))}
         />
         <div className="sticky bottom-0 z-30 -mx-4 flex items-center justify-between gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur">

@@ -9,6 +9,7 @@ import { Countdown } from "@/components/countdown";
 import { Markdown } from "@/components/markdown";
 import { OpsBriefing } from "@/components/ops-briefing";
 import { RsvpForm } from "@/components/ops-rsvp";
+import { rsvpOf } from "@/lib/rsvp";
 import { dtg, opNumber } from "@/components/ops-util";
 import { ATTENDANCE_LABEL, AttendanceBadge, EventTypeBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +24,7 @@ import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Operation" };
 
-const ORDER: AttendanceStatus[] = ["ATTENDING", "EXCUSED", "ABSENT", "NOSHOW"];
+const ORDER: AttendanceStatus[] = ["ATTENDING", "TENTATIVE", "EXCUSED", "ABSENT", "NOSHOW"];
 
 export default async function EventPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -125,7 +126,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
                 mine ? <AttendanceBadge status={mine.status} /> : <p className="text-sm text-muted-foreground">Not recorded.</p>
               ) : (
                 <>
-                  <RsvpForm eventId={event.id} status={mine?.status === "ATTENDING" || mine?.status === "ABSENT" ? mine.status : null} />
+                  <RsvpForm eventId={event.id} status={rsvpOf(mine?.status)} />
                   {event.mandatory && mine?.status === "ABSENT" && (
                     <p className="flex items-start gap-1.5 text-xs text-warning">
                       <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden /> This is mandatory — let your squad leader know why you can&apos;t attend.

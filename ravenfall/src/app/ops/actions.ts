@@ -1,6 +1,6 @@
 "use server";
 
-import type { AttendanceStatus, EventType } from "@prisma/client";
+import type { AttendanceStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -9,11 +9,11 @@ import { evaluateAwards } from "@/lib/award-evaluator";
 import { announceAutoNominationsLater } from "@/lib/award-notify";
 import { recommendPromotions } from "@/lib/promotions";
 import { assertPerm } from "@/lib/auth";
-import { linkButton, row, sendMessage } from "@/lib/discord";
-import { getChannelConfig } from "@/lib/channel-config";
-import { env } from "@/lib/env";
+import { explain } from "@/lib/discord";
+import { announceEvent, cancelEventPost, refreshEventPostLater } from "@/lib/ops-notify";
+import { RSVP_CHOICES } from "@/lib/rsvp";
 import { prisma } from "@/lib/prisma";
-import { discordTime, fromInput } from "@/lib/time";
+import { fromInput } from "@/lib/time";
 
 const eventSchema = z.object({
   title: z.string().trim().min(3, "Give it a title.").max(120),
@@ -41,35 +41,12 @@ function parseEvent(data: FormData) {
   return parsed.success ? ({ data: parsed.data } as const) : ({ error: parsed.error.issues[0]?.message ?? "Check the form." } as const);
 }
 
-async function announce(id: string) {
-  const { ops: channel } = await getChannelConfig();
-  if (!channel || !env.botToken) return;
-  const e = await prisma.event.findUniqueOrThrow({ where: { id } });
-  const label: Record<EventType, string> = { OP: "Operation", TRAINING: "Training", BRIEFING: "Briefing" };
-  await sendMessage(channel, {
-    embeds: [
-      {
-        title: `${label[e.type]}: ${e.title}`,
-        url: `${env.siteUrl}/ops/${e.id}`,
-        description: e.description.slice(0, 600) || undefined,
-        color: e.type === "OP" ? 0x9b2c2c : 0x4f7a3a,
-        fields: [
-          { name: "When", value: `${discordTime(e.startTime)} (${discordTime(e.startTime, "R")})`, inline: false },
-          ...(e.location ? [{ name: "Where", value: e.location, inline: true }] : []),
-          ...(e.mandatory ? [{ name: "Attendance", value: "**Mandatory**", inline: true }] : []),
-        ],
-      },
-    ],
-    components: [row(linkButton("RSVP", `${env.siteUrl}/ops/${e.id}`))],
-  });
-}
-
 export async function createEvent(_: ActionState, data: FormData): Promise<ActionState> {
   const me = await assertPerm("INSTRUCTOR");
   const r = parseEvent(data);
   if ("error" in r) return { error: r.error };
   const event = await prisma.event.create({ data: { ...r.data, createdById: me.id } });
-  if (data.get("announce") === "on") await announce(event.id).catch(() => {});
+  if (data.get("announce") === "on") await announceEvent(event.id).catch((e) => console.error(`[ops] announce: ${explain(e)}`));
   revalidatePath("/ops");
   redirect(`/ops/${event.id}`);
 }
@@ -80,6 +57,7 @@ export async function updateEvent(_: ActionState, data: FormData): Promise<Actio
   const r = parseEvent(data);
   if ("error" in r) return { error: r.error };
   await prisma.event.update({ where: { id }, data: r.data });
+  refreshEventPostLater(id);
   revalidatePath("/ops");
   revalidatePath(`/ops/${id}`);
   redirect(`/ops/${id}`);
@@ -87,7 +65,8 @@ export async function updateEvent(_: ActionState, data: FormData): Promise<Actio
 
 export async function deleteEvent(data: FormData) {
   await assertPerm("ADMIN");
-  await prisma.event.delete({ where: { id: String(data.get("id")) } });
+  const gone = await prisma.event.delete({ where: { id: String(data.get("id")) } });
+  await cancelEventPost(gone).catch((e) => console.error(`[ops] cancel post: ${explain(e)}`));
   revalidatePath("/ops");
   redirect("/ops");
 }
@@ -101,13 +80,14 @@ export async function rsvp(data: FormData) {
   if (!event || event.startTime < new Date()) return;
   if (choice === "CLEAR") {
     await prisma.attendance.deleteMany({ where: { eventId, userId: me.id } });
-  } else if (choice === "ATTENDING" || choice === "ABSENT") {
+  } else if ((RSVP_CHOICES as readonly string[]).includes(choice)) {
     await prisma.attendance.upsert({
       where: { eventId_userId: { eventId, userId: me.id } },
-      create: { eventId, userId: me.id, status: choice },
-      update: { status: choice },
+      create: { eventId, userId: me.id, status: choice as AttendanceStatus },
+      update: { status: choice as AttendanceStatus },
     });
   }
+  refreshEventPostLater(eventId);
   revalidatePath(`/ops/${eventId}`);
   revalidatePath("/dashboard");
 }
@@ -155,6 +135,7 @@ export async function saveDebrief(_: ActionState, data: FormData): Promise<Actio
   } catch (e) {
     console.error("[awards] evaluation after AAR failed:", e);
   }
+  refreshEventPostLater(eventId);
   revalidatePath(`/ops/${eventId}`);
   redirect(`/ops/${eventId}`);
 }

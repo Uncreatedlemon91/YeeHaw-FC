@@ -1,5 +1,5 @@
 import type { ApplicationStatus, AttendanceStatus, EventType, MemberStatus } from "@prisma/client";
-import { CalendarOff, Check, Clock, Minus, X } from "lucide-react";
+import { CalendarOff, Check, CircleHelp, Clock, Minus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 type V = "default" | "accent" | "destructive" | "success" | "info" | "warning" | "outline";
@@ -21,6 +21,7 @@ const APP: Record<ApplicationStatus, [V, Icon]> = {
 };
 const ATT: Record<AttendanceStatus, [V, Icon]> = {
   ATTENDING: ["success", Check],
+  TENTATIVE: ["outline", CircleHelp],
   ABSENT: ["outline", Minus],
   EXCUSED: ["accent", CalendarOff],
   NOSHOW: ["destructive", X],
@@ -29,6 +30,7 @@ const EVT: Record<EventType, V> = { OP: "destructive", TRAINING: "default", BRIE
 
 export const ATTENDANCE_LABEL: Record<AttendanceStatus, string> = {
   ATTENDING: "Attending",
+  TENTATIVE: "Not sure",
   ABSENT: "Absent",
   EXCUSED: "Excused",
   NOSHOW: "No-show",

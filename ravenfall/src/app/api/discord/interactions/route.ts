@@ -6,6 +6,8 @@ import { env } from "@/lib/env";
 import { hasPerm, permsFromRoles } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { decideRequest, REQUEST_LABEL } from "@/lib/personnel";
+import { refreshEventPost } from "@/lib/ops-notify";
+import { RSVP_CHOICES, type RsvpChoice } from "@/lib/rsvp";
 import { getRoleConfig } from "@/lib/role-config";
 import { answersOf, approveApplication, denyApplication } from "@/lib/recruitment";
 import { discordTime } from "@/lib/time";
@@ -115,6 +117,7 @@ const textInput = (custom_id: string, label: string, o: { value?: string; long?:
 async function component(i: Interaction) {
   const [ns, action, appId] = (i.data?.custom_id ?? "").split(":");
   if (ns === "per" && appId) return personnelButton(i, action, appId);
+  if (ns === "rsvp" && appId) return rsvpButton(i, action, appId);
   if (ns !== "rec" || !appId) return reply("Unknown button.");
   if (!(await isRecruiter(i))) return reply("Only recruiters can decide applications.");
 
@@ -189,6 +192,40 @@ async function modalSubmit(i: Interaction) {
   });
 
   return NextResponse.json({ type: R.DEFERRED_MESSAGE, data: { flags: EPHEMERAL } });
+}
+
+// --- Event RSVP ---------------------------------------------------------- //
+// Yes / Not sure / No on an event announcement (src/lib/ops-notify.ts). The
+// same rules as the site's RSVP: operators only, and closed once it starts.
+
+const RSVP_REPLY: Record<RsvpChoice, string> = {
+  ATTENDING: "✅ You're down as **going** to",
+  TENTATIVE: "❔ You're down as **not sure** for",
+  ABSENT: "❌ You're down as **can't make it** for",
+};
+
+async function rsvpButton(i: Interaction, choice: string, eventId: string) {
+  const m = i.member;
+  if (!m) return reply("Use this in the server.");
+  if (!(RSVP_CHOICES as readonly string[]).includes(choice)) return reply("Unknown button.");
+  if (!hasPerm(permsFromRoles(m.roles, m.user.id, (await getRoleConfig()).perms), "OPERATOR")) return reply("Only unit members can RSVP.");
+  const event = await prisma.event.findUnique({ where: { id: eventId } });
+  if (!event) return reply("That event no longer exists.");
+  if (event.startTime < new Date()) return reply("RSVPs are closed: this event has started.");
+  const user = await prisma.user.upsert({
+    where: { discordId: m.user.id },
+    create: { discordId: m.user.id, discordUsername: m.user.username, avatar: m.user.avatar ?? null },
+    update: {},
+  });
+  await prisma.attendance.upsert({
+    where: { eventId_userId: { eventId, userId: user.id } },
+    create: { eventId, userId: user.id, status: choice as RsvpChoice },
+    update: { status: choice as RsvpChoice },
+  });
+  after(() => refreshEventPost(eventId).catch((e) => console.error(`[ops] RSVP refresh: ${explain(e)}`)));
+  return reply(`${RSVP_REPLY[choice as RsvpChoice]} **${event.title}** (${discordTime(event.startTime)}). Change it any time before it starts.`, {
+    components: [row(linkButton("Briefing", `${env.siteUrl}/ops/${event.id}`))],
+  });
 }
 
 // --- Personnel board (S1) ------------------------------------------------ //

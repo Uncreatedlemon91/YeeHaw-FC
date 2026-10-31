@@ -95,9 +95,17 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
 - **Billet assignments on Discord.** Every assignment to a squad and billet
   (an approved billet request, an approved interest that seats the member, or
   Command editing the personnel file) is posted in the **assignments channel**.
-- **Operations.** List and month-calendar views, one-click RSVP, optional
-  Discord announcement, and an after-action report editor where leaders
-  write the debrief and mark who actually attended, was excused or no-showed.
+- **Operations.** List and month-calendar views, RSVP (Yes / Not sure / No),
+  and an after-action report editor where leaders write the debrief and mark
+  who actually attended, was excused or no-showed ("Not sure" is never a
+  final mark; the leader picks).
+- **Events on Discord.** A new event is posted to the ops channel (the
+  Announce box, ticked by default) with **Yes / Not sure / No** buttons.
+  Any member with an operator role can answer there (ephemeral confirmation,
+  changeable until the start) and the post keeps a live list of who's going,
+  not sure and out, whichever side they answered on. Editing the event
+  updates the post, filing the AAR or the start time closes RSVPs on it, and
+  deleting the event marks it cancelled.
 - **Awards & decorations (`/vault`).** A public catalog (visible signed out)
   of the unit's ribbons and medals in rack order: each award's ribbon, optional
   medal art, description and criteria. The Hall of Honour on an award's page

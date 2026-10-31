@@ -40,6 +40,8 @@ enum EventType {
 
 enum AttendanceStatus {
   ATTENDING
+  // RSVP only ("Not sure"): never a final mark, the AAR replaces it.
+  TENTATIVE
   ABSENT
   EXCUSED
   NOSHOW
@@ -193,6 +195,9 @@ model Event {
   debriefAt   DateTime?
   createdById String?
   createdBy   User?             @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  // The announcement on Discord, kept up to date with the RSVP count.
+  announceChannelId String?
+  announceMessageId String?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   attendances Attendance[]
@@ -208,7 +213,7 @@ model Attendance {
   event     Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
   userId    String
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // Before the event this is the member's RSVP (ATTENDING / ABSENT); the
+  // Before the event this is the member's RSVP (ATTENDING / TENTATIVE / ABSENT); the
   // AAR overwrites it with what actually happened.
   status    AttendanceStatus
   updatedAt DateTime         @updatedAt

@@ -6,6 +6,7 @@ import { Container } from "@/components/container";
 import { Countdown } from "@/components/countdown";
 import { RankInsignia } from "@/components/insignia";
 import { RsvpForm } from "@/components/ops-rsvp";
+import { rsvpOf } from "@/lib/rsvp";
 import { relDay } from "@/components/ops-util";
 import { PageHeader } from "@/components/page-header";
 import { AttendanceBadge, EventTypeBadge, MemberStatusBadge } from "@/components/status-badge";
@@ -181,8 +182,8 @@ export default async function Dashboard() {
               <div className="mt-4 flex flex-wrap items-start gap-x-4 gap-y-2">
                 <RsvpForm
                   eventId={next.id}
-                  status={next.attendances[0]?.status === "ATTENDING" || next.attendances[0]?.status === "ABSENT" ? next.attendances[0].status : null}
-                  className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-72 sm:flex-1 sm:max-w-sm"
+                  status={rsvpOf(next.attendances[0]?.status)}
+                  className="grid w-full grid-cols-3 gap-2 sm:w-auto sm:min-w-72 sm:flex-1 sm:max-w-sm"
                 />
                 <Link href={`/ops/${next.id}`} className="py-2 text-sm text-accent underline-offset-4 hover:underline">
                   Open briefing
