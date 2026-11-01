@@ -6,8 +6,6 @@ import { env } from "@/lib/env";
 import { hasPerm, permsFromRoles } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { decideRequest, REQUEST_LABEL } from "@/lib/personnel";
-import { refreshEventPost } from "@/lib/ops-notify";
-import { RSVP_CHOICES, type RsvpChoice } from "@/lib/rsvp";
 import { getRoleConfig } from "@/lib/role-config";
 import { answersOf, approveApplication, denyApplication } from "@/lib/recruitment";
 import { discordTime } from "@/lib/time";
@@ -124,7 +122,9 @@ const textInput = (custom_id: string, label: string, o: { value?: string; long?:
 async function component(i: Interaction) {
   const [ns, action, appId] = (i.data?.custom_id ?? "").split(":");
   if (ns === "per" && appId) return personnelButton(i, action, appId);
-  if (ns === "rsvp" && appId) return rsvpButton(i, action, appId);
+  // Event posts made before sign-ups moved to the site still carry RSVP buttons.
+  if (ns === "rsvp" && appId)
+    return reply("Sign up for events on the site.", { components: [row(linkButton("Open the event", `${env.siteUrl}/ops/${appId}`))] });
   if (ns !== "rec" || !appId) return reply("Unknown button.");
   if (!(await isRecruiter(i))) return reply("Only recruiters can decide applications.");
 
@@ -199,60 +199,6 @@ async function modalSubmit(i: Interaction) {
   });
 
   return NextResponse.json({ type: R.DEFERRED_MESSAGE, data: { flags: EPHEMERAL } });
-}
-
-// --- Event RSVP ---------------------------------------------------------- //
-// Yes / Not sure / No on an event announcement (src/lib/ops-notify.ts). The
-// same rules as the site's RSVP: operators only, and closed once it starts.
-
-const RSVP_REPLY: Record<RsvpChoice, string> = {
-  ATTENDING: "✅ You're down as **going** to",
-  TENTATIVE: "❔ You're down as **not sure** for",
-  ABSENT: "❌ You're down as **can't make it** for",
-};
-
-// Discord gives an interaction 3 seconds. Answer "thinking…" at once and do
-// every database step afterwards, then edit the answer in, as the S1 and
-// recruitment buttons do.
-function rsvpButton(i: Interaction, choice: string, eventId: string) {
-  const m = i.member;
-  if (!m) return reply("Use this in the server.");
-  if (!(RSVP_CHOICES as readonly string[]).includes(choice)) return reply("Unknown button.");
-  after(async () => {
-    let content: string;
-    let components: object[] = [];
-    try {
-      content = await recordRsvp(m, choice as RsvpChoice, eventId);
-      components = [row(linkButton("Briefing", `${env.siteUrl}/ops/${eventId}`))];
-    } catch (e) {
-      console.error(`[interactions] RSVP failed: ${explain(e)}`);
-      content = `⚠️ Something went wrong: ${explain(e)}`;
-    }
-    await editOriginal(i.token, { content, components, allowed_mentions: { parse: [] } }).catch((e) =>
-      console.error(`[interactions] couldn't edit the RSVP reply (check DISCORD_CLIENT_ID): ${explain(e)}`),
-    );
-  });
-  return NextResponse.json({ type: R.DEFERRED_MESSAGE, data: { flags: EPHEMERAL } });
-}
-
-/** Record the RSVP and refresh the post; returns the member's confirmation. */
-async function recordRsvp(m: NonNullable<Interaction["member"]>, choice: RsvpChoice, eventId: string): Promise<string> {
-  if (!hasPerm(permsFromRoles(m.roles, m.user.id, (await getRoleConfig()).perms), "OPERATOR")) return "Only unit members can RSVP.";
-  const event = await prisma.event.findUnique({ where: { id: eventId } });
-  if (!event) return "That event no longer exists.";
-  if (event.startTime < new Date()) return "RSVPs are closed: this event has started.";
-  const user = await prisma.user.upsert({
-    where: { discordId: m.user.id },
-    create: { discordId: m.user.id, discordUsername: m.user.username, avatar: m.user.avatar ?? null },
-    update: {},
-  });
-  await prisma.attendance.upsert({
-    where: { eventId_userId: { eventId, userId: user.id } },
-    create: { eventId, userId: user.id, status: choice },
-    update: { status: choice },
-  });
-  await refreshEventPost(eventId).catch((e) => console.error(`[ops] RSVP refresh: ${explain(e)}`));
-  return `${RSVP_REPLY[choice]} **${event.title}** (${discordTime(event.startTime)}). Change it any time before it starts.`;
 }
 
 // --- Personnel board (S1) ------------------------------------------------ //

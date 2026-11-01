@@ -100,12 +100,11 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   who actually attended, was excused or no-showed ("Not sure" is never a
   final mark; the leader picks).
 - **Events on Discord.** A new event is posted to the ops channel (the
-  Announce box, ticked by default) with **Yes / Not sure / No** buttons.
-  Any member with an operator role can answer there (ephemeral confirmation,
-  changeable until the start) and the post keeps a live list of who's going,
-  not sure and out, whichever side they answered on. Editing the event
-  updates the post, filing the AAR or the start time closes RSVPs on it, and
-  deleting the event marks it cancelled.
+  Announce box, ticked by default) as a sign-up notice: when and where, and a
+  **Sign up on the site** link button to the event page, where members RSVP.
+  The notice shows a running count (going / not sure), edited whenever
+  someone RSVPs; editing the event updates it, the start time or the AAR
+  closes sign-ups on it, and deleting the event marks it cancelled.
 - **Awards & decorations (`/vault`).** A public catalog (visible signed out)
   of the unit's ribbons and medals in rack order: each award's ribbon, optional
   medal art, description and criteria. The Hall of Honour on an award's page
