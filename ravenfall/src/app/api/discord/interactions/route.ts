@@ -204,14 +204,33 @@ const RSVP_REPLY: Record<RsvpChoice, string> = {
   ABSENT: "❌ You're down as **can't make it** for",
 };
 
-async function rsvpButton(i: Interaction, choice: string, eventId: string) {
+// Discord gives an interaction 3 seconds. Answer "thinking…" at once and do
+// every database step afterwards, then edit the answer in, as the S1 and
+// recruitment buttons do.
+function rsvpButton(i: Interaction, choice: string, eventId: string) {
   const m = i.member;
   if (!m) return reply("Use this in the server.");
   if (!(RSVP_CHOICES as readonly string[]).includes(choice)) return reply("Unknown button.");
-  if (!hasPerm(permsFromRoles(m.roles, m.user.id, (await getRoleConfig()).perms), "OPERATOR")) return reply("Only unit members can RSVP.");
+  after(async () => {
+    let content: string;
+    let components: object[] = [];
+    try {
+      content = await recordRsvp(m, choice as RsvpChoice, eventId);
+      components = [row(linkButton("Briefing", `${env.siteUrl}/ops/${eventId}`))];
+    } catch (e) {
+      content = `⚠️ Something went wrong: ${explain(e)}`;
+    }
+    await editOriginal(i.token, { content, components, allowed_mentions: { parse: [] } }).catch(() => {});
+  });
+  return NextResponse.json({ type: R.DEFERRED_MESSAGE, data: { flags: EPHEMERAL } });
+}
+
+/** Record the RSVP and refresh the post; returns the member's confirmation. */
+async function recordRsvp(m: NonNullable<Interaction["member"]>, choice: RsvpChoice, eventId: string): Promise<string> {
+  if (!hasPerm(permsFromRoles(m.roles, m.user.id, (await getRoleConfig()).perms), "OPERATOR")) return "Only unit members can RSVP.";
   const event = await prisma.event.findUnique({ where: { id: eventId } });
-  if (!event) return reply("That event no longer exists.");
-  if (event.startTime < new Date()) return reply("RSVPs are closed: this event has started.");
+  if (!event) return "That event no longer exists.";
+  if (event.startTime < new Date()) return "RSVPs are closed: this event has started.";
   const user = await prisma.user.upsert({
     where: { discordId: m.user.id },
     create: { discordId: m.user.id, discordUsername: m.user.username, avatar: m.user.avatar ?? null },
@@ -219,13 +238,11 @@ async function rsvpButton(i: Interaction, choice: string, eventId: string) {
   });
   await prisma.attendance.upsert({
     where: { eventId_userId: { eventId, userId: user.id } },
-    create: { eventId, userId: user.id, status: choice as RsvpChoice },
-    update: { status: choice as RsvpChoice },
+    create: { eventId, userId: user.id, status: choice },
+    update: { status: choice },
   });
-  after(() => refreshEventPost(eventId).catch((e) => console.error(`[ops] RSVP refresh: ${explain(e)}`)));
-  return reply(`${RSVP_REPLY[choice as RsvpChoice]} **${event.title}** (${discordTime(event.startTime)}). Change it any time before it starts.`, {
-    components: [row(linkButton("Briefing", `${env.siteUrl}/ops/${event.id}`))],
-  });
+  await refreshEventPost(eventId).catch((e) => console.error(`[ops] RSVP refresh: ${explain(e)}`));
+  return `${RSVP_REPLY[choice]} **${event.title}** (${discordTime(event.startTime)}). Change it any time before it starts.`;
 }
 
 // --- Personnel board (S1) ------------------------------------------------ //
