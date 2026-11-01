@@ -467,7 +467,10 @@ Copy them off the droplet too, for example with `rclone` (YeeHaw FC's
   (Discord setup step 3).
 - **Approve/Deny buttons say "This interaction failed"**: the interactions
   endpoint URL isn't set, or `DISCORD_PUBLIC_KEY` is wrong (every request
-  gets a 401). `journalctl -u ravenfall` shows it.
+  gets a 401). `journalctl -u ravenfall` shows each press as
+  `[interactions] <button> from <user>`, or why it was rejected. A press that
+  logs nothing never reached the site: check the endpoint URL in the
+  Developer Portal.
 - **Approved, but a warning about roles or the nickname**: see Discord
   setup step 5. The approval itself still went through.
 - **Build killed partway**: out of memory. Add swap (step 2).

@@ -58,9 +58,16 @@ const reply = (content: string, extra: object = {}) =>
 export async function POST(req: Request) {
   const body = await req.text();
   if (!verifySignature(body, req.headers.get("x-signature-ed25519"), req.headers.get("x-signature-timestamp"))) {
+    // Discord also probes the endpoint with bad signatures on purpose; a steady
+    // stream of these on real clicks means DISCORD_PUBLIC_KEY is wrong.
+    console.warn(
+      `[interactions] rejected: ${!env.publicKey ? "DISCORD_PUBLIC_KEY is not set" : !req.headers.get("x-signature-ed25519") ? "no signature (not from Discord)" : "signature doesn't match DISCORD_PUBLIC_KEY"}`,
+    );
     return new NextResponse("invalid request signature", { status: 401 });
   }
   const i = JSON.parse(body) as Interaction;
+  if (i.type !== T.PING)
+    console.log(`[interactions] ${i.data?.custom_id ?? `/${i.data?.name ?? "?"}`} from ${i.member?.user.username ?? "a DM"} (type ${i.type})`);
 
   if (i.type === T.PING) return NextResponse.json({ type: R.PONG });
   if (i.type === T.COMMAND) return command(i);
@@ -218,9 +225,12 @@ function rsvpButton(i: Interaction, choice: string, eventId: string) {
       content = await recordRsvp(m, choice as RsvpChoice, eventId);
       components = [row(linkButton("Briefing", `${env.siteUrl}/ops/${eventId}`))];
     } catch (e) {
+      console.error(`[interactions] RSVP failed: ${explain(e)}`);
       content = `⚠️ Something went wrong: ${explain(e)}`;
     }
-    await editOriginal(i.token, { content, components, allowed_mentions: { parse: [] } }).catch(() => {});
+    await editOriginal(i.token, { content, components, allowed_mentions: { parse: [] } }).catch((e) =>
+      console.error(`[interactions] couldn't edit the RSVP reply (check DISCORD_CLIENT_ID): ${explain(e)}`),
+    );
   });
   return NextResponse.json({ type: R.DEFERRED_MESSAGE, data: { flags: EPHEMERAL } });
 }
