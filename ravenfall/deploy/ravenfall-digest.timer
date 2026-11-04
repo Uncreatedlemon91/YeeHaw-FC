@@ -1,0 +1,12 @@
+[Unit]
+Description=Weekly Ravenfall HQ digest (Mondays)
+
+[Timer]
+# Monday evening, unit time (keep in step with UNIT_TIMEZONE in .env). The
+# site posts once per ISO week, so a catch-up run after downtime is harmless.
+OnCalendar=Mon *-*-* 18:00:00 America/New_York
+RandomizedDelaySec=5m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -22,9 +22,11 @@ export type ChannelConfig = {
   promotions: string;
   /** Members assigned to a billet (optional). */
   assignments: string;
+  /** The weekly digest: last week in review and the week ahead (optional). */
+  digest: string;
 };
 
-export const CHANNEL_KEYS = ["board", "welcome", "ops", "personnel", "library", "awards", "promotions", "assignments"] as const;
+export const CHANNEL_KEYS = ["board", "welcome", "ops", "personnel", "library", "awards", "promotions", "assignments", "digest"] as const;
 
 const KEY = "channels";
 const TTL_MS = 30_000;
@@ -40,6 +42,7 @@ export function channelConfigFromEnv(): ChannelConfig {
     awards: env.awardsChannelId,
     promotions: env.promotionsChannelId,
     assignments: env.assignmentsChannelId,
+    digest: env.digestChannelId,
   };
 }
 
@@ -56,6 +59,7 @@ export function cleanChannelConfig(raw: unknown): ChannelConfig {
     awards: id(r.awards),
     promotions: id(r.promotions),
     assignments: id(r.assignments),
+    digest: id(r.digest),
   };
 }
 

@@ -29,9 +29,10 @@ as_app env NODE_OPTIONS=--max-old-space-size=1536 npm run build
 
 cp deploy/ravenfall.service deploy/ravenfall-gateway.service deploy/ravenfall-backup.service deploy/ravenfall-backup.timer \
    deploy/ravenfall-awards.service deploy/ravenfall-awards.timer \
+   deploy/ravenfall-digest.service deploy/ravenfall-digest.timer \
    /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now ravenfall-backup.timer ravenfall-awards.timer
+systemctl enable --now ravenfall-backup.timer ravenfall-awards.timer ravenfall-digest.timer
 systemctl enable ravenfall ravenfall-gateway
 systemctl restart ravenfall
 systemctl restart ravenfall-gateway

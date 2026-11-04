@@ -91,6 +91,9 @@ export default async function Admin() {
               <Link href="/admin/qualifications">Qualification builder</Link>
             </Button>
             <Button asChild variant="outline">
+              <Link href="/admin/digest">Weekly digest</Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href="/admin/media">Home page media</Link>
             </Button>
           </div>
@@ -180,6 +183,7 @@ export default async function Admin() {
                 { key: "awards", label: "Awards", help: "Awards and decorations once S1 approves them." },
                 { key: "promotions", label: "Promotions", help: "Members promoted, by S1 approval or by Command on the personnel file." },
                 { key: "assignments", label: "Billet assignments", help: "Members assigned to a squad and billet." },
+                { key: "digest", label: "Weekly digest", help: "Mondays: last week's ops, turnout, promotions and awards, and the week ahead." },
               ]}
             />
           ) : (

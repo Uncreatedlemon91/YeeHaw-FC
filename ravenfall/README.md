@@ -441,6 +441,13 @@ same retention; `update.sh` creates that directory, owned by `ravenfall`.
 `systemctl list-timers ravenfall-awards.timer` shows the next run;
 `journalctl -u ravenfall-awards` the last result.
 
+`ravenfall-digest.timer` posts the weekly digest on Mondays at 18:00 US
+Eastern: last week's events, turnout, promotions, awards, qualifications and
+new members, squad standings, and the week ahead, to the digest channel set
+on the Admin page. It posts once per week however often it runs. Preview it,
+or post it by hand, at `/admin/digest`; from the shell:
+`sudo -u ravenfall bash /opt/ravenfall/ravenfall/deploy/digest.sh`.
+
 ```bash
 systemctl list-timers ravenfall-backup.timer
 sudo -u ravenfall bash /opt/ravenfall/ravenfall/deploy/backup.sh         # one now

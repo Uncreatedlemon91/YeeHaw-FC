@@ -88,6 +88,10 @@ export const env = {
   get assignmentsChannelId() {
     return process.env.ASSIGNMENTS_ANNOUNCE_CHANNEL_ID ?? "";
   },
+  /** Where the weekly digest is posted (optional). */
+  get digestChannelId() {
+    return process.env.DIGEST_CHANNEL_ID ?? "";
+  },
   /** Discord role per squad name, kept in step with each member's squad. */
   get squadRoleIds() {
     return pairs("ROLE_IDS_SQUADS");
