@@ -135,6 +135,10 @@ model User {
   availability    String[]     @default([])
   loadout         String?
   lastLoginAt     DateTime?
+  // Set when they leave (or are removed from) the Discord server while they
+  // still have a file here; cleared if they come back. The S1 Desk lists
+  // them so Command can discharge them.
+  leftDiscordAt   DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -188,6 +192,10 @@ model Event {
   startTime   DateTime
   endTime     DateTime?
   mandatory   Boolean           @default(false)
+  // Squads invited (SQUADS[].name). Empty: the whole unit. Only invited
+  // members (and the event's creator) may RSVP; the Discord post pings
+  // the invited squads' roles.
+  invitedSquads String[]        @default([])
   // After-action report, Markdown. Null until a leader files one.
   debrief     String?
   debriefById String?

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { relDay } from "@/components/ops-util";
 import { requireUser } from "@/lib/auth";
+import { invitedLabel, isWholeUnit } from "@/lib/event-invites";
 import { hasPerm } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { dayKey, fmt, monthKey, monthRange } from "@/lib/time";
@@ -122,6 +123,7 @@ function EventRow({ e, past }: { e: Row; past: boolean }) {
         <div className="flex flex-wrap items-center gap-2">
           <EventTypeBadge type={e.type} />
           {e.mandatory && <Badge variant="destructive">Mandatory</Badge>}
+          {!isWholeUnit(e) && <Badge variant="outline">{invitedLabel(e)}</Badge>}
           {past && (e.debrief ? <Badge variant="success">AAR filed</Badge> : <Badge variant="outline">No AAR</Badge>)}
           {mine && <AttendanceBadge status={mine.status} />}
         </div>

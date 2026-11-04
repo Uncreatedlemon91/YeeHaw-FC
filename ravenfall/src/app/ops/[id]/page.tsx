@@ -1,5 +1,5 @@
 import type { AttendanceStatus } from "@prisma/client";
-import { Check, ClipboardList, MapPin, Pencil, ShieldAlert, Timer, Users } from "lucide-react";
+import { Check, ClipboardList, MapPin, Pencil, ShieldAlert, Timer, UserCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/avatar";
@@ -17,10 +17,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { rankIndex, SQUADS } from "@/config/unit";
 import { requireUser } from "@/lib/auth";
+import { invitedLabel, invitedSquads, inviteeWhere, isInvited, isWholeUnit } from "@/lib/event-invites";
 import { hasPerm } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { fmt } from "@/lib/time";
 import { cn } from "@/lib/utils";
+import { DiscordPostForm } from "./discord-post-form";
 
 export const metadata = { title: "Operation" };
 
@@ -29,7 +31,7 @@ const ORDER: AttendanceStatus[] = ["ATTENDING", "TENTATIVE", "EXCUSED", "ABSENT"
 export default async function EventPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requireUser("OPERATOR", `/ops/${id}`);
-  const [event, strength] = await Promise.all([
+  const [event, viewer] = await Promise.all([
     prisma.event.findUnique({
       where: { id },
       include: {
@@ -38,9 +40,12 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
         debriefBy: true,
       },
     }),
-    prisma.user.count({ where: { status: "ACTIVE" } }),
+    prisma.user.findUnique({ where: { id: me.id }, select: { id: true, squad: true } }),
   ]);
   if (!event) notFound();
+  // Strength is the invited squads' (or the whole unit's) active members.
+  const strength = await prisma.user.count({ where: inviteeWhere(event) });
+  const invited = !!viewer && isInvited(event, viewer);
 
   const started = event.startTime < new Date();
   const mine = event.attendances.find((a) => a.userId === me.id);
@@ -87,6 +92,9 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <EventTypeBadge type={event.type} />
               {event.mandatory && <Badge variant="destructive">Mandatory</Badge>}
+              <Badge variant="outline">
+                <UserCheck className="size-3" aria-hidden /> {isWholeUnit(event) ? "Whole unit" : `For ${invitedLabel(event)}`}
+              </Badge>
             </div>
           </div>
           {canLead && (
@@ -124,6 +132,10 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
               )}
               {started ? (
                 mine ? <AttendanceBadge status={mine.status} /> : <p className="text-sm text-muted-foreground">Not recorded.</p>
+              ) : !invited ? (
+                <p className="text-sm text-muted-foreground">
+                  This event is for {invitedSquads(event).join(", ")} only. Ask its organiser if you should be there.
+                </p>
               ) : (
                 <>
                   <RsvpForm eventId={event.id} status={rsvpOf(mine?.status)} />
@@ -148,6 +160,12 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
                   </dd>
                 </div>
                 <div>
+                  <dt className="field-label">Invited</dt>
+                  <dd className="mt-0.5 flex items-center gap-1.5">
+                    <UserCheck className="size-4 text-muted-foreground" aria-hidden /> {invitedLabel(event)}
+                  </dd>
+                </div>
+                <div>
                   <dt className="field-label">Location</dt>
                   <dd className="mt-0.5 flex items-center gap-1.5">
                     <MapPin className="size-4 text-muted-foreground" aria-hidden /> {event.location ?? "TBC"}
@@ -163,13 +181,25 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
                     {attending} / {strength}
                   </span>
                 </div>
-                <div role="progressbar" aria-valuemin={0} aria-valuemax={strength} aria-valuenow={attending} aria-label="Attending versus active strength" className="h-2 overflow-hidden rounded-full bg-secondary">
+                <div role="progressbar" aria-valuemin={0} aria-valuemax={strength} aria-valuenow={attending} aria-label="Attending versus invited strength" className="h-2 overflow-hidden rounded-full bg-secondary">
                   <div className="h-full rounded-full bg-primary" style={{ width: `${fill}%` }} />
                 </div>
-                <p className="mt-1 text-micro text-muted-foreground">{fill}% of active strength confirmed</p>
+                <p className="mt-1 text-micro text-muted-foreground">
+                  {fill}% of {isWholeUnit(event) ? "active strength" : `${invitedLabel(event)}'s active strength`} confirmed
+                </p>
               </div>
             </CardContent>
           </Card>
+          {canLead && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Discord</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DiscordPostForm eventId={event.id} posted={!!event.announceMessageId} />
+              </CardContent>
+            </Card>
+          )}
           {event.createdBy && (
             <p className="text-xs text-muted-foreground">Issued by {event.createdBy.callsign ?? event.createdBy.discordUsername}</p>
           )}

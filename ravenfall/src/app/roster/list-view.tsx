@@ -147,6 +147,7 @@ export async function ListView({ sp }: { sp: ListQuery }) {
               <span className="flex shrink-0 flex-col items-end gap-1">
                 <MemberStatusBadge status={m.status} />
                 {away.has(m.id) && <Badge variant="accent">LOA</Badge>}
+                {m.leftDiscordAt && m.status !== "DISCHARGED" && <Badge variant="warning">Left Discord</Badge>}
               </span>
             </Link>
           </li>
@@ -210,6 +211,7 @@ export async function ListView({ sp }: { sp: ListQuery }) {
                   <span className="flex flex-wrap gap-1">
                     <MemberStatusBadge status={m.status} />
                     {away.has(m.id) && <Badge variant="accent">LOA</Badge>}
+                    {m.leftDiscordAt && m.status !== "DISCHARGED" && <Badge variant="warning">Left Discord</Badge>}
                   </span>
                 </TD>
               </TR>

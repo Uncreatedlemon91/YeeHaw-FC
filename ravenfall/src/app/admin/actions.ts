@@ -91,7 +91,7 @@ export async function syncProfiles(): Promise<ActionState> {
     const r = await syncAllMembers();
     revalidatePath("/roster");
     return {
-      ok: `Done: ${r.created} new personnel file${r.created === 1 ? "" : "s"}, ${r.updated} filled in, ${r.unchanged} already up to date. ${r.skipped} server member${r.skipped === 1 ? "" : "s"} hold no mapped role.`,
+      ok: `Done: ${r.created} new personnel file${r.created === 1 ? "" : "s"}, ${r.updated} filled in, ${r.unchanged} already up to date. ${r.skipped} server member${r.skipped === 1 ? "" : "s"} hold no mapped role.${r.left ? ` ${r.left} personnel file${r.left === 1 ? "" : "s"} belong to people no longer on the server: see the S1 Desk.` : ""}`,
       warnings: r.errors.slice(0, 5),
     };
   } catch (e) {

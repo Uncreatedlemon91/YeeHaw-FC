@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { MAX_SECONDARY_ROLES, RANKS, rankName, ROLES, SQUADS, stripRank } from "@/config/unit";
 import { getMember, listMembers, type GuildMember } from "./discord";
+import { memberReturned, reconcileDepartures } from "./member-left";
 import { permsFromRoles, type Perm } from "./permissions";
 import { applyNickname } from "./personnel";
 import { prisma } from "./prisma";
@@ -148,26 +149,31 @@ export async function importMember(m: GuildMember, cfg: RoleConfig, retried = fa
   }
 }
 
-export type SyncSummary = Record<SyncOutcome, number> & { errors: string[] };
+export type SyncSummary = Record<SyncOutcome, number> & { errors: string[]; left: number };
 
 /** Every server member, for the Admin page's "Sync profiles" button. */
 export async function syncAllMembers(): Promise<SyncSummary> {
   const cfg = await getRoleConfig();
-  const summary: SyncSummary = { created: 0, updated: 0, unchanged: 0, skipped: 0, errors: [] };
-  for (const m of await listMembers()) {
+  const summary: SyncSummary = { created: 0, updated: 0, unchanged: 0, skipped: 0, errors: [], left: 0 };
+  const members = await listMembers();
+  for (const m of members) {
     try {
       summary[await importMember(m, cfg)]++;
     } catch (e) {
       summary.errors.push(`${m.user?.username ?? "?"}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
+  // An empty list would mean a broken read, not an empty server: don't flag everyone.
+  if (members.length) summary.left = await reconcileDepartures(new Set(members.flatMap((m) => (m.user ? [m.user.id] : []))));
   return summary;
 }
 
 /** One member, re-read from Discord: the gateway calls this on role changes. */
 export async function syncMemberById(discordId: string): Promise<SyncOutcome> {
   const m = await getMember(discordId);
-  return m ? importMember(m, await getRoleConfig()) : "skipped";
+  if (!m) return "skipped";
+  await memberReturned(discordId);
+  return importMember(m, await getRoleConfig());
 }
 
 // --- Gateway -> site ------------------------------------------------------ //

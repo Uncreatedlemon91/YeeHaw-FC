@@ -143,10 +143,14 @@ export default async function Dossier({ params, searchParams }: { params: Promis
       </div>
       <div className="jacket relative overflow-hidden rounded-lg border">
         <div className="absolute right-4 top-4 hidden sm:block">
-          {currentLeave ? (
-            <span className="stamp stamp-amber">On leave</span>
-          ) : member.status === "DISCHARGED" ? (
+          {member.status === "DISCHARGED" ? (
             <span className="stamp">Discharged</span>
+          ) : member.leftDiscordAt ? (
+            <span className="stamp stamp-amber" title={`Left the Discord server ${fmtDate(member.leftDiscordAt)}`}>
+              Left Discord
+            </span>
+          ) : currentLeave ? (
+            <span className="stamp stamp-amber">On leave</span>
           ) : (
             <span className="stamp">Restricted</span>
           )}

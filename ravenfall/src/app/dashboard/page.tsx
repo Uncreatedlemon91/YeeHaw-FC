@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { rankName } from "@/config/unit";
 import { requireUser } from "@/lib/auth";
+import { invitedWhere } from "@/lib/event-invites";
 import { getViewer, viewerLevel } from "@/lib/library";
 import { hasPerm } from "@/lib/permissions";
 import { canDecide, isLeader } from "@/lib/personnel";
@@ -59,12 +60,15 @@ export default async function Dashboard() {
       where: { id: me.id },
       include: { _count: { select: { qualifications: true } } },
     }),
-    prisma.event.findMany({
-      where: { startTime: { gte: now } },
-      orderBy: { startTime: "asc" },
-      take: 5,
-      include: { attendances: { where: { userId: me.id } } },
-    }),
+    // What's coming up for them: whole-unit events and their squad's.
+    prisma.user.findUnique({ where: { id: me.id }, select: { id: true, squad: true } }).then((m) =>
+      prisma.event.findMany({
+        where: { startTime: { gte: now }, ...(m ? invitedWhere(m) : {}) },
+        orderBy: { startTime: "asc" },
+        take: 5,
+        include: { attendances: { where: { userId: me.id } } },
+      }),
+    ),
     hasPerm(me.perms, "RECRUITER") ? prisma.recruitmentApplication.count({ where: { status: "PENDING" } }) : 0,
     hasPerm(me.perms, "INSTRUCTOR")
       ? prisma.event.findMany({

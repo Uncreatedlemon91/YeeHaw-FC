@@ -2,6 +2,7 @@ import type { Event } from "@prisma/client";
 import { ActionForm, type ActionState, SubmitButton } from "@/components/action-form";
 import { BriefingField } from "@/components/ops-briefing-field";
 import { Field, Input, Select } from "@/components/ui/input";
+import { SQUADS } from "@/config/unit";
 import { env } from "@/lib/env";
 import { toInput } from "@/lib/time";
 
@@ -39,6 +40,26 @@ export function EventForm({
         </Field>
       </div>
       <BriefingField defaultValue={event?.description} />
+      <fieldset className="flex flex-col gap-3 rounded-md border p-4">
+        <legend className="px-1 text-xs font-semibold uppercase tracking-label text-muted-foreground">Invite</legend>
+        <p className="text-xs text-muted-foreground">
+          Tick the squads this is for: only they can sign up, and the Discord post pings their roles. Leave them all unticked to invite the whole unit.
+        </p>
+        <div className="flex flex-wrap gap-x-5 gap-y-2">
+          {SQUADS.map((s) => (
+            <label key={s.name} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="invitedSquads"
+                value={s.name}
+                defaultChecked={event?.invitedSquads.includes(s.name)}
+                className="size-4 accent-[var(--accent)]"
+              />
+              {s.name} <span className="text-xs text-muted-foreground">{s.callsign}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <fieldset className="flex flex-col gap-3 rounded-md border p-4">
         <legend className="px-1 text-xs font-semibold uppercase tracking-label text-muted-foreground">Options</legend>
         <label className="flex items-center gap-2 text-sm">

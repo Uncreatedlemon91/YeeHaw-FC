@@ -139,6 +139,10 @@ export function editMessage(channelId: string, messageId: string, payload: objec
   return discord<Message>(`/channels/${channelId}/messages/${messageId}`, { method: "PATCH", body: payload });
 }
 
+export function deleteMessage(channelId: string, messageId: string) {
+  return discord(`/channels/${channelId}/messages/${messageId}`, { method: "DELETE" });
+}
+
 export async function dm(discordId: string, content: string) {
   const channel = await discord<{ id: string }>("/users/@me/channels", {
     method: "POST",

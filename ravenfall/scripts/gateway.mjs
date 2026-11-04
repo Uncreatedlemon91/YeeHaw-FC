@@ -6,7 +6,9 @@
 //      connection, so without this the bot always reads "offline".
 //   2. Member events. When someone joins or their roles change, it asks the
 //      site to generate / fill in their personnel file
-//      (POST /api/internal/member-sync).
+//      (POST /api/internal/member-sync). When someone leaves (or is kicked
+//      or banned), it tells the site, which flags their file for Command
+//      (POST /api/internal/member-left).
 //
 // No dependencies: Node 22's built-in WebSocket and fetch. Config comes from
 // the same .env as the site (systemd EnvironmentFile).
@@ -105,6 +107,14 @@ function memberChanged(discordId) {
   );
 }
 
+function memberLeft(discordId) {
+  clearTimeout(pending.get(discordId)); // a pending role sync is moot now
+  pending.delete(discordId);
+  post("/api/internal/member-left", { discordId }, (r) => {
+    if (r.outcome === "flagged") log(`Member ${discordId} left the server; flagged on the S1 Desk.`);
+  });
+}
+
 async function post(path, body, onOk) {
   if (!internalToken) return; // NEXTAUTH_SECRET missing: the site would refuse anyway
   try {
@@ -170,7 +180,7 @@ function connect(resume) {
     if (ev.code === DISALLOWED_INTENTS && intents & INTENT_GUILD_MEMBERS) {
       log(
         "Server Members Intent is off for this bot, so member events can't be received. " +
-          "Staying online without them. To get automatic personnel files on role changes, turn it on: " +
+          "Staying online without them. To get automatic personnel files on role changes and departure notices, turn it on: " +
           "Developer Portal -> your app -> Bot -> Privileged Gateway Intents -> Server Members Intent, then restart ravenfall-gateway.",
       );
       intents &= ~INTENT_GUILD_MEMBERS;
@@ -206,6 +216,9 @@ function dispatch(t, d) {
     case "GUILD_MEMBER_ADD":
     case "GUILD_MEMBER_UPDATE":
       if (d.guild_id === GUILD_ID && d.user && !d.user.bot) memberChanged(d.user.id);
+      break;
+    case "GUILD_MEMBER_REMOVE":
+      if (d.guild_id === GUILD_ID && d.user && !d.user.bot) memberLeft(d.user.id);
       break;
   }
 }

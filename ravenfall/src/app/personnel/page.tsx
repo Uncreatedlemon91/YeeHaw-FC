@@ -1,4 +1,4 @@
-import { ArrowRight, Award, CalendarOff, Medal } from "lucide-react";
+import { ArrowRight, Award, CalendarOff, Medal, UserX } from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { Container } from "@/components/container";
@@ -50,7 +50,7 @@ export default async function S1Desk() {
       : [];
   const nominationsPending = nominations.filter((n) => n.status === "PENDING").length;
 
-  const [open, mine, status, leave] = await Promise.all([
+  const [open, mine, status, leave, departed] = await Promise.all([
     leader
       ? prisma.personnelRequest.findMany({
           // Pending, plus anything decided this week, so a decision stays on
@@ -75,6 +75,10 @@ export default async function S1Desk() {
           orderBy: { startDate: "asc" },
         })
       : [],
+    // Left the Discord server but still on the books (src/lib/member-left.ts).
+    leader
+      ? prisma.user.findMany({ where: { leftDiscordAt: { not: null }, status: { not: "DISCHARGED" } }, orderBy: { leftDiscordAt: "desc" } })
+      : [],
   ]);
 
   const queue = open.filter((r) => canDecide(me, viewer, r, r.user));
@@ -85,6 +89,7 @@ export default async function S1Desk() {
     .filter((b) => covers(b.u) && b.path.eligible && b.u.id !== me.id)
     .sort((a, b) => rankIndex(b.u.rank) - rankIndex(a.u.rank));
   const away = leave.filter((l) => covers(l.user));
+  const left = departed.filter(covers);
 
   return (
     <Container>
@@ -122,6 +127,33 @@ export default async function S1Desk() {
                   <RequestCard key={r.id} r={r} decidable showNotes showMember flush />
                 ))}
                 {!queue.length && <p className="text-sm text-muted-foreground">Nothing waiting. In-tray clear.</p>}
+              </CardContent>
+            </Card>
+          )}
+
+          {leader && left.length > 0 && (
+            <Card id="left-discord" className="scroll-mt-20 border-warning/40">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserX className="size-4 text-warning" /> Left Discord <Badge variant="warning">{left.length}</Badge>
+                </CardTitle>
+                <CardDescription>
+                  No longer on the Discord server but still on the roster. {command ? "Discharge them from their file" : "Command can discharge them"} if
+                  they&apos;ve gone for good; they drop off this list if they rejoin.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col divide-y divide-foreground/10">
+                {left.map((u) => (
+                  <Link key={u.id} href={`/roster/${u.id}`} className="flex min-w-0 items-center gap-3 py-2 text-sm first:pt-0 last:pb-0 hover:text-accent">
+                    <RankInsignia rank={u.rank} size={20} />
+                    <Avatar discordId={u.discordId} avatar={u.avatar} name={u.callsign ?? u.discordUsername} size={24} />
+                    <span className="min-w-0 flex-1 truncate">
+                      {u.callsign ?? u.discordUsername}
+                      <span className="ml-2 text-xs text-muted-foreground">{[u.squad, u.unitRole].filter(Boolean).join(" · ")}</span>
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">left {fmtDate(u.leftDiscordAt!)}</span>
+                  </Link>
+                ))}
               </CardContent>
             </Card>
           )}

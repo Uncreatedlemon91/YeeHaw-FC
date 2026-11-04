@@ -10,7 +10,9 @@ import { announceAutoNominationsLater } from "@/lib/award-notify";
 import { recommendPromotions } from "@/lib/promotions";
 import { assertPerm } from "@/lib/auth";
 import { explain } from "@/lib/discord";
-import { announceEvent, cancelEventPost, refreshEventPostLater } from "@/lib/ops-notify";
+import { SQUADS } from "@/config/unit";
+import { isInvited } from "@/lib/event-invites";
+import { announceEvent, cancelEventPost, pushEventPost, refreshEventPostLater } from "@/lib/ops-notify";
 import { RSVP_CHOICES } from "@/lib/rsvp";
 import { prisma } from "@/lib/prisma";
 import { fromInput } from "@/lib/time";
@@ -23,6 +25,8 @@ const eventSchema = z.object({
   startTime: z.date({ invalid_type_error: "Set a start time." }),
   endTime: z.date().nullable(),
   mandatory: z.boolean(),
+  // Empty: the whole unit.
+  invitedSquads: z.array(z.enum(SQUADS.map((s) => s.name) as [string, ...string[]])).max(SQUADS.length),
 });
 
 function parseEvent(data: FormData) {
@@ -34,6 +38,7 @@ function parseEvent(data: FormData) {
     startTime: fromInput(String(data.get("startTime") ?? "")),
     endTime: fromInput(String(data.get("endTime") ?? "")),
     mandatory: data.get("mandatory") === "on",
+    invitedSquads: [...new Set(data.getAll("invitedSquads").map(String))],
   });
   if (parsed.success && parsed.data.endTime && parsed.data.endTime <= parsed.data.startTime) {
     return { error: "The end time must be after the start." } as const;
@@ -63,6 +68,20 @@ export async function updateEvent(_: ActionState, data: FormData): Promise<Actio
   redirect(`/ops/${id}`);
 }
 
+/** The event page's "Update Discord post" / "Repost to Discord" buttons. */
+export async function discordPost(_: ActionState, data: FormData): Promise<ActionState> {
+  await assertPerm("INSTRUCTOR");
+  const id = String(data.get("id"));
+  const mode = data.get("mode") === "repost" ? "repost" : "update";
+  try {
+    const done = await pushEventPost(id, mode);
+    revalidatePath(`/ops/${id}`);
+    return { ok: done === "updated" ? "Discord post updated." : done === "reposted" ? "Reposted to Discord; the old post was removed." : "Posted to Discord." };
+  } catch (e) {
+    return { error: `Discord said no: ${explain(e)}` };
+  }
+}
+
 export async function deleteEvent(data: FormData) {
   await assertPerm("ADMIN");
   const gone = await prisma.event.delete({ where: { id: String(data.get("id")) } });
@@ -75,9 +94,14 @@ export async function rsvp(data: FormData) {
   const me = await assertPerm("OPERATOR");
   const eventId = String(data.get("eventId"));
   const choice = String(data.get("status"));
-  const event = await prisma.event.findUnique({ where: { id: eventId } });
+  const [event, member] = await Promise.all([
+    prisma.event.findUnique({ where: { id: eventId } }),
+    prisma.user.findUnique({ where: { id: me.id }, select: { id: true, squad: true } }),
+  ]);
   // RSVPs close once the event starts; after that the AAR owns attendance.
-  if (!event || event.startTime < new Date()) return;
+  // Only those invited may answer (CLEAR is always allowed, to take one back).
+  if (!event || !member || event.startTime < new Date()) return;
+  if (choice !== "CLEAR" && !isInvited(event, member)) return;
   if (choice === "CLEAR") {
     await prisma.attendance.deleteMany({ where: { eventId, userId: me.id } });
   } else if ((RSVP_CHOICES as readonly string[]).includes(choice)) {
