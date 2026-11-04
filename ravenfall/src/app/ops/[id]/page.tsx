@@ -23,6 +23,7 @@ import { prisma } from "@/lib/prisma";
 import { fmt } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { DiscordPostForm } from "./discord-post-form";
+import { QualBadge } from "@/components/qual-badge";
 
 export const metadata = { title: "Operation" };
 
@@ -41,6 +42,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
         attendances: { include: { user: true } },
         createdBy: true,
         debriefBy: true,
+        course: true,
       },
     }),
     inviteMember(me.id),
@@ -96,6 +98,11 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <EventTypeBadge type={event.type} />
               {event.mandatory && <Badge variant="destructive">Mandatory</Badge>}
+              {event.course && (
+                <Badge variant="accent">
+                  <QualBadge q={event.course} size={14} /> Course: {event.course.title}
+                </Badge>
+              )}
               <Badge variant="outline">
                 <UserCheck className="size-3" aria-hidden /> {isWholeUnit(event) && !event.openToRecruits ? "Whole unit" : `For ${invitedLabel(event)}`}
               </Badge>

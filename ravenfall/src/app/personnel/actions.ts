@@ -1,6 +1,7 @@
 "use server";
 
 import type { RequestType } from "@prisma/client";
+import { heldSlugs } from "@/lib/qual-rules";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionState } from "@/components/action-form";
@@ -82,7 +83,7 @@ export async function requestRole(_: ActionState, data: FormData): Promise<Actio
     [...want.secondary].sort().join() === [...member.secondaryRoles].sort().join()
   )
     return { error: "That's the billet you already hold." };
-  const held = member.qualifications.map((q) => q.qualification.slug);
+  const held = heldSlugs(member.qualifications);
   const err = checkRoleChange(member, held, want, await billetFill());
   if (err) return { error: err };
   return file(me.id, "ROLE", { payload: want, reason: text(data.get("reason"), 500) });
@@ -111,7 +112,7 @@ export async function expressInterest(_: ActionState, data: FormData): Promise<A
   );
   if (open.some((p) => p.squad === squad && p.role === role)) return { error: "You've already put your name in for that billet." };
   if (open.length >= MAX_OPEN_INTERESTS) return { error: `Up to ${MAX_OPEN_INTERESTS} open interests at a time. Withdraw one from your file first.` };
-  const missing = missingQuals(role, member.qualifications.map((q) => q.qualification.slug));
+  const missing = missingQuals(role, heldSlugs(member.qualifications));
   const titles = await prisma.qualification.findMany({ where: { slug: { in: missing } }, select: { slug: true, title: true } });
   const payload: InterestPayload = { squad, role, needs: missing.map((m) => titles.find((t) => t.slug === m)?.title ?? m) };
   const req = await prisma.personnelRequest.create({

@@ -1,4 +1,5 @@
 import type { User } from "@prisma/client";
+import { heldSlugs } from "@/lib/qual-rules";
 import { CalendarOff, ChevronDown, Plus } from "lucide-react";
 import Link from "next/link";
 import { RankInsignia } from "@/components/insignia";
@@ -20,7 +21,7 @@ export async function OrbatView({ me }: { me: { id: string } }) {
   ]);
   const filed = interests.map((r) => r.payload as InterestPayload);
   const away = await onLeave(members.map((m) => m.id));
-  const held = mine?.qualifications.map((q) => q.qualification.slug) ?? [];
+  const held = heldSlugs(mine?.qualifications ?? []);
   const canRequest = mine?.status === "ACTIVE";
   const byRank = (a: User, b: User) => rankIndex(b.rank) - rankIndex(a.rank);
 

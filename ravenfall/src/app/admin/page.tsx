@@ -88,6 +88,9 @@ export default async function Admin() {
               <Link href="/admin/awards">Awards editor</Link>
             </Button>
             <Button asChild variant="outline">
+              <Link href="/admin/qualifications">Qualification builder</Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href="/admin/media">Home page media</Link>
             </Button>
           </div>

@@ -1,4 +1,8 @@
+import { QualBadge } from "@/components/qual-badge";
+import { blockers, expiringSoon, isCurrent } from "@/lib/qual-rules";
+import { CertifyForm, type CertifyOption } from "./certify-form";
 import { Award, CalendarOff, CheckCircle2, Circle, Crosshair, Lock, X } from "lucide-react";
+import { heldSlugs } from "@/lib/qual-rules";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -14,7 +18,6 @@ import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { MAX_SECONDARY_ROLES, RANKS, rankIndex, rankName, roleDef, ROLES, squadDef, SQUADS, UNIT, UNIT_ROLES, WEEKDAYS } from "@/config/unit";
 import { Rack, SkillBadges } from "@/components/rack";
 import { Ribbon } from "@/components/ribbon";
-import { RIBBON } from "@/components/vault-category";
 import { canNominate } from "@/lib/award-service";
 import { groupHeld, stripesOf } from "@/lib/awards";
 import { requireUser } from "@/lib/auth";
@@ -29,7 +32,7 @@ import { fmt, fmtDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { requestCallsign, requestLeave, updateOwnProfile } from "../../personnel/actions";
 import { RequestCard } from "../../personnel/request-card";
-import { addRecord, awardQualification, revokeQualification, updateProfile } from "../actions";
+import { addRecord, revokeQualification, updateProfile } from "../actions";
 import { BilletPicker } from "./billet-picker";
 import { FileTabs } from "./file-tabs";
 import { promotionRanks, RECORD_STYLE } from "./record-style";
@@ -70,7 +73,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
   const [counted, fill, allQuals, leave] = await Promise.all([
     prisma.attendance.groupBy({ by: ["status"], where: { userId: id, event: { startTime: { lt: new Date() } } }, _count: true }),
     billetFill(),
-    prisma.qualification.findMany({ orderBy: [{ category: "asc" }, { title: "asc" }] }),
+    prisma.qualification.findMany({ orderBy: [{ position: "asc" }, { title: "asc" }], include: { prerequisites: { select: { slug: true, title: true } } } }),
     onLeave([id]),
   ]);
   // Every award row of the member: the rack and Awards tab read these. Revoked
@@ -94,7 +97,21 @@ export default async function Dossier({ params, searchParams }: { params: Promis
   const total = attended + n("ABSENT") + n("NOSHOW") + n("EXCUSED");
   const rate = total ? Math.round((attended / total) * 100) : null;
 
-  const held = member.qualifications.map((q) => q.qualification.slug);
+  const held = heldSlugs(member.qualifications);
+  // What this viewer may certify the member in: instructors anything active;
+  // others only what they hold (in date) where holders may certify.
+  const now = new Date();
+  const mine = isInstructor ? [] : heldSlugs(await prisma.userQualification.findMany({ where: { userId: me.id }, include: { qualification: { select: { slug: true } } } }));
+  const certifyOptions: CertifyOption[] =
+    member.id === me.id && !isInstructor
+      ? []
+      : allQuals
+          .filter((q) => q.active && (isInstructor || (q.holdersCanCertify && mine.includes(q.slug))))
+          .flatMap((q) => {
+            const has = member.qualifications.find((h) => h.qualificationId === q.id);
+            if (has && isCurrent(has, now) && !expiringSoon(has, now)) return [];
+            return [{ id: q.id, title: q.title, category: q.category, tasks: q.tasks, renew: !!has, blockers: blockers(q, { rank: member.rank, held }, rankName) }];
+          });
   const qualTitle = Object.fromEntries(allQuals.map((q) => [q.slug, q.title]));
   const titles = (slugs: string[]) => slugs.map((s) => qualTitle[s] ?? s);
   const since =
@@ -132,6 +149,8 @@ export default async function Dossier({ params, searchParams }: { params: Promis
     id: q.id,
     title: q.qualification.title,
     category: q.qualification.category,
+    badge: q.qualification,
+    expired: !isCurrent(q),
     href: manuals.has(q.qualificationId) ? `/library/${manuals.get(q.qualificationId)}` : null,
   }));
 
@@ -391,11 +410,18 @@ export default async function Dossier({ params, searchParams }: { params: Promis
             {member.qualifications.map((q) => (
               <div key={q.id} className="flex items-center justify-between gap-2">
                 <Link href={`/vault/${q.qualification.slug}`} className="flex items-center gap-2 hover:text-accent">
-                  <span className={cn("h-3 w-6 rounded-[2px]", RIBBON[q.qualification.category])} />
+                  <QualBadge q={q.qualification} size={24} expired={!isCurrent(q, now)} />
                   <span className="text-sm font-semibold">{q.qualification.title}</span>
                 </Link>
                 <div className="flex items-center gap-1">
-                  <span className="typed text-xs text-muted-foreground">{fmtDate(q.awardedAt)}</span>
+                  <span className="typed flex flex-col items-end text-xs text-muted-foreground">
+                    {fmtDate(q.awardedAt)}
+                    {q.expiresAt && (
+                      <span className={cn("text-micro", !isCurrent(q, now) ? "text-destructive-fg" : expiringSoon(q, now) ? "text-warning" : "")}>
+                        {isCurrent(q, now) ? `until ${fmtDate(q.expiresAt)}` : `expired ${fmtDate(q.expiresAt)}`}
+                      </span>
+                    )}
+                  </span>
                   {isInstructor && (
                     <form action={revokeQualification}>
                       <input type="hidden" name="userQualId" value={q.id} />
@@ -408,23 +434,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
               </div>
             ))}
             {!member.qualifications.length && <Empty>None yet.</Empty>}
-            {isInstructor && allQuals.some((q) => !held.includes(q.slug)) && (
-              <ActionForm action={awardQualification} className="mt-2 border-t border-foreground/10 pt-4">
-                <input type="hidden" name="userId" value={member.id} />
-                <Field label="Award qualification" htmlFor="qualificationId">
-                  <Select id="qualificationId" name="qualificationId" required>
-                    {allQuals
-                      .filter((q) => !held.includes(q.slug))
-                      .map((q) => (
-                        <option key={q.id} value={q.id}>
-                          [{q.category}] {q.title}
-                        </option>
-                      ))}
-                  </Select>
-                </Field>
-                <SubmitButton size="sm">Award</SubmitButton>
-              </ActionForm>
-            )}
+            {certifyOptions.length > 0 && <CertifyForm userId={member.id} options={certifyOptions} />}
           </div>
         </Section>
       </div>

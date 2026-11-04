@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { heldSlugs } from "./qual-rules";
 import { rankName } from "@/config/unit";
 import { career, type Career } from "./career";
 import { postRequest, type PromotionPayload } from "./personnel";
@@ -36,7 +37,7 @@ export async function promotionStatus(where: Prisma.UserWhereInput = {}, now = n
       since: u.rankSince ?? u.serviceRecords[0]?.createdAt ?? u.enlistedAt,
       enlistedAt: u.enlistedAt,
       opsAttended: ops.get(u.id) ?? 0,
-      quals: u.qualifications.map((q) => q.qualification.slug),
+      quals: heldSlugs(u.qualifications),
       reading: reading.get(u.id),
       now,
     }),

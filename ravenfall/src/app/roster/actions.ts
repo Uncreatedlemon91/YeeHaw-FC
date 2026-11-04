@@ -1,5 +1,6 @@
 "use server";
 
+import { canCertify, certify } from "@/lib/qualifications";
 import type { MemberStatus, ServiceRecordType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -174,30 +175,25 @@ export async function deleteRecord(data: FormData) {
   revalidatePath(`/roster/${rec.userId}`);
 }
 
+/** Certify (or recertify) from the personnel file: instructors, or holders where the qualification allows. */
 export async function awardQualification(_: ActionState, data: FormData): Promise<ActionState> {
-  const me = await assertPerm("INSTRUCTOR");
+  const me = await assertPerm("OPERATOR");
   const userId = String(data.get("userId"));
   const qualificationId = String(data.get("qualificationId"));
   const qual = await prisma.qualification.findUnique({ where: { id: qualificationId } });
   if (!qual) return { error: "Pick a qualification." };
-  const exists = await prisma.userQualification.findUnique({
-    where: { userId_qualificationId: { userId, qualificationId } },
+  if (userId === me.id && !hasPerm(me.perms, "INSTRUCTOR")) return { error: "You can't certify yourself." };
+  if (!(await canCertify(me, qual))) return { error: `You can't certify ${qual.title}.` };
+  const r = await certify({
+    userId,
+    qualificationId,
+    byId: me.id,
+    passed: data.getAll("passed").map(String),
+    note: String(data.get("note") ?? "").slice(0, 500) || null,
   });
-  if (exists) return { error: "They already hold that qualification." };
-  await prisma.$transaction([
-    prisma.userQualification.create({ data: { userId, qualificationId, awardedById: me.id } }),
-    prisma.serviceRecord.create({
-      data: {
-        userId,
-        type: "QUALIFICATION",
-        title: `Qualified: ${qual.title}`,
-        description: `Certified against version ${qual.version}.`,
-        issuedById: me.id,
-      },
-    }),
-  ]);
+  if (!r.ok) return { error: r.error };
   revalidatePath(`/roster/${userId}`);
-  return { ok: `${qual.title} awarded.` };
+  return { ok: `${r.renewed ? "Recertified" : "Certified"}: ${r.title}.` };
 }
 
 export async function revokeQualification(data: FormData) {

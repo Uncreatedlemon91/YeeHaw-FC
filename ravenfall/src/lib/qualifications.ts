@@ -1,5 +1,8 @@
-import { prisma } from "./prisma";
+import { rankName } from "@/config/unit";
 import { RESERVED_AWARD_SLUGS } from "./awards";
+import { hasPerm, type Perm } from "./permissions";
+import { prisma } from "./prisma";
+import { blockers, expiringSoon, expiryFor, heldSlugs, isCurrent } from "./qual-rules";
 
 // Qualifications are skills; their manuals live in the Library, one UNIT
 // document each in this folder, linked through the existing relation.
@@ -45,4 +48,79 @@ export async function manualSlugs(qualificationIds: string[]) {
   // Oldest wins when several documents are linked, matching manualFor.
   for (const d of docs) for (const q of d.qualifications) out.set(q.id, d.slug);
   return out;
+}
+
+// --- Certifying ----------------------------------------------------------- //
+
+/** Who may certify: instructors (and Command), or a current holder where the qualification allows it. */
+export async function canCertify(certifier: { id: string; perms: readonly Perm[] }, q: { id: string; holdersCanCertify: boolean }) {
+  if (hasPerm(certifier.perms, "INSTRUCTOR")) return true;
+  if (!q.holdersCanCertify || !hasPerm(certifier.perms, "OPERATOR")) return false;
+  const mine = await prisma.userQualification.findUnique({ where: { userId_qualificationId: { userId: certifier.id, qualificationId: q.id } } });
+  return !!mine && isCurrent(mine);
+}
+
+export type CertifyResult = { ok: true; renewed: boolean; title: string } | { ok: false; error: string };
+
+/**
+ * Certify (or recertify) a member: checks prerequisites, minimum rank and
+ * that every assessment task was passed, sets the expiry, and writes the
+ * service record. The certifier's permission is the caller's to check.
+ */
+export async function certify(opts: {
+  userId: string;
+  qualificationId: string;
+  byId: string;
+  /** Tasks the assessor checked off. All of the qualification's are required unless `course` is set. */
+  passed?: string[];
+  /** Certified by passing a course (an event's AAR) rather than a checklist. */
+  course?: { id: string; title: string };
+  note?: string | null;
+}): Promise<CertifyResult> {
+  const [q, member] = await Promise.all([
+    prisma.qualification.findUnique({ where: { id: opts.qualificationId }, include: { prerequisites: { select: { slug: true, title: true } } } }),
+    prisma.user.findUnique({ where: { id: opts.userId }, include: { qualifications: { include: { qualification: { select: { slug: true } } } } } }),
+  ]);
+  if (!q) return { ok: false, error: "That qualification no longer exists." };
+  if (!member) return { ok: false, error: "Member not found." };
+  if (!q.active) return { ok: false, error: `${q.title} is retired.` };
+  const existing = member.qualifications.find((h) => h.qualificationId === q.id);
+  if (existing && isCurrent(existing) && !expiringSoon(existing)) return { ok: false, error: `They already hold ${q.title}.` };
+  const stop = blockers(q, { rank: member.rank, held: heldSlugs(member.qualifications) }, rankName);
+  if (stop.length) return { ok: false, error: `${stop.join("; ")}.` };
+  const passed = (opts.passed ?? []).filter((t) => q.tasks.includes(t));
+  if (!opts.course && passed.length < q.tasks.length) return { ok: false, error: `Check off every task (${passed.length} of ${q.tasks.length}).` };
+
+  const now = new Date();
+  const expiresAt = expiryFor(q.validDays, now);
+  const notes = [
+    opts.course ? `Passed the course: ${opts.course.title}.` : q.tasks.length ? `Assessed on ${q.tasks.length} task${q.tasks.length === 1 ? "" : "s"}: ${q.tasks.join("; ")}.` : null,
+    opts.note?.trim() || null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const renewed = !!existing;
+  await prisma.$transaction([
+    prisma.userQualification.upsert({
+      where: { userId_qualificationId: { userId: member.id, qualificationId: q.id } },
+      create: { userId: member.id, qualificationId: q.id, awardedById: opts.byId, awardedAt: now, expiresAt, notes: notes || null },
+      update: { awardedById: opts.byId, awardedAt: now, expiresAt, notes: notes || null },
+    }),
+    prisma.serviceRecord.create({
+      data: {
+        userId: member.id,
+        type: "QUALIFICATION",
+        title: `${renewed ? "Recertified" : "Qualified"}: ${q.title}`,
+        description: [
+          `Certified against version ${q.version}${opts.course ? ` on ${opts.course.title}` : ""}.`,
+          expiresAt ? `Valid until ${expiresAt.toISOString().slice(0, 10)}.` : null,
+          opts.note?.trim() || null,
+        ]
+          .filter(Boolean)
+          .join(" "),
+        issuedById: opts.byId,
+      },
+    }),
+  ]);
+  return { ok: true, renewed, title: q.title };
 }

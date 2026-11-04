@@ -216,6 +216,9 @@ model Event {
   openToRecruits    Boolean           @default(false)
   // Shown on the public home page under "Recent operations" when set.
   publicSummary     String?
+  // A course: the AAR can certify attendees in this qualification.
+  courseId          String?
+  course            Qualification?    @relation("CourseEvents", fields: [courseId], references: [id], onDelete: SetNull)
   // After-action report, Markdown. Null until a leader files one.
   debrief           String?
   debriefById       String?
@@ -253,19 +256,38 @@ model Attendance {
 // A qualification and its manual are one thing: the document is the
 // standard a member is certified against.
 model Qualification {
-  id          String                @id @default(cuid())
-  slug        String                @unique
-  title       String
-  category    QualificationCategory
-  summary     String                @default("")
-  content     String                @default("")
-  version     Int                   @default(1)
-  updatedById String?
-  updatedBy   User?                 @relation(fields: [updatedById], references: [id], onDelete: SetNull)
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
-  holders     UserQualification[]
-  libraryDocs LibraryDocument[]
+  id                String                @id @default(cuid())
+  slug              String                @unique
+  title             String
+  category          QualificationCategory
+  summary           String                @default("")
+  content           String                @default("")
+  version           Int                   @default(1)
+  // The builder (/admin/qualifications). The badge: a shape, an optional
+  // colour (null: the category's) and up to four letters (src/lib/qual-rules.ts).
+  badgeShape        String                @default("TAB")
+  badgeColor        String?
+  badgeCode         String                @default("")
+  // What it takes: qualifications held first, a minimum rank, and the
+  // tasks an assessor checks off when certifying someone.
+  prerequisites     Qualification[]       @relation("QualPrereqs")
+  requiredFor       Qualification[]       @relation("QualPrereqs")
+  minRank           String?
+  tasks             String[]              @default([])
+  // Recertify after this many days (null: never expires).
+  validDays         Int?
+  // Members holding it (current) may certify others, not only instructors.
+  holdersCanCertify Boolean               @default(false)
+  // Retired: hidden from new certifications, kept on those who hold it.
+  active            Boolean               @default(true)
+  position          Int                   @default(0)
+  courses           Event[]               @relation("CourseEvents")
+  updatedById       String?
+  updatedBy         User?                 @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  holders           UserQualification[]
+  libraryDocs       LibraryDocument[]
 }
 
 model UserQualification {
@@ -277,6 +299,11 @@ model UserQualification {
   awardedAt       DateTime      @default(now())
   awardedById     String?
   awardedBy       User?         @relation("QualAwarder", fields: [awardedById], references: [id], onDelete: SetNull)
+  // Set from the qualification's validDays when certified; past it the
+  // qualification no longer counts for billets or promotions.
+  expiresAt       DateTime?
+  // What the assessor recorded: tasks passed, the course it came from.
+  notes           String?
 
   @@unique([userId, qualificationId])
 }

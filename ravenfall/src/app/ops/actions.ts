@@ -16,6 +16,7 @@ import { hasPerm } from "@/lib/permissions";
 import { announceEvent, cancelEventPost, pushEventPost, refreshEventPostLater } from "@/lib/ops-notify";
 import { RSVP_CHOICES } from "@/lib/rsvp";
 import { prisma } from "@/lib/prisma";
+import { certify } from "@/lib/qualifications";
 import { fromInput } from "@/lib/time";
 
 const eventSchema = z.object({
@@ -27,6 +28,7 @@ const eventSchema = z.object({
   endTime: z.date().nullable(),
   mandatory: z.boolean(),
   openToRecruits: z.boolean(),
+  courseId: z.string().nullable(),
   // Empty: the whole unit.
   invitedSquads: z.array(z.enum(SQUADS.map((s) => s.name) as [string, ...string[]])).max(SQUADS.length),
 });
@@ -41,6 +43,7 @@ function parseEvent(data: FormData) {
     endTime: fromInput(String(data.get("endTime") ?? "")),
     mandatory: data.get("mandatory") === "on",
     openToRecruits: data.get("openToRecruits") === "on",
+    courseId: String(data.get("courseId") ?? "") || null,
     invitedSquads: [...new Set(data.getAll("invitedSquads").map(String))],
   });
   if (parsed.success && parsed.data.endTime && parsed.data.endTime <= parsed.data.startTime) {
@@ -53,6 +56,7 @@ export async function createEvent(_: ActionState, data: FormData): Promise<Actio
   const me = await assertPerm("INSTRUCTOR");
   const r = parseEvent(data);
   if ("error" in r) return { error: r.error };
+  if (r.data.courseId && !(await prisma.qualification.findUnique({ where: { id: r.data.courseId }, select: { id: true } }))) return { error: "That course's qualification no longer exists." };
   const event = await prisma.event.create({ data: { ...r.data, createdById: me.id } });
   if (data.get("announce") === "on") await announceEvent(event.id).catch((e) => console.error(`[ops] announce: ${explain(e)}`));
   revalidatePath("/ops");
@@ -64,6 +68,7 @@ export async function updateEvent(_: ActionState, data: FormData): Promise<Actio
   const id = String(data.get("id"));
   const r = parseEvent(data);
   if ("error" in r) return { error: r.error };
+  if (r.data.courseId && !(await prisma.qualification.findUnique({ where: { id: r.data.courseId }, select: { id: true } }))) return { error: "That course's qualification no longer exists." };
   await prisma.event.update({ where: { id }, data: r.data });
   refreshEventPostLater(id);
   revalidatePath("/ops");
@@ -156,6 +161,18 @@ export async function saveDebrief(_: ActionState, data: FormData): Promise<Actio
       }),
     ),
   ]);
+  // A course: certify those ticked as passed who were marked as attending.
+  // Ineligible ones are skipped (the form disables them); never fails the report.
+  const ev = await prisma.event.findUnique({ where: { id: eventId }, select: { title: true, courseId: true } });
+  if (ev?.courseId) {
+    const attendedIds = new Set(marks.filter((m) => m.status === "ATTENDING").map((m) => m.userId));
+    for (const [k] of data.entries()) {
+      if (!k.startsWith("pass:") || !attendedIds.has(k.slice(5))) continue;
+      const r = await certify({ userId: k.slice(5), qualificationId: ev.courseId, byId: me.id, course: { id: eventId, title: ev.title } }).catch((e) => ({ ok: false as const, error: String(e) }));
+      if (!r.ok) console.error(`[ops] course pass for ${k.slice(5)}: ${r.error}`);
+      else revalidatePath(`/roster/${k.slice(5)}`);
+    }
+  }
   // Automatic award nominations and promotion recommendations for the people
   // who were there, for S1 to approve. Never fails the report.
   try {

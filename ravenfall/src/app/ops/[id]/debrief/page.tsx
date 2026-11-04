@@ -5,7 +5,9 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Textarea } from "@/components/ui/input";
 import { DebriefAttendance } from "@/components/ops-debrief-attendance";
-import { rankIndex } from "@/config/unit";
+import { rankIndex, rankName } from "@/config/unit";
+import { QualBadge } from "@/components/qual-badge";
+import { blockers, expiringSoon, heldSlugs, isCurrent } from "@/lib/qual-rules";
 import { requireUser } from "@/lib/auth";
 import { onLeave } from "@/lib/personnel";
 import { prisma } from "@/lib/prisma";
@@ -33,7 +35,10 @@ What was the mission, and was it achieved?
 export default async function Debrief({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requireUser("INSTRUCTOR", `/ops/${id}/debrief`);
-  const event = await prisma.event.findUnique({ where: { id }, include: { attendances: true } });
+  const event = await prisma.event.findUnique({
+    where: { id },
+    include: { attendances: true, course: { include: { prerequisites: { select: { slug: true, title: true } } } } },
+  });
   if (!event) notFound();
 
   // Everyone active, plus anyone who RSVP'd even if they've since gone
@@ -44,6 +49,23 @@ export default async function Debrief({ params }: { params: Promise<{ id: string
   });
   // Approved leave covering the start of the op pre-excuses the member.
   const away = await onLeave(people.map((p) => p.id), event.startTime);
+  // A course: who can be certified on it, and why not where they can't.
+  const course = event.course;
+  const courseRows = course
+    ? await prisma.userQualification
+        .findMany({ where: { userId: { in: people.map((p) => p.id) } }, include: { qualification: { select: { slug: true } } } })
+        .then((rows) =>
+          people.map((p) => {
+            const mine = rows.filter((r) => r.userId === p.id);
+            const has = mine.find((r) => r.qualificationId === course.id);
+            const why =
+              has && isCurrent(has) && !expiringSoon(has)
+                ? "Already holds it"
+                : blockers(course, { rank: p.rank, held: heldSlugs(mine) }, rankName).join("; ");
+            return { id: p.id, name: p.callsign ?? p.discordUsername, why, renew: !!has, rsvp: marked.get(p.id) };
+          }),
+        )
+    : [];
   people.sort(
     (a, b) =>
       Number(marked.has(b.id)) - Number(marked.has(a.id)) ||
@@ -74,6 +96,38 @@ export default async function Debrief({ params }: { params: Promise<{ id: string
             </Field>
           </CardContent>
         </Card>
+        {course && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <QualBadge q={course} size={24} /> Course results: {course.title}
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Tick who passed. Filing certifies them in {course.title}
+                {course.validDays ? ` for ${course.validDays} days` : ""}, but only those marked Attended below.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+                {courseRows
+                  .filter((r) => r.rsvp === "ATTENDING" || r.rsvp === "TENTATIVE" || !r.why)
+                  .sort((a, b) => Number(!!a.why) - Number(!!b.why) || Number(b.rsvp === "ATTENDING") - Number(a.rsvp === "ATTENDING"))
+                  .map((r) => (
+                    <li key={r.id}>
+                      <label className={`flex items-start gap-2 text-sm ${r.why ? "text-muted-foreground" : ""}`}>
+                        <input type="checkbox" name={`pass:${r.id}`} disabled={!!r.why} className="mt-0.5 size-4 accent-[var(--accent)]" />
+                        <span>
+                          {r.name}
+                          {r.renew && !r.why && <span className="ml-1.5 text-micro uppercase text-accent">recertify</span>}
+                          {r.why && <span className="block text-micro">{r.why}</span>}
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
         <DebriefAttendance
           rows={people.map((p) => ({
             id: p.id,

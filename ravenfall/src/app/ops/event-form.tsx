@@ -10,10 +10,13 @@ export function EventForm({
   action,
   event,
   showAnnounce,
+  courses = [],
 }: {
   action: (prev: ActionState, data: FormData) => Promise<ActionState>;
   event?: Event;
   showAnnounce?: boolean;
+  /** Active qualifications, for "this event is a course". */
+  courses?: { id: string; title: string }[];
 }) {
   return (
     <ActionForm action={action}>
@@ -27,6 +30,16 @@ export function EventForm({
             <option value="OP">Operation</option>
             <option value="TRAINING">Training</option>
             <option value="BRIEFING">Briefing</option>
+          </Select>
+        </Field>
+        <Field label="Course (optional)" htmlFor="courseId" help="A training that certifies: its AAR can mark who passed.">
+          <Select id="courseId" name="courseId" defaultValue={event?.courseId ?? ""}>
+            <option value="">Not a course</option>
+            {courses.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.title}
+              </option>
+            ))}
           </Select>
         </Field>
         <Field label="Location / server (optional)" htmlFor="location">

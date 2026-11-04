@@ -1,3 +1,5 @@
+import { QualBadge } from "@/components/qual-badge";
+import { rankName } from "@/config/unit";
 import { Pencil, Plus } from "lucide-react";
 import Link from "next/link";
 import { Container } from "@/components/container";
@@ -5,7 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { Ribbon } from "@/components/ribbon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CategoryIcon, categoryLabel } from "@/components/vault-category";
+import { categoryLabel } from "@/components/vault-category";
 import { describeRule, KIND_LABEL, medalUrl, ruleOf, stripesOf } from "@/lib/awards";
 import { getSessionUser } from "@/lib/auth";
 import { hasPerm } from "@/lib/permissions";
@@ -21,7 +23,13 @@ export default async function Awards() {
   const isOperator = hasPerm(me?.perms, "OPERATOR");
   const [awards, quals] = await Promise.all([
     prisma.award.findMany({ where: isAdmin ? {} : { active: true }, orderBy: [{ precedence: "asc" }, { name: "asc" }] }),
-    isOperator ? prisma.qualification.findMany({ orderBy: [{ category: "asc" }, { title: "asc" }] }) : [],
+    isOperator
+      ? prisma.qualification.findMany({
+          where: hasPerm(me?.perms, "INSTRUCTOR") ? {} : { active: true },
+          orderBy: [{ position: "asc" }, { title: "asc" }],
+          include: { prerequisites: { select: { title: true } } },
+        })
+      : [],
   ]);
   const canEditQuals = hasPerm(me?.perms, "INSTRUCTOR");
 
@@ -89,24 +97,43 @@ export default async function Awards() {
               <p className="text-sm text-muted-foreground">Skills members are certified in. They show as badges on a personnel file, and each links to its manual in the Library.</p>
             </div>
             {canEditQuals && (
-              <Button asChild size="sm">
-                <Link href="/vault/qualifications/new">
-                  <Plus /> New qualification
-                </Link>
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/admin/qualifications">Qualification builder</Link>
+                </Button>
+                <Button asChild size="sm">
+                  <Link href="/admin/qualifications/new">
+                    <Plus /> New qualification
+                  </Link>
+                </Button>
+              </div>
             )}
           </div>
           {quals.length ? (
             <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
               {quals.map((q) => (
                 <li key={q.id} className="flex items-center justify-between gap-2 border-b border-border/50 py-2">
-                  <Link href={`/vault/${q.slug}`} className="flex min-w-0 items-center gap-2 text-sm hover:text-accent">
-                    <CategoryIcon category={q.category} className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="truncate font-semibold">{q.title}</span>
-                    <span className="hidden text-xs text-muted-foreground sm:inline">{categoryLabel(q.category)}</span>
+                  <Link href={`/vault/${q.slug}`} className="flex min-w-0 items-center gap-3 text-sm hover:text-accent">
+                    <QualBadge q={q} size={28} />
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold">
+                        {q.title}
+                        {!q.active && <span className="ml-2 text-micro font-normal uppercase text-muted-foreground">retired</span>}
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {[
+                          categoryLabel(q.category),
+                          q.prerequisites.length ? `needs ${q.prerequisites.map((p) => p.title).join(", ")}` : null,
+                          q.minRank ? `${rankName(q.minRank)}+` : null,
+                          q.validDays ? `recertify every ${q.validDays} days` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    </span>
                   </Link>
                   {canEditQuals && (
-                    <Link href={`/vault/qualifications/${q.slug}/edit`} className="text-xs text-muted-foreground hover:text-foreground">
+                    <Link href={`/admin/qualifications/${q.slug}`} className="text-xs text-muted-foreground hover:text-foreground">
                       Edit
                     </Link>
                   )}

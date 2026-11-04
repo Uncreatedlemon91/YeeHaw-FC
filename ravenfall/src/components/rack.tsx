@@ -4,6 +4,7 @@ import { CategoryIcon, categoryLabel, RIBBON } from "@/components/vault-category
 import { rackRows, type Stripe } from "@/lib/awards";
 import type { AwardDevice } from "@prisma/client";
 import { cn } from "@/lib/utils";
+import { type BadgeLike, QualBadge } from "@/components/qual-badge";
 
 export type RackItem = {
   id: string;
@@ -45,7 +46,7 @@ export function Rack({ items, className }: { items: RackItem[]; className?: stri
   );
 }
 
-export type SkillBadge = { id: string; title: string; category: string; href: string | null };
+export type SkillBadge = { id: string; title: string; category: string; href: string | null; badge?: BadgeLike; expired?: boolean };
 
 /** Qualifications as compact skill badges (not ribbons): category icon and colour, linked to the manual. */
 export function SkillBadges({ skills }: { skills: SkillBadge[] }) {
@@ -55,20 +56,26 @@ export function SkillBadges({ skills }: { skills: SkillBadge[] }) {
       {skills.map((s) => {
         const body = (
           <>
-            <span aria-hidden className={cn("h-3 w-1 rounded-full", RIBBON[s.category])} />
-            <CategoryIcon category={s.category} className="size-3" />
-            {s.title}
+            {s.badge ? (
+              <QualBadge q={s.badge} size={16} expired={s.expired} />
+            ) : (
+              <>
+                <span aria-hidden className={cn("h-3 w-1 rounded-full", RIBBON[s.category])} />
+                <CategoryIcon category={s.category} className="size-3" />
+              </>
+            )}
+            <span className={cn(s.expired && "text-muted-foreground line-through")}>{s.title}</span>
           </>
         );
         const cls = "inline-flex items-center gap-1.5 rounded-full border border-foreground/15 bg-card px-2 py-0.5 text-micro font-semibold uppercase tracking-wider";
         return (
           <li key={s.id}>
             {s.href ? (
-              <Link href={s.href} title={`${s.title} (${categoryLabel(s.category)}): open the manual`} className={cn(cls, "hover:border-accent/60 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>
+              <Link href={s.href} title={`${s.title} (${categoryLabel(s.category)})${s.expired ? ", expired" : ""}: open the manual`} className={cn(cls, "hover:border-accent/60 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>
                 {body}
               </Link>
             ) : (
-              <span title={`${s.title} (${categoryLabel(s.category)})`} className={cls}>
+              <span title={`${s.title} (${categoryLabel(s.category)})${s.expired ? ", expired" : ""}`} className={cls}>
                 {body}
               </span>
             )}

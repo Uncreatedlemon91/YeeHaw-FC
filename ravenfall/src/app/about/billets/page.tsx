@@ -1,4 +1,5 @@
 import { Hand, ShieldCheck } from "lucide-react";
+import { heldSlugs } from "@/lib/qual-rules";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AboutCta } from "@/components/about-cta";
@@ -46,7 +47,7 @@ export default async function BilletsPage() {
   const user = await getSessionUser();
   const operator = !!user && hasPerm(user.perms, "OPERATOR");
   const [titles, strength, vac] = await Promise.all([qualTitles(slugs), squadStrength(), vacancies(operator ? user.id : null)]);
-  const held = vac?.me?.qualifications.map((q) => q.qualification.slug) ?? [];
+  const held = heldSlugs(vac?.me?.qualifications ?? []);
   const active = vac?.me?.status === "ACTIVE";
   const slots = SQUADS.reduce((n, s) => n + squadCap(s.billets), 0);
 

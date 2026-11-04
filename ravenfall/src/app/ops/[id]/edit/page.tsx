@@ -16,6 +16,11 @@ export default async function EditEvent({ params }: { params: Promise<{ id: stri
   const me = await requireUser("INSTRUCTOR", `/ops/${id}/edit`);
   const event = await prisma.event.findUnique({ where: { id } });
   if (!event) notFound();
+  const courses = await prisma.qualification.findMany({
+    where: { OR: [{ active: true }, ...(event.courseId ? [{ id: event.courseId }] : [])] },
+    orderBy: [{ position: "asc" }, { title: "asc" }],
+    select: { id: true, title: true },
+  });
   return (
     <Container size="narrow">
       <PageHeader
@@ -34,7 +39,7 @@ export default async function EditEvent({ params }: { params: Promise<{ id: stri
       />
       <Card>
         <CardContent className="py-6">
-          <EventForm action={updateEvent} event={event} />
+          <EventForm action={updateEvent} event={event} courses={courses} />
         </CardContent>
       </Card>
     </Container>
