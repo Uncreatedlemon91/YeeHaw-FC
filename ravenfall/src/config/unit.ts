@@ -81,32 +81,32 @@ export const SQUADS: readonly SquadDef[] = [
   {
     name: "Alpha",
     callsign: "Talon",
-    blurb: "Assault team. Room clearing, close-quarters battle and holding ground.",
-    billets: { "Team Leader": 1, "Assistant Team Leader": 1, "Point Man": 1, Assaulter: 4, Breacher: 2, Medic: 1, "Communications / Intelligence Specialist": 1 },
+    blurb: "Frontline assault and infantry.",
+    billets: { "Team Leader": 1, Assaulter: 3, Medic: 1, "Assistant Medic": 1 },
   },
   {
     name: "Bravo",
     callsign: "Havoc",
-    blurb: "Assault team. Fire support and manoeuvre element.",
-    billets: { "Team Leader": 1, "Assistant Team Leader": 1, "Point Man": 1, Assaulter: 4, Breacher: 2, Medic: 1, "Communications / Intelligence Specialist": 1 },
+    blurb: "Frontline assault and infantry.",
+    billets: { "Team Leader": 1, Assaulter: 3, Medic: 1, "Assistant Medic": 1 },
   },
   {
     name: "Charlie",
-    callsign: "Shadow",
-    blurb: "Reconnaissance troop. Overwatch, sniper pairs and early warning.",
-    billets: { "Team Leader": 1, "Assistant Team Leader": 1, "Communications / Intelligence Specialist": 1, "Overwatch / Sniper": 4, Assaulter: 2 },
+    callsign: "Hammer",
+    blurb: "Frontline assault and infantry.",
+    billets: { "Team Leader": 1, Assaulter: 3, Medic: 1, "Assistant Medic": 1 },
   },
   {
-    name: "Reaper",
+    name: "Delta",
     callsign: "Reaper",
-    blurb: "Rotary-wing transport, CAS and medevac.",
-    billets: { "Team Leader": 1, Pilot: 4 },
+    blurb: "Logistics: piloting, driving and building FOBs.",
+    billets: { "Team Leader": 1, Technician: 3 },
   },
   {
-    name: "Medical",
-    callsign: "Lifeline",
-    blurb: "Tactical combat casualty care and casualty evacuation.",
-    billets: { "Team Leader": 1, Medic: 4 },
+    name: "Echo",
+    callsign: "Shadow",
+    blurb: "Reconnaissance, sniping and overwatch.",
+    billets: { "Team Leader": 1, Operator: 3 },
   },
 ];
 
@@ -116,21 +116,20 @@ export const SQUADS: readonly SquadDef[] = [
 // files and decide its role and leave requests.
 // `about` is optional longer copy for the public About > Billets page.
 // `name` is stored on each member and in the Admin page's role mapping, so
-// renaming one needs a data migration (see prisma/migrations/*_team_billets).
+// renaming one needs a data migration (see prisma/migrations/*_team_billets
+// and *_squad_restructure).
 export type RoleDef = { name: string; code: string; blurb: string; requires: string[]; leads?: boolean; about?: string };
 
 const LEADS = " A leadership billet: also decides the squad's role and leave requests.";
 
 export const ROLES: readonly RoleDef[] = [
   { name: "Team Leader", code: "TL", blurb: "Commands the team.", requires: ["basic-combat-training", "team-leader-course"], leads: true, about: "Commands the team; typically a Master Sergeant (E-8) or senior Sergeant First Class (E-7)." + LEADS },
-  { name: "Assistant Team Leader", code: "ATL", blurb: "Second-in-command (2IC).", requires: ["basic-combat-training", "team-leader-course"], leads: true, about: "Second-in-command (2IC); assists with tactical planning, coordination, and execution." + LEADS },
-  { name: "Point Man", code: "PT", blurb: "Leads the stack or movement formation.", requires: ["basic-combat-training"], about: "Leads the team's stack or movement formation; responsible for forward security, navigation, and immediate threat engagement." },
   { name: "Assaulter", code: "ASLT", blurb: "The core tactical element.", requires: ["basic-combat-training"], about: "Forms the core tactical element; executes room clearing, close-quarters battle (CQB), and primary target engagement." },
-  { name: "Breacher", code: "BRCH", blurb: "Mechanical, ballistic, thermal and explosive entry.", requires: ["basic-combat-training"], about: "Specializes in mechanical, ballistic, thermal, and explosive entry methods to bypass locked or fortified doors and obstacles." },
   { name: "Medic", code: "MED", blurb: "Tactical combat casualty care under fire.", requires: ["basic-combat-training", "combat-lifesaver"], about: "Advanced tactical combat casualty care (TCCC) specialist trained to manage trauma and provide prolonged field care under fire." },
+  { name: "Assistant Medic", code: "AMED", blurb: "Backs up the medic and keeps casualties moving.", requires: ["basic-combat-training"], about: "Works alongside the team's medic: first aid under fire, casualty drags and evacuation, and taking over care when the medic is down." },
+  { name: "Technician", code: "TECH", blurb: "Pilots, drives and builds FOBs.", requires: ["basic-combat-training"], about: "Keeps the unit moving and supplied: flies and drives its transport, runs logistics and resupply, and builds and maintains forward operating bases (FOBs)." },
+  { name: "Operator", code: "OPR", blurb: "Reconnaissance, sniping and overwatch.", requires: ["basic-combat-training", "marksman"], about: "Works ahead of the main force: reconnaissance and surveillance, precision long-range fire, and overwatch and early warning for the teams." },
   { name: "Communications / Intelligence Specialist", code: "COMMS", blurb: "Secure radio and satellite networks, and battlefield intel.", requires: ["basic-combat-training"], about: "Manages secure satellite and tactical radio networks; relays real-time battlefield data to higher command." },
-  { name: "Overwatch / Sniper", code: "OW", blurb: "Long-range surveillance and precision fire, in pairs.", requires: ["basic-combat-training", "marksman"], about: "Works as a sniper pair: provides long-range surveillance, precision fire support, and early warning from a distance (typically attached from a reconnaissance troop)." },
-  { name: "Pilot", code: "153A", blurb: "Rotary-wing aviator.", requires: ["rotary-wing-pilot"], about: "Flies the unit's rotary-wing transport, close air support and medevac." },
   { name: "Command", code: "HQ", blurb: "Unit command staff.", requires: ["team-leader-course"], leads: true, about: "Sits on the unit's command staff, planning missions and leading the unit. A leadership billet: also decides role and leave requests across every squad." },
 ];
 

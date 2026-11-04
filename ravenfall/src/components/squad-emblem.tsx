@@ -12,8 +12,8 @@ const SHAPE: Record<string, Outline> = {
   Alpha: "shield",
   Bravo: "hex",
   Charlie: "diamond",
-  Reaper: "pennant",
-  Medical: "round",
+  Delta: "pennant",
+  Echo: "round",
 };
 
 const PATH: Record<Outline, string> = {
