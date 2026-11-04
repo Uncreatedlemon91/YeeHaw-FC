@@ -20,12 +20,14 @@ const TYPE_LABEL: Record<EventType, string> = { OP: "Operation", TRAINING: "Trai
 
 type Loaded = Event & { attendances: { status: AttendanceStatus }[] };
 
-/** The invited squads' Discord roles, for the post's ping. */
+/** The Discord roles the post pings: invited squads, plus Recruit and Candidate on an event open to recruits. */
 async function squadRoleIds(e: Event): Promise<string[]> {
   const squads = invitedSquads(e);
-  if (!squads.length) return [];
-  const { squads: map } = await getRoleConfig();
-  return squads.map((s) => map[s]).filter(Boolean);
+  if (!squads.length && !e.openToRecruits) return [];
+  const cfg = await getRoleConfig();
+  const ids = squads.map((s) => cfg.squads[s]);
+  if (e.openToRecruits) ids.push(cfg.recruit, cfg.candidate);
+  return [...new Set(ids.filter(Boolean))];
 }
 
 function message(e: Loaded, state: "open" | "closed" | "cancelled", ping: string[] = []) {

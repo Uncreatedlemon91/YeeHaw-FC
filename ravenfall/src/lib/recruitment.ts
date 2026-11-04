@@ -1,4 +1,4 @@
-import type { RecruitmentApplication, User } from "@prisma/client";
+import type { RecruitmentApplication, RecruitStage, User } from "@prisma/client";
 import { APPLICATION_QUESTIONS, nickname, RANKS, RECRUIT_RANK, rankName, UNIT } from "@/config/unit";
 import {
   addRole,
@@ -15,7 +15,9 @@ import {
 import { env } from "./env";
 import { prisma } from "./prisma";
 import { getChannelConfig } from "./channel-config";
+import { STAGE_LABEL } from "./recruit-pipeline";
 import { getRoleConfig } from "./role-config";
+import { discordTime } from "./time";
 
 // The approval pipeline lives here so the website dashboard and the Discord
 // buttons run exactly the same steps.
@@ -48,6 +50,10 @@ export function boardMessage(
     value: String(a[q.key]).slice(0, 1000),
     inline: q.type !== "textarea",
   }));
+  if (app.status === "PENDING" && app.stage !== "APPLIED") {
+    const when = app.stage === "INTERVIEW_SET" && app.interviewAt ? ` · ${discordTime(app.interviewAt)}` : "";
+    fields.push({ name: "Stage", value: `${STAGE_LABEL[app.stage]}${when}`, inline: false });
+  }
   if (decision) {
     const what =
       app.status === "APPROVED"
@@ -175,7 +181,10 @@ export async function approveApplication(opts: {
     await step("Welcome DM", () =>
       dm(
         app.discordId,
-        `Welcome to ${UNIT.name}, **${callsign}**. Your application was approved — check the operations calendar at ${env.siteUrl}/ops and your dossier at ${env.siteUrl}/roster/${app.userId}.`,
+        [
+          `Welcome to ${UNIT.name}, **${callsign}**. Your application was approved.`,
+          `Next steps: sign up for a recruit night or basic training, pass basic training, then join your first op. Your checklist is at ${env.siteUrl}/apply.`,
+        ].join("\n\n"),
       ),
     );
   } else {
@@ -204,6 +213,59 @@ export async function denyApplication(opts: {
     } catch (e) {
       warnings.push(`Board post: ${explain(e)}`);
     }
+  }
+  return { ok: true, warnings };
+}
+
+// --- The recruiter's pipeline -------------------------------------------- //
+
+/** Tell the applicant their application arrived and what happens next. Best-effort. */
+export async function welcomeApplicant(discordId: string) {
+  if (!env.botToken) return;
+  await dm(
+    discordId,
+    [
+      `Thanks for applying to ${UNIT.name}. A recruiter will reach out on Discord, usually within 48 hours, to set up a short interview.`,
+      `While you wait, you can sign up for a recruit night and follow your application at ${env.siteUrl}/apply.`,
+    ].join("\n\n"),
+  ).catch((e) => console.error(`[recruitment] welcome DM: ${explain(e)}`));
+}
+
+/**
+ * Move a pending application along. Setting an interview needs a time and
+ * DMs it to the applicant; every change refreshes the board post. Returns
+ * warnings for the Discord side, which never fails the change.
+ */
+export async function setStage(opts: {
+  appId: string;
+  stage: RecruitStage;
+  interviewAt?: Date | null;
+  recruiterId: string;
+}): Promise<DecisionResult> {
+  const app = await prisma.recruitmentApplication.findUnique({ where: { id: opts.appId } });
+  if (!app) return { ok: false, error: "Application not found." };
+  if (app.status !== "PENDING") return { ok: false, error: `This application was already ${app.status.toLowerCase()}.` };
+  if (opts.stage === "INTERVIEW_SET" && !opts.interviewAt) return { ok: false, error: "Pick a time for the interview." };
+  const interviewAt = opts.stage === "INTERVIEW_SET" ? opts.interviewAt! : opts.stage === "INTERVIEWED" ? app.interviewAt : null;
+  const updated = await prisma.recruitmentApplication.update({
+    where: { id: app.id },
+    data: {
+      stage: opts.stage,
+      stageAt: opts.stage === app.stage ? app.stageAt : new Date(),
+      interviewAt,
+      // Whoever moves it first takes it on, unless someone already has.
+      recruiterId: app.recruiterId ?? opts.recruiterId,
+    },
+  });
+  const warnings: string[] = [];
+  if (env.botToken) {
+    if (opts.stage === "INTERVIEW_SET" && interviewAt && interviewAt.getTime() !== app.interviewAt?.getTime()) {
+      await dm(
+        app.discordId,
+        `Your ${UNIT.name} interview is set for ${discordTime(interviewAt)} (${discordTime(interviewAt, "R")}). A recruiter will meet you in voice on our Discord server. Can't make it? Reply to your recruiter and they'll find another time.`,
+      ).catch((e) => warnings.push(`Interview DM: ${explain(e)}`));
+    }
+    await refreshBoard(updated, undefined).catch((e) => warnings.push(`Board post: ${explain(e)}`));
   }
   return { ok: true, warnings };
 }

@@ -64,6 +64,14 @@ export default async function Debrief({ params }: { params: Promise<{ id: string
             <Field label="Report (Markdown)" htmlFor="debrief">
               <Textarea id="debrief" name="debrief" className="min-h-72 font-mono text-xs" defaultValue={event.debrief ?? TEMPLATE} />
             </Field>
+            <Field
+              label="Public summary (optional)"
+              htmlFor="publicSummary"
+              help="Two or three sentences for the public home page's Recent operations. Leave blank to keep this op off it. The report above stays internal."
+              className="mt-4"
+            >
+              <Textarea id="publicSummary" name="publicSummary" maxLength={600} className="min-h-20 text-sm" defaultValue={event.publicSummary ?? ""} />
+            </Field>
           </CardContent>
         </Card>
         <DebriefAttendance

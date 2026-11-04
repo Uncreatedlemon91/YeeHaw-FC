@@ -2,9 +2,9 @@ import { cn } from "@/lib/utils";
 
 export const PIPELINE = [
   { step: "01", title: "Apply", body: "Sign in with Discord and fill out a short questionnaire. No separate account." },
-  { step: "02", title: "Review", body: "Recruiters are alerted on Discord and review your application, usually within 48 hours." },
-  { step: "03", title: "Enlist", body: "Once approved you get your callsign, roles and a service record. You're a Recruit." },
-  { step: "04", title: "Deploy", body: "RSVP to your first op, complete basic training and start earning qualifications." },
+  { step: "02", title: "Interview", body: "A recruiter reaches out on Discord, usually within 48 hours, for a short chat in voice." },
+  { step: "03", title: "Train", body: "Once enlisted you get your callsign and roles. Join a recruit night and pass basic training." },
+  { step: "04", title: "Deploy", body: "RSVP to your first op, find your squad and start earning qualifications and rank." },
 ];
 
 /** Compact four-step strip for the signed-out apply page. */

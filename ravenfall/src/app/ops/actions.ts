@@ -8,10 +8,11 @@ import type { ActionState } from "@/components/action-form";
 import { evaluateAwards } from "@/lib/award-evaluator";
 import { announceAutoNominationsLater } from "@/lib/award-notify";
 import { recommendPromotions } from "@/lib/promotions";
-import { assertPerm } from "@/lib/auth";
+import { assertPerm, getSessionUser } from "@/lib/auth";
 import { explain } from "@/lib/discord";
 import { SQUADS } from "@/config/unit";
-import { isInvited } from "@/lib/event-invites";
+import { inviteMember, isInvited } from "@/lib/event-invites";
+import { hasPerm } from "@/lib/permissions";
 import { announceEvent, cancelEventPost, pushEventPost, refreshEventPostLater } from "@/lib/ops-notify";
 import { RSVP_CHOICES } from "@/lib/rsvp";
 import { prisma } from "@/lib/prisma";
@@ -25,6 +26,7 @@ const eventSchema = z.object({
   startTime: z.date({ invalid_type_error: "Set a start time." }),
   endTime: z.date().nullable(),
   mandatory: z.boolean(),
+  openToRecruits: z.boolean(),
   // Empty: the whole unit.
   invitedSquads: z.array(z.enum(SQUADS.map((s) => s.name) as [string, ...string[]])).max(SQUADS.length),
 });
@@ -38,6 +40,7 @@ function parseEvent(data: FormData) {
     startTime: fromInput(String(data.get("startTime") ?? "")),
     endTime: fromInput(String(data.get("endTime") ?? "")),
     mandatory: data.get("mandatory") === "on",
+    openToRecruits: data.get("openToRecruits") === "on",
     invitedSquads: [...new Set(data.getAll("invitedSquads").map(String))],
   });
   if (parsed.success && parsed.data.endTime && parsed.data.endTime <= parsed.data.startTime) {
@@ -91,16 +94,17 @@ export async function deleteEvent(data: FormData) {
 }
 
 export async function rsvp(data: FormData) {
-  const me = await assertPerm("OPERATOR");
+  // Signed in is enough to get this far: applicants and Recruits without
+  // unit access may answer events open to recruits, and nothing else.
+  const me = await getSessionUser();
+  if (!me) throw new Error("Sign in first.");
   const eventId = String(data.get("eventId"));
   const choice = String(data.get("status"));
-  const [event, member] = await Promise.all([
-    prisma.event.findUnique({ where: { id: eventId } }),
-    prisma.user.findUnique({ where: { id: me.id }, select: { id: true, squad: true } }),
-  ]);
+  const [event, member] = await Promise.all([prisma.event.findUnique({ where: { id: eventId } }), inviteMember(me.id)]);
   // RSVPs close once the event starts; after that the AAR owns attendance.
   // Only those invited may answer (CLEAR is always allowed, to take one back).
   if (!event || !member || event.startTime < new Date()) return;
+  if (!hasPerm(me.perms, "OPERATOR") && !(event.openToRecruits && member.recruit)) return;
   if (choice !== "CLEAR" && !isInvited(event, member)) return;
   if (choice === "CLEAR") {
     await prisma.attendance.deleteMany({ where: { eventId, userId: me.id } });
@@ -114,6 +118,7 @@ export async function rsvp(data: FormData) {
   refreshEventPostLater(eventId);
   revalidatePath(`/ops/${eventId}`);
   revalidatePath("/dashboard");
+  revalidatePath("/apply");
 }
 
 const MARKS = ["ATTENDING", "ABSENT", "EXCUSED", "NOSHOW"] as const;
@@ -124,6 +129,8 @@ export async function saveDebrief(_: ActionState, data: FormData): Promise<Actio
   const eventId = String(data.get("eventId"));
   const debrief = String(data.get("debrief") ?? "").trim();
   if (debrief.length > 50000) return { error: "That debrief is too long." };
+  const publicSummary = String(data.get("publicSummary") ?? "").trim();
+  if (publicSummary.length > 600) return { error: "Keep the public summary under 600 characters." };
 
   // Each member row posts "att:<userId>" = status, or "" to leave them off.
   const marks: { userId: string; status: AttendanceStatus }[] = [];
@@ -138,7 +145,7 @@ export async function saveDebrief(_: ActionState, data: FormData): Promise<Actio
   await prisma.$transaction([
     prisma.event.update({
       where: { id: eventId },
-      data: { debrief: debrief || null, debriefById: me.id, debriefAt: new Date() },
+      data: { debrief: debrief || null, publicSummary: publicSummary || null, debriefById: me.id, debriefAt: new Date() },
     }),
     prisma.attendance.deleteMany({ where: { eventId, userId: { in: cleared } } }),
     ...marks.map((m) =>
@@ -161,5 +168,6 @@ export async function saveDebrief(_: ActionState, data: FormData): Promise<Actio
   }
   refreshEventPostLater(eventId);
   revalidatePath(`/ops/${eventId}`);
+  revalidatePath("/");
   redirect(`/ops/${eventId}`);
 }

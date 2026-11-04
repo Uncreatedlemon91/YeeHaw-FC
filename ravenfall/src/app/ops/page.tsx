@@ -123,7 +123,7 @@ function EventRow({ e, past }: { e: Row; past: boolean }) {
         <div className="flex flex-wrap items-center gap-2">
           <EventTypeBadge type={e.type} />
           {e.mandatory && <Badge variant="destructive">Mandatory</Badge>}
-          {!isWholeUnit(e) && <Badge variant="outline">{invitedLabel(e)}</Badge>}
+          {(!isWholeUnit(e) || e.openToRecruits) && <Badge variant={e.openToRecruits ? "accent" : "outline"}>{invitedLabel(e)}</Badge>}
           {past && (e.debrief ? <Badge variant="success">AAR filed</Badge> : <Badge variant="outline">No AAR</Badge>)}
           {mine && <AttendanceBadge status={mine.status} />}
         </div>

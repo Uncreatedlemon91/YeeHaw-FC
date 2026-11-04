@@ -66,6 +66,15 @@ export function EventForm({
           <input type="checkbox" name="mandatory" defaultChecked={event?.mandatory} className="size-4 accent-[var(--accent)]" />
           Mandatory attendance
         </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="openToRecruits" defaultChecked={event?.openToRecruits} className="mt-0.5 size-4 accent-[var(--accent)]" />
+          <span>
+            Open to recruits
+            <span className="block text-xs text-muted-foreground">
+              Recruits and applicants under review can see it and sign up too: recruit nights, basic training. The Discord post pings the Recruit and Candidate roles.
+            </span>
+          </span>
+        </label>
         {showAnnounce && (
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="announce" defaultChecked className="size-4 accent-[var(--accent)]" />

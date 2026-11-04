@@ -12,9 +12,10 @@ import { PageHeader } from "@/components/page-header";
 import { AttendanceBadge, EventTypeBadge, MemberStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { rankName } from "@/config/unit";
+import { RECRUIT_RANK, rankName } from "@/config/unit";
+import { RecruitChecklist } from "@/components/recruit-journey";
 import { requireUser } from "@/lib/auth";
-import { invitedWhere } from "@/lib/event-invites";
+import { invitedWhere, inviteMember } from "@/lib/event-invites";
 import { getViewer, viewerLevel } from "@/lib/library";
 import { hasPerm } from "@/lib/permissions";
 import { canDecide, isLeader } from "@/lib/personnel";
@@ -61,7 +62,7 @@ export default async function Dashboard() {
       include: { _count: { select: { qualifications: true } } },
     }),
     // What's coming up for them: whole-unit events and their squad's.
-    prisma.user.findUnique({ where: { id: me.id }, select: { id: true, squad: true } }).then((m) =>
+    inviteMember(me.id).then((m) =>
       prisma.event.findMany({
         where: { startTime: { gte: now }, ...(m ? invitedWhere(m) : {}) },
         orderBy: { startTime: "asc" },
@@ -103,6 +104,7 @@ export default async function Dashboard() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-6">
+          {profile.rank === RECRUIT_RANK && <RecruitChecklist userId={me.id} unitAccess />}
           {reading.length > 0 && (
             <div className="flex flex-col gap-2 rounded-lg border border-accent/40 bg-accent/10 p-4">
               <div className="flex items-center gap-3">

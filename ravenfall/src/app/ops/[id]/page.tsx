@@ -1,7 +1,7 @@
 import type { AttendanceStatus } from "@prisma/client";
 import { Check, ClipboardList, MapPin, Pencil, ShieldAlert, Timer, UserCheck, Users } from "lucide-react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { RankInsignia } from "@/components/insignia";
 import { Container } from "@/components/container";
@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { rankIndex, SQUADS } from "@/config/unit";
 import { requireUser } from "@/lib/auth";
-import { invitedLabel, invitedSquads, inviteeWhere, isInvited, isWholeUnit } from "@/lib/event-invites";
+import { invitedLabel, inviteeWhere, inviteMember, isInvited, isWholeUnit } from "@/lib/event-invites";
 import { hasPerm } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { fmt } from "@/lib/time";
@@ -30,7 +30,10 @@ const ORDER: AttendanceStatus[] = ["ATTENDING", "TENTATIVE", "EXCUSED", "ABSENT"
 
 export default async function EventPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const me = await requireUser("OPERATOR", `/ops/${id}`);
+  // Signed in, then: the unit sees every event; applicants and Recruits
+  // without unit access see only those open to recruits.
+  const me = await requireUser(undefined, `/ops/${id}`);
+  const unit = hasPerm(me.perms, "OPERATOR");
   const [event, viewer] = await Promise.all([
     prisma.event.findUnique({
       where: { id },
@@ -40,9 +43,10 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
         debriefBy: true,
       },
     }),
-    prisma.user.findUnique({ where: { id: me.id }, select: { id: true, squad: true } }),
+    inviteMember(me.id),
   ]);
   if (!event) notFound();
+  if (!unit && !(event.openToRecruits && viewer?.recruit)) redirect("/denied");
   // Strength is the invited squads' (or the whole unit's) active members.
   const strength = await prisma.user.count({ where: inviteeWhere(event) });
   const invited = !!viewer && isInvited(event, viewer);
@@ -93,7 +97,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
               <EventTypeBadge type={event.type} />
               {event.mandatory && <Badge variant="destructive">Mandatory</Badge>}
               <Badge variant="outline">
-                <UserCheck className="size-3" aria-hidden /> {isWholeUnit(event) ? "Whole unit" : `For ${invitedLabel(event)}`}
+                <UserCheck className="size-3" aria-hidden /> {isWholeUnit(event) && !event.openToRecruits ? "Whole unit" : `For ${invitedLabel(event)}`}
               </Badge>
             </div>
           </div>
@@ -134,7 +138,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
                 mine ? <AttendanceBadge status={mine.status} /> : <p className="text-sm text-muted-foreground">Not recorded.</p>
               ) : !invited ? (
                 <p className="text-sm text-muted-foreground">
-                  This event is for {invitedSquads(event).join(", ")} only. Ask its organiser if you should be there.
+                  This event is for {invitedLabel(event)} only. Ask its organiser if you should be there.
                 </p>
               ) : (
                 <>

@@ -67,6 +67,10 @@ export const RANKS: readonly RankDef[] = [
 
 export const RECRUIT_RANK = RANKS[0].abbr;
 
+// The qualification that marks a recruit as trained in the recruit pipeline
+// (src/lib/recruit-pipeline.ts). A vault slug.
+export const BASIC_TRAINING_QUAL = "basic-combat-training";
+
 // Billets are slot caps per role: an ORBAT entry, not a suggestion. A role
 // a squad doesn't list can't be held in that squad.
 export type SquadDef = { name: string; callsign: string; blurb: string; billets: Record<string, number> };

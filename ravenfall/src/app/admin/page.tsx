@@ -83,9 +83,14 @@ export default async function Admin() {
         title="Admin"
         description="Discord integration status and one-off setup actions."
         actions={
-          <Button asChild variant="outline">
-            <Link href="/admin/awards">Awards editor</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link href="/admin/awards">Awards editor</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/admin/media">Home page media</Link>
+            </Button>
+          </div>
         }
       />
       <div className="grid items-start gap-6 lg:grid-cols-2">

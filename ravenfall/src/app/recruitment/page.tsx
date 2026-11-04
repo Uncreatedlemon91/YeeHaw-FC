@@ -12,18 +12,22 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { answersOf } from "@/lib/recruitment";
 import { fmt } from "@/lib/time";
+import { PipelineBoard } from "./pipeline-board";
 
 export const metadata = { title: "Recruitment" };
 
 const TABS: ApplicationStatus[] = ["PENDING", "APPROVED", "DENIED"];
 
 export default async function Recruitment({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
-  await requireUser("RECRUITER", "/recruitment");
+  const me = await requireUser("RECRUITER", "/recruitment");
   const { status: s } = await searchParams;
-  const status = TABS.includes(s as ApplicationStatus) ? (s as ApplicationStatus) : "PENDING";
+  const board = !TABS.includes(s as ApplicationStatus);
+  const status = board ? "PENDING" : (s as ApplicationStatus);
 
   const [apps, counts] = await Promise.all([
-    prisma.recruitmentApplication.findMany({
+    board
+      ? []
+      : prisma.recruitmentApplication.findMany({
       where: { status },
       orderBy: { createdAt: status === "PENDING" ? "asc" : "desc" },
       include: { user: true, reviewedBy: true },
@@ -38,12 +42,24 @@ export default async function Recruitment({ searchParams }: { searchParams: Prom
       <PageHeader
         eyebrow="Personnel"
         title="Recruitment"
-        description="Applications from /apply. Decisions here and on the Discord board stay in sync."
+        description="From application to first op. Decisions here and on the Discord board stay in sync."
+        actions={
+          <Link href="/admin/media" className="text-sm text-accent underline-offset-4 hover:underline">
+            Home page media
+          </Link>
+        }
       />
       <TabLinks
         label="Application status"
-        items={TABS.map((t) => ({ href: `/recruitment?status=${t}`, label: t, count: count(t), active: t === status }))}
+        items={[
+          { href: "/recruitment", label: "Pipeline", active: board },
+          ...TABS.map((t) => ({ href: `/recruitment?status=${t}`, label: t, count: count(t), active: !board && t === status })),
+        ]}
       />
+      {board ? (
+        <PipelineBoard meId={me.id} />
+      ) : (
+        <>
       <ul className="flex flex-col gap-2 sm:hidden" aria-label={`${status.toLowerCase()} applications`}>
         {apps.map((a) => {
           const ans = answersOf(a);
@@ -123,6 +139,8 @@ export default async function Recruitment({ searchParams }: { searchParams: Prom
           </TBody>
         </Table>
       </Card>
+        </>
+      )}
     </Container>
   );
 }

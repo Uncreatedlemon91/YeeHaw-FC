@@ -85,6 +85,20 @@ enum ApplicationStatus {
   DENIED
 }
 
+// Where a pending application is before the decision. After approval the
+// recruit's progress is read from their file (src/lib/recruit-pipeline.ts).
+enum RecruitStage {
+  APPLIED
+  CONTACTED
+  INTERVIEW_SET
+  INTERVIEWED
+}
+
+enum GalleryKind {
+  IMAGE
+  VIDEO
+}
+
 enum AwardKind {
   MEDAL
   SERVICE
@@ -149,6 +163,8 @@ model User {
   attendances          Attendance[]
   applications         RecruitmentApplication[] @relation("Applicant")
   reviewedApplications RecruitmentApplication[] @relation("Reviewer")
+  recruiting           RecruitmentApplication[] @relation("AppRecruiter")
+  galleryItems         GalleryItem[]
   eventsCreated        Event[]                  @relation("EventCreator")
   debriefsWritten      Event[]                  @relation("EventDebriefer")
   documentsEdited      Qualification[]
@@ -184,33 +200,38 @@ model ServiceRecord {
 }
 
 model Event {
-  id          String            @id @default(cuid())
-  title       String
-  description String            @default("")
-  type        EventType
-  location    String?
-  startTime   DateTime
-  endTime     DateTime?
-  mandatory   Boolean           @default(false)
+  id                String            @id @default(cuid())
+  title             String
+  description       String            @default("")
+  type              EventType
+  location          String?
+  startTime         DateTime
+  endTime           DateTime?
+  mandatory         Boolean           @default(false)
   // Squads invited (SQUADS[].name). Empty: the whole unit. Only invited
   // members (and the event's creator) may RSVP; the Discord post pings
   // the invited squads' roles.
-  invitedSquads String[]        @default([])
+  invitedSquads     String[]          @default([])
+  // Applicants and Recruits may sign up too (recruit nights, basic training).
+  openToRecruits    Boolean           @default(false)
+  // Shown on the public home page under "Recent operations" when set.
+  publicSummary     String?
   // After-action report, Markdown. Null until a leader files one.
-  debrief     String?
-  debriefById String?
-  debriefBy   User?             @relation("EventDebriefer", fields: [debriefById], references: [id], onDelete: SetNull)
-  debriefAt   DateTime?
-  createdById String?
-  createdBy   User?             @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  debrief           String?
+  debriefById       String?
+  debriefBy         User?             @relation("EventDebriefer", fields: [debriefById], references: [id], onDelete: SetNull)
+  debriefAt         DateTime?
+  createdById       String?
+  createdBy         User?             @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
   // The announcement on Discord, kept up to date with the RSVP count.
   announceChannelId String?
   announceMessageId String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  attendances Attendance[]
-  awards      MemberAward[]
-  nominations AwardNomination[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  attendances       Attendance[]
+  awards            MemberAward[]
+  nominations       AwardNomination[]
+  gallery           GalleryItem[]
 
   @@index([startTime])
 }
@@ -274,6 +295,14 @@ model RecruitmentApplication {
   // The embed on #recruitment-board, so a decision made on the website
   // can update the Discord post too.
   boardMessageId  String?
+  // The recruiter's side of a pending application.
+  stage           RecruitStage      @default(APPLIED)
+  stageAt         DateTime          @default(now())
+  interviewAt     DateTime?
+  recruiterId     String?
+  recruiter       User?             @relation("AppRecruiter", fields: [recruiterId], references: [id], onDelete: SetNull)
+  // Recruiters' working notes. Never shown to the applicant.
+  notes           String?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -527,4 +556,24 @@ model LibraryImage {
   createdAt  DateTime         @default(now())
 
   @@index([documentId])
+}
+
+// The public home page's "From the field" gallery: screenshots (stored like
+// library images, served publicly by /api/gallery/<id>) and YouTube videos.
+model GalleryItem {
+  id         String      @id @default(cuid())
+  kind       GalleryKind
+  // IMAGE: the stored file. VIDEO: the YouTube id.
+  filename   String?
+  mime       String?
+  size       Int?
+  youtubeId  String?
+  caption    String      @default("")
+  eventId    String?
+  event      Event?      @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  uploaderId String?
+  uploader   User?       @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+  createdAt  DateTime    @default(now())
+
+  @@index([createdAt])
 }

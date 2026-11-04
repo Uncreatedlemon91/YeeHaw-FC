@@ -9,7 +9,7 @@ import { addRole } from "@/lib/discord";
 import { env } from "@/lib/env";
 import { hasPerm } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { CALLSIGN_RE, postToBoard } from "@/lib/recruitment";
+import { CALLSIGN_RE, postToBoard, welcomeApplicant } from "@/lib/recruitment";
 import { getRoleConfig } from "@/lib/role-config";
 import { REAPPLY_DAYS } from "./rules";
 
@@ -70,5 +70,6 @@ export async function submitApplication(_: ActionState, data: FormData): Promise
   if (candidate && env.botToken) {
     await addRole(dbUser.discordId, candidate, "Submitted an application").catch(() => {});
   }
+  await welcomeApplicant(dbUser.discordId);
   redirect("/apply?submitted=1");
 }

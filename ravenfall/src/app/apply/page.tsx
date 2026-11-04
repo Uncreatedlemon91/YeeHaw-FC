@@ -5,6 +5,7 @@ import { Container } from "@/components/container";
 import { PageHeader } from "@/components/page-header";
 import { ApplicationProgress, PipelineStepper } from "@/components/public-pipeline";
 import { ApplyForm, type ApplyGroup, type ApplyQuestion } from "@/components/recruit-apply-form";
+import { ApplicantJourney, RecruitChecklist } from "@/components/recruit-journey";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { APPLICATION_QUESTIONS, UNIT } from "@/config/unit";
@@ -59,20 +60,24 @@ export default async function Apply() {
 
   if (latest?.status === "PENDING") {
     return (
-      <Status icon={<Clock className="size-10 text-accent" />} title="Application under review" progress={<ApplicationProgress current={1} />}>
+      <Status icon={<Clock className="size-10 text-accent" />} title="Application under review" progress={<ApplicationProgress current={1} />} wide>
         <p className="text-sm text-muted-foreground">
           Submitted {fmt(latest.createdAt)}. Recruiters have been notified on Discord — you'll get a DM and new roles when
           a decision is made.
         </p>
+        <ApplicantJourney userId={user.id} app={latest} />
       </Status>
     );
   }
   if (latest?.status === "APPROVED") {
     return (
-      <Status icon={<CheckCircle2 className="size-10 text-success-fg" />} title="Approved — welcome aboard" progress={<ApplicationProgress current={2} outcome="approved" />}>
+      <Status icon={<CheckCircle2 className="size-10 text-success-fg" />} title="Approved — welcome aboard" progress={<ApplicationProgress current={2} outcome="approved" />} wide>
         <p className="text-sm text-muted-foreground">
           Your roles may take up to five minutes to reach the site. Sign out and back in to pick them up immediately.
         </p>
+        <div className="w-full text-left">
+          <RecruitChecklist userId={user.id} unitAccess={false} />
+        </div>
       </Status>
     );
   }
@@ -135,14 +140,16 @@ function Status({
   title,
   progress,
   children,
+  wide,
 }: {
   icon: React.ReactNode;
   title: string;
   progress?: React.ReactNode;
   children: React.ReactNode;
+  wide?: boolean;
 }) {
   return (
-    <Container className="flex max-w-lg flex-col items-center gap-4 py-24 text-center">
+    <Container className={`flex flex-col items-center gap-4 text-center ${wide ? "max-w-2xl py-16" : "max-w-lg py-24"}`}>
       {progress && <div className="mb-4 w-full">{progress}</div>}
       {icon}
       <h1 className="text-2xl font-bold uppercase">{title}</h1>

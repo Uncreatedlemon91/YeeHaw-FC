@@ -13,15 +13,16 @@ import { answersOf } from "@/lib/recruitment";
 import { fmt } from "@/lib/time";
 import { repost } from "../actions";
 import { DecisionPanel } from "./decision-panel";
+import { PipelinePanel } from "./pipeline-panel";
 
 export const metadata = { title: "Application" };
 
 export default async function ApplicationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await requireUser("RECRUITER", `/recruitment/${id}`);
+  const me = await requireUser("RECRUITER", `/recruitment/${id}`);
   const app = await prisma.recruitmentApplication.findUnique({
     where: { id },
-    include: { user: true, reviewedBy: true },
+    include: { user: true, reviewedBy: true, recruiter: true },
   });
   if (!app) notFound();
   const previous = await prisma.recruitmentApplication.findMany({
@@ -60,6 +61,17 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
         </Card>
 
         <div className="flex flex-col gap-6">
+          {app.status === "PENDING" && <PipelinePanel app={app} meId={me.id} />}
+          {app.status !== "PENDING" && app.notes && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Recruiter notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="whitespace-pre-wrap text-sm text-muted-foreground">{app.notes}</p>
+              </CardContent>
+            </Card>
+          )}
           <DecisionPanel appId={app.id} pending={app.status === "PENDING"} callsign={String(ans.callsign ?? "")} />
           {app.status === "PENDING" && !app.boardMessageId && (
             <ActionForm action={repost}>
