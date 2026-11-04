@@ -1,4 +1,4 @@
-import { ArrowRight, Award, CalendarOff, Medal, UserX } from "lucide-react";
+import { ArrowRight, Award, CalendarOff, Hourglass, Medal, UserX } from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { Container } from "@/components/container";
@@ -16,6 +16,8 @@ import { rankIndex } from "@/config/unit";
 import { fmtDate } from "@/lib/time";
 import { NominationCard } from "./nomination-card";
 import { RequestCard } from "./request-card";
+import { CheckInButton } from "./check-in-button";
+import { inactiveMembers, INACTIVE_DAYS } from "@/lib/inactivity";
 
 export const metadata = { title: "S1 Desk" };
 export const dynamic = "force-dynamic";
@@ -50,7 +52,7 @@ export default async function S1Desk() {
       : [];
   const nominationsPending = nominations.filter((n) => n.status === "PENDING").length;
 
-  const [open, mine, status, leave, departed] = await Promise.all([
+  const [open, mine, status, leave, departed, dormant] = await Promise.all([
     leader
       ? prisma.personnelRequest.findMany({
           // Pending, plus anything decided this week, so a decision stays on
@@ -79,6 +81,7 @@ export default async function S1Desk() {
     leader
       ? prisma.user.findMany({ where: { leftDiscordAt: { not: null }, status: { not: "DISCHARGED" } }, orderBy: { leftDiscordAt: "desc" } })
       : [],
+    leader ? inactiveMembers(now) : [],
   ]);
 
   const queue = open.filter((r) => canDecide(me, viewer, r, r.user));
@@ -90,6 +93,8 @@ export default async function S1Desk() {
     .sort((a, b) => rankIndex(b.u.rank) - rankIndex(a.u.rank));
   const away = leave.filter((l) => covers(l.user));
   const left = departed.filter(covers);
+  const quiet = dormant.filter(covers);
+  const daysAgo = (d: Date) => Math.max(0, Math.floor((now.getTime() - d.getTime()) / 864e5));
 
   return (
     <Container>
@@ -153,6 +158,42 @@ export default async function S1Desk() {
                     </span>
                     <span className="shrink-0 text-xs text-muted-foreground">left {fmtDate(u.leftDiscordAt!)}</span>
                   </Link>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {leader && quiet.length > 0 && (
+            <Card id="inactive" className="scroll-mt-20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Hourglass className="size-4 text-muted-foreground" /> Gone quiet <Badge variant="outline">{quiet.length}</Badge>
+                </CardTitle>
+                <CardDescription>
+                  Active members with no RSVP or attendance in {INACTIVE_DAYS} days, not on leave. A check-in DM asks how they are and points them at leave; one a week each.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col divide-y divide-foreground/10">
+                {quiet.map((u) => (
+                  <div key={u.id} className="flex min-w-0 items-center gap-3 py-2 text-sm first:pt-0 last:pb-0">
+                    <Link href={`/roster/${u.id}`} className="flex min-w-0 flex-1 items-center gap-3 hover:text-accent">
+                      <RankInsignia rank={u.rank} size={20} />
+                      <Avatar discordId={u.discordId} avatar={u.avatar} name={u.callsign ?? u.discordUsername} size={24} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">{u.callsign ?? u.discordUsername}</span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {[
+                            u.squad,
+                            u.lastEvent ? `last event ${daysAgo(u.lastEvent)}d ago` : "never attended",
+                            u.lastLoginAt ? `site ${daysAgo(u.lastLoginAt)}d ago` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      </span>
+                    </Link>
+                    <CheckInButton userId={u.id} sentLabel={u.coolingDown && u.checkInAt ? `Checked in ${daysAgo(u.checkInAt) || "<1"}d ago` : null} />
+                  </div>
                 ))}
               </CardContent>
             </Card>

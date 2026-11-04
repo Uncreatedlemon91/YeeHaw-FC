@@ -153,6 +153,8 @@ model User {
   // still have a file here; cleared if they come back. The S1 Desk lists
   // them so Command can discharge them.
   leftDiscordAt   DateTime?
+  // The last inactivity check-in DM from leadership (S1 Desk).
+  checkInAt       DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -212,6 +214,9 @@ model Event {
   // members (and the event's creator) may RSVP; the Discord post pings
   // the invited squads' roles.
   invitedSquads     String[]          @default([])
+  // Members invited by name on top of the squads: a course invites those
+  // who need its qualification (src/lib/training.ts).
+  invitedUserIds    String[]          @default([])
   // Applicants and Recruits may sign up too (recruit nights, basic training).
   openToRecruits    Boolean           @default(false)
   // Shown on the public home page under "Recent operations" when set.

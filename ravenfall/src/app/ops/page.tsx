@@ -1,4 +1,7 @@
-import type { Attendance, Event } from "@prisma/client";
+import type { Attendance, Event, Qualification } from "@prisma/client";
+import { GraduationCap } from "lucide-react";
+import { QualBadge } from "@/components/qual-badge";
+import { coursesFor } from "@/lib/training";
 import { CalendarDays, CalendarX, Check, ChevronLeft, ChevronRight, ClipboardList, List, MapPin, Plus, Users } from "lucide-react";
 import Link from "next/link";
 import { Container } from "@/components/container";
@@ -18,18 +21,24 @@ import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Operations" };
 
-type Row = Event & { attendances: Attendance[]; _count: { attendances: number } };
+type Row = Event & { attendances: Attendance[]; _count: { attendances: number }; course: Qualification | null };
+
+const WHY = { billet: "Your billet needs it", promotion: "Your next rank needs it", recertify: "Recertify" } as const;
 
 export default async function Ops({ searchParams }: { searchParams: Promise<{ view?: string; month?: string }> }) {
   const me = await requireUser("OPERATOR", "/ops");
   const sp = await searchParams;
-  const view = sp.view === "calendar" ? "calendar" : sp.view === "past" ? "past" : "upcoming";
+  const view = sp.view === "calendar" ? "calendar" : sp.view === "past" ? "past" : sp.view === "training" ? "training" : "upcoming";
   const now = new Date();
 
   const include = {
     attendances: { where: { userId: me.id } },
     _count: { select: { attendances: { where: { status: "ATTENDING" as const } } } },
+    course: true,
   };
+  // Courses this member needs, flagged wherever they appear.
+  const mine = await coursesFor(me.id, now);
+  const needs = new Map(mine.map((c) => [c.event.id, c.why]));
 
   let events: Row[];
   let month = "";
@@ -37,6 +46,15 @@ export default async function Ops({ searchParams }: { searchParams: Promise<{ vi
     month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : monthKey(now);
     const { start, end } = monthRange(month);
     events = await prisma.event.findMany({ where: { startTime: { gte: start, lt: end } }, orderBy: { startTime: "asc" }, include });
+  } else if (view === "training") {
+    // The training calendar: courses and other trainings, courses you need first.
+    events = await prisma.event.findMany({
+      where: { startTime: { gte: now }, OR: [{ type: "TRAINING" }, { courseId: { not: null } }] },
+      orderBy: { startTime: "asc" },
+      take: 50,
+      include,
+    });
+    events.sort((a, b) => Number(needs.has(b.id)) - Number(needs.has(a.id)));
   } else if (view === "past") {
     events = await prisma.event.findMany({ where: { startTime: { lt: now } }, orderBy: { startTime: "desc" }, take: 50, include });
   } else {
@@ -64,6 +82,7 @@ export default async function Ops({ searchParams }: { searchParams: Promise<{ vi
         items={[
           { href: "/ops?view=upcoming", label: "Upcoming", icon: <List className="size-3.5" />, active: view === "upcoming" },
           { href: "/ops?view=calendar", label: "Calendar", icon: <CalendarDays className="size-3.5" />, active: view === "calendar" },
+          { href: "/ops?view=training", label: "Training", icon: <GraduationCap className="size-3.5" />, active: view === "training", count: mine.length || undefined },
           { href: "/ops?view=past", label: "Past & AARs", icon: <List className="size-3.5" />, active: view === "past" },
         ]}
       />
@@ -73,13 +92,13 @@ export default async function Ops({ searchParams }: { searchParams: Promise<{ vi
       ) : events.length ? (
         <div className="flex flex-col gap-2">
           {events.map((e) => (
-            <EventRow key={e.id} e={e} past={view === "past"} />
+            <EventRow key={e.id} e={e} past={view === "past"} need={needs.get(e.id)} />
           ))}
         </div>
       ) : (
         <Card className="flex flex-col items-center gap-3 px-4 py-14 text-center">
           <CalendarX className="size-8 text-muted-foreground" aria-hidden />
-          <p className="text-sm text-muted-foreground">{view === "past" ? "No past events on record." : "Nothing scheduled yet."}</p>
+          <p className="text-sm text-muted-foreground">{view === "past" ? "No past events on record." : view === "training" ? "No trainings scheduled yet." : "Nothing scheduled yet."}</p>
           {view === "past" ? (
             <Button asChild variant="outline" size="sm">
               <Link href="/ops?view=upcoming">See upcoming</Link>
@@ -110,7 +129,7 @@ const DOT_COLOR = { OP: "bg-destructive", TRAINING: "bg-primary", BRIEFING: "bg-
 // Shape differs per type so the dots never rely on colour alone.
 const DOT_SHAPE = { OP: "rounded-full", TRAINING: "rounded-[1px]", BRIEFING: "rotate-45 rounded-[1px] scale-90" } as const;
 
-function EventRow({ e, past }: { e: Row; past: boolean }) {
+function EventRow({ e, past, need }: { e: Row; past: boolean; need?: keyof typeof WHY | null }) {
   const mine = e.attendances[0];
   return (
     <Link href={`/ops/${e.id}`} className="group flex items-stretch overflow-hidden rounded-lg border bg-card hover:border-accent/50">
@@ -125,6 +144,12 @@ function EventRow({ e, past }: { e: Row; past: boolean }) {
           {e.mandatory && <Badge variant="destructive">Mandatory</Badge>}
           {(!isWholeUnit(e) || e.openToRecruits) && <Badge variant={e.openToRecruits ? "accent" : "outline"}>{invitedLabel(e)}</Badge>}
           {past && (e.debrief ? <Badge variant="success">AAR filed</Badge> : <Badge variant="outline">No AAR</Badge>)}
+          {e.course && (
+            <Badge variant="outline">
+              <QualBadge q={e.course} size={14} /> {e.course.title} course
+            </Badge>
+          )}
+          {need !== undefined && !past && <Badge variant="warning">{need ? WHY[need] : "You're invited"}</Badge>}
           {mine && <AttendanceBadge status={mine.status} />}
         </div>
         <div className="font-display text-lg font-semibold uppercase tracking-wide group-hover:text-accent">{e.title}</div>

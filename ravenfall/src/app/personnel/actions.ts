@@ -7,12 +7,16 @@ import { z } from "zod";
 import type { ActionState } from "@/components/action-form";
 import { MAX_SECONDARY_ROLES, WEEKDAYS } from "@/config/unit";
 import { assertPerm } from "@/lib/auth";
+import { explain } from "@/lib/discord";
+import { CHECKIN_COOLDOWN_DAYS, sendCheckIn } from "@/lib/inactivity";
+import { hasPerm } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { CALLSIGN_RE } from "@/lib/recruitment";
 import {
   billetFill,
   checkInterest,
   checkRoleChange,
+  leads,
   decideRequest,
   endOfDay,
   type InterestPayload,
@@ -187,4 +191,23 @@ export async function decide(_: ActionState, data: FormData): Promise<ActionStat
   const req = await prisma.personnelRequest.findUnique({ where: { id: String(data.get("requestId")) } });
   if (req) refresh(req.userId);
   return result.ok ? { ok: result.message, warnings: result.warnings } : { error: result.error };
+}
+
+/** The inactivity watch's one-click check-in DM: Command, or the member's squad leadership. */
+export async function checkIn(_: ActionState, data: FormData): Promise<ActionState> {
+  const me = await assertPerm("OPERATOR");
+  const [viewer, member] = await Promise.all([
+    prisma.user.findUnique({ where: { id: me.id } }),
+    prisma.user.findUnique({ where: { id: String(data.get("userId")) } }),
+  ]);
+  if (!member) return { error: "Member not found." };
+  if (!hasPerm(me.perms, "ADMIN") && !leads(viewer, member.squad)) return { error: "Only Command or their squad leadership can check in on them." };
+  if (member.checkInAt && Date.now() - member.checkInAt.getTime() < CHECKIN_COOLDOWN_DAYS * 864e5) return { error: "They had a check-in this week already." };
+  try {
+    await sendCheckIn(member, { id: me.id, name: viewer?.callsign ?? me.name });
+  } catch (e) {
+    return { error: `Couldn't DM them: ${explain(e)}` };
+  }
+  revalidatePath("/personnel");
+  return { ok: "Check-in sent." };
 }

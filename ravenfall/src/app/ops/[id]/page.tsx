@@ -22,6 +22,7 @@ import { hasPerm } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { fmt } from "@/lib/time";
 import { cn } from "@/lib/utils";
+import { CourseNeeds } from "./course-needs";
 import { DiscordPostForm } from "./discord-post-form";
 import { QualBadge } from "@/components/qual-badge";
 
@@ -201,6 +202,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
               </div>
             </CardContent>
           </Card>
+          {canLead && event.course && <CourseNeeds event={{ ...event, course: event.course }} />}
           {canLead && (
             <Card>
               <CardHeader>

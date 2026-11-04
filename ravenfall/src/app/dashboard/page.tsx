@@ -24,6 +24,7 @@ import { outstandingFor } from "@/lib/required-reading";
 import { fmt, fmtDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { RECORD_STYLE } from "../roster/[id]/record-style";
+import { ServiceCard, SquadBoard, TrainingForYou } from "./retention";
 
 export const metadata = { title: "Dashboard" };
 
@@ -198,6 +199,9 @@ export default async function Dashboard() {
             </section>
           )}
 
+          <TrainingForYou userId={me.id} />
+          <ServiceCard userId={me.id} />
+
           <Card>
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle>Upcoming</CardTitle>
@@ -224,6 +228,8 @@ export default async function Dashboard() {
               {!later.length && <p className="py-6 text-sm text-muted-foreground">{next ? "Nothing else scheduled." : "Nothing scheduled."}</p>}
             </CardContent>
           </Card>
+
+          <SquadBoard mySquad={profile.squad} />
 
           <Card>
             <CardHeader>

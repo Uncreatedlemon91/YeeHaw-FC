@@ -17,6 +17,7 @@ import { announceEvent, cancelEventPost, pushEventPost, refreshEventPostLater } 
 import { RSVP_CHOICES } from "@/lib/rsvp";
 import { prisma } from "@/lib/prisma";
 import { certify } from "@/lib/qualifications";
+import { inviteCourseNeeds, inviteCourseNeedsLater } from "@/lib/training";
 import { fromInput } from "@/lib/time";
 
 const eventSchema = z.object({
@@ -59,6 +60,8 @@ export async function createEvent(_: ActionState, data: FormData): Promise<Actio
   if (r.data.courseId && !(await prisma.qualification.findUnique({ where: { id: r.data.courseId }, select: { id: true } }))) return { error: "That course's qualification no longer exists." };
   const event = await prisma.event.create({ data: { ...r.data, createdById: me.id } });
   if (data.get("announce") === "on") await announceEvent(event.id).catch((e) => console.error(`[ops] announce: ${explain(e)}`));
+  // A course invites (and DMs) the members who need it.
+  if (event.courseId) inviteCourseNeedsLater(event.id);
   revalidatePath("/ops");
   redirect(`/ops/${event.id}`);
 }
@@ -69,8 +72,12 @@ export async function updateEvent(_: ActionState, data: FormData): Promise<Actio
   const r = parseEvent(data);
   if ("error" in r) return { error: r.error };
   if (r.data.courseId && !(await prisma.qualification.findUnique({ where: { id: r.data.courseId }, select: { id: true } }))) return { error: "That course's qualification no longer exists." };
-  await prisma.event.update({ where: { id }, data: r.data });
+  const prev = await prisma.event.findUnique({ where: { id }, select: { courseId: true } });
+  // A different course (or none): the old course's named invitations go with it.
+  const resetInvites = prev && prev.courseId !== r.data.courseId ? { invitedUserIds: [] } : {};
+  await prisma.event.update({ where: { id }, data: { ...r.data, ...resetInvites } });
   refreshEventPostLater(id);
+  if (r.data.courseId) inviteCourseNeedsLater(id);
   revalidatePath("/ops");
   revalidatePath(`/ops/${id}`);
   redirect(`/ops/${id}`);
@@ -88,6 +95,15 @@ export async function discordPost(_: ActionState, data: FormData): Promise<Actio
   } catch (e) {
     return { error: `Discord said no: ${explain(e)}` };
   }
+}
+
+/** The event page's "Invite who needs it": catch members who came to need the course since it was scheduled. */
+export async function inviteNeeds(_: ActionState, data: FormData): Promise<ActionState> {
+  await assertPerm("INSTRUCTOR");
+  const id = String(data.get("id"));
+  const r = await inviteCourseNeeds(id);
+  revalidatePath(`/ops/${id}`);
+  return r.invited ? { ok: `Invited ${r.invited} more and sent them a DM.`, warnings: r.warnings.slice(0, 5) } : { ok: "Everyone who needs it is already invited." };
 }
 
 export async function deleteEvent(data: FormData) {
