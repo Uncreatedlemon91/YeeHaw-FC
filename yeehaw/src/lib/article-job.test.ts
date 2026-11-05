@@ -53,6 +53,13 @@ describe("runArticleJob", () => {
     expect(ask).not.toHaveBeenCalled();
   });
 
+  it("--force publishes inside the period", async () => {
+    db.article.findFirst.mockResolvedValue({ publishedAt: new Date(now.getTime() - 3600_000) });
+    const r = await runArticleJob({ now, force: true, ask: async () => written });
+    expect(r.message).toContain("published /news/big-win");
+    expect(createArticle).toHaveBeenCalledOnce();
+  });
+
   it("goes ahead two days after the last one", async () => {
     db.article.findFirst.mockResolvedValue({ publishedAt: new Date(now.getTime() - 48 * 3600_000 + 10 * 60_000) });
     const r = await runArticleJob({ now, ask: async () => written });

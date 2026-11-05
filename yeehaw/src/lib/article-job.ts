@@ -168,12 +168,14 @@ export async function runClaude(args: string[], input: string): Promise<{ stdout
 
 // --- The job -------------------------------------------------------------------------- //
 
-export async function runArticleJob(opts: { dryRun?: boolean; now?: Date; ask?: typeof askClaude } = {}): Promise<JobResult> {
+export async function runArticleJob(opts: { dryRun?: boolean; force?: boolean; now?: Date; ask?: typeof askClaude } = {}): Promise<JobResult> {
   const now = opts.now ?? new Date();
   if (!env.claudeToken) return { code: 0, message: "CLAUDE_CODE_OAUTH_TOKEN not set: the roundup is disabled" };
   if (!env.eaClubId) return { code: 0, message: "EA_CLUB_ID not set: nothing to write about" };
 
-  if (!opts.dryRun) {
+  // --force publishes one now even inside the period (a one-off after a deploy);
+  // the timer's runs after it count from this one.
+  if (!opts.dryRun && !opts.force) {
     const last = await prisma.article.findFirst({ where: { source: "AI", published: true }, orderBy: { publishedAt: "desc" }, select: { publishedAt: true } });
     if (alreadyPostedThisPeriod(last?.publishedAt ?? null, now, env.roundupDays, env.timezone)) return { code: 0, message: `a roundup went out in the last ${env.roundupDays} days: skipping` };
   }

@@ -557,6 +557,9 @@ CLI lives elsewhere. Preview one without publishing:
 cd /opt/yeehaw/yeehaw && sudo -u yeehaw npm run article:job -- --dry-run
 ```
 
+Publish one right now, even if one went out in the last `ROUNDUP_DAYS` days (a
+quiet stretch is still skipped): `sudo -u yeehaw -H env PATH=/opt/yeehaw/.local/bin:$PATH npm run article:job -- --force`.
+
 The token lasts about a year; when it expires `journalctl -u yeehaw-article`
 shows the failure and `claude setup-token` fixes it. The CLI is a Node program and
 needs a few hundred MB: the service is capped at 700 MB, which needs the swap the
