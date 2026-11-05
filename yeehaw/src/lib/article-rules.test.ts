@@ -1,31 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { alreadyPostedThisPeriod, ArticleError, categoryFor, claudeArgs, dayLabel, hasNews, parseWritten, readEnvelope, REPOST_SLACK_MS, systemPrompt, userPrompt, type Facts } from "./article-rules";
+import { alreadyPostedThisPeriod, ArticleError, categoryFor, claudeArgs, dayLabel, hasNews, parseWritten, readEnvelope, systemPrompt, userPrompt, type Facts } from "./article-rules";
 
 const H = 3600_000;
 const at = (d: number, h: number, m = 0) => new Date(Date.UTC(2026, 9, d, h, m));
 
 describe("skipping the days between roundups", () => {
-  // The daily timer fires at ~09:15 Eastern; ROUNDUP_DAYS = 2.
+  // The daily timer fires at ~09:15 Eastern (13:15 UTC in EDT); ROUNDUP_DAYS = 2.
+  const tz = "America/New_York";
   it("posts when none has ever gone out", () => {
-    expect(alreadyPostedThisPeriod(null, at(20, 13), 2)).toBe(false);
+    expect(alreadyPostedThisPeriod(null, at(20, 13), 2, tz)).toBe(false);
   });
   it("skips the next morning", () => {
-    expect(alreadyPostedThisPeriod(at(20, 13, 20), at(21, 13, 10), 2)).toBe(true);
+    expect(alreadyPostedThisPeriod(at(20, 13, 20), at(21, 13, 10), 2, tz)).toBe(true);
   });
   it("posts two mornings later even if the timer fired a bit early", () => {
-    expect(alreadyPostedThisPeriod(at(20, 13, 20), at(22, 13, 10), 2)).toBe(false);
+    expect(alreadyPostedThisPeriod(at(20, 13, 20), at(22, 13, 10), 2, tz)).toBe(false);
   });
-  it("the period is two days less six hours of slack to the millisecond", () => {
-    const last = at(20, 13);
-    const edge = new Date(last.getTime() + 2 * 24 * H - REPOST_SLACK_MS);
-    expect(alreadyPostedThisPeriod(last, edge, 2)).toBe(true);
-    expect(alreadyPostedThisPeriod(last, new Date(edge.getTime() + 1), 2)).toBe(false);
+  it("a roundup that went out late (retries after a usage limit) doesn't push the next one back a day", () => {
+    // Monday 15:15 Eastern, then Wednesday's 09:15 run: under 42 hours, still due.
+    expect(alreadyPostedThisPeriod(at(19, 19, 15), at(21, 13, 15), 2, tz)).toBe(false);
+    expect(alreadyPostedThisPeriod(at(19, 19, 15), at(20, 13, 15), 2, tz)).toBe(true);
+  });
+  it("counts the club's days, not UTC's: a late-evening post is that evening's day", () => {
+    // 23:30 Eastern on the 20th is 03:30 UTC on the 21st; the 22nd's run is two days on.
+    expect(alreadyPostedThisPeriod(at(21, 3, 30), at(22, 13, 15), 2, tz)).toBe(false);
+  });
+  it("holds across the clock change", () => {
+    // Sat 31 Oct 09:15 EDT, then Mon 2 Nov 09:15 EST.
+    expect(alreadyPostedThisPeriod(at(31, 13, 15), new Date(Date.UTC(2026, 10, 2, 14, 15)), 2, tz)).toBe(false);
   });
   it("honours ROUNDUP_DAYS", () => {
-    expect(alreadyPostedThisPeriod(at(20, 13), at(22, 13), 3)).toBe(true);
-    expect(alreadyPostedThisPeriod(at(20, 13), at(23, 13), 3)).toBe(false);
-    expect(alreadyPostedThisPeriod(at(20, 13), at(20, 20), 1)).toBe(true);
-    expect(alreadyPostedThisPeriod(at(20, 13), at(21, 13), 1)).toBe(false);
+    expect(alreadyPostedThisPeriod(at(20, 13), at(22, 13), 3, tz)).toBe(true);
+    expect(alreadyPostedThisPeriod(at(20, 13), at(23, 13), 3, tz)).toBe(false);
+    expect(alreadyPostedThisPeriod(at(20, 13), at(20, 20), 1, tz)).toBe(true);
+    expect(alreadyPostedThisPeriod(at(20, 13), at(21, 13), 1, tz)).toBe(false);
   });
 });
 

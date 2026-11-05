@@ -7,21 +7,25 @@ import { formatInTimeZone } from "date-fns-tz";
 // the facts include EA-controlled strings (player and club names) that have no
 // business steering anything.
 
-/**
- * The daily timer can fire a little early or late (RandomizedDelaySec, a retry
- * after a usage limit), so "posted within the period" allows a few hours'
- * slack: a roundup at 09:20 Monday still lets Wednesday's 09:10 one through,
- * and still stops Tuesday's.
- */
-export const REPOST_SLACK_MS = 6 * 3600_000;
 export const CLAUDE_TIMEOUT_MS = 600_000;
 
 const DAY = 24 * 3600_000;
 
-/** Posted within the period: the daily run skips the days in between (keeps the rhythm through month ends and downtime where a calendar rule wouldn't). */
-export function alreadyPostedThisPeriod(lastPublishedAt: Date | null, now: Date, days: number): boolean {
+/** The club-local calendar date as a day number (UTC midnight of that date / DAY), so DST never shifts a count. */
+const localDayNumber = (d: Date, tz: string) => Date.parse(formatInTimeZone(d, tz, "yyyy-MM-dd") + "T00:00:00Z") / DAY;
+
+/**
+ * Posted within the period, counted in the club's calendar days, not hours: with
+ * ROUNDUP_DAYS = 2 a roundup on Monday (at 09:15, or at 15:15 after the hourly
+ * retries waited out a usage limit) lets Wednesday's through and stops Tuesday's.
+ * An hours-based window made every late roundup push the next one back a day, so
+ * the "every 2 days" roundup kept slipping to every 3. The daily run skips the days
+ * in between, which keeps the rhythm through month ends and downtime where a
+ * calendar rule in the timer wouldn't.
+ */
+export function alreadyPostedThisPeriod(lastPublishedAt: Date | null, now: Date, days: number, tz: string): boolean {
   if (!lastPublishedAt) return false;
-  return lastPublishedAt.getTime() >= now.getTime() - (days * DAY - REPOST_SLACK_MS);
+  return localDayNumber(now, tz) - localDayNumber(lastPublishedAt, tz) < days;
 }
 
 /** A day as the club lives it, in the club's zone, so a late-evening game isn't dated the next day. */

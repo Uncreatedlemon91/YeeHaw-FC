@@ -175,7 +175,7 @@ export async function runArticleJob(opts: { dryRun?: boolean; now?: Date; ask?: 
 
   if (!opts.dryRun) {
     const last = await prisma.article.findFirst({ where: { source: "AI", published: true }, orderBy: { publishedAt: "desc" }, select: { publishedAt: true } });
-    if (alreadyPostedThisPeriod(last?.publishedAt ?? null, now, env.roundupDays)) return { code: 0, message: `a roundup went out in the last ${env.roundupDays} days: skipping` };
+    if (alreadyPostedThisPeriod(last?.publishedAt ?? null, now, env.roundupDays, env.timezone)) return { code: 0, message: `a roundup went out in the last ${env.roundupDays} days: skipping` };
   }
 
   const facts = await gatherPeriod(now);
