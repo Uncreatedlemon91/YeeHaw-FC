@@ -12,10 +12,10 @@ WorkingDirectory=/opt/ravenfall/ravenfall
 # uses, so the file works unchanged.
 EnvironmentFile=/opt/ravenfall/ravenfall/.env
 Environment=NODE_ENV=production
-# Localhost only; Caddy is the public face. YeeHaw FC has 8001.
+# Localhost only; Caddy is the public face.
 Environment=PORT=8002
 Environment=HOSTNAME=127.0.0.1
-# Keep a runaway from starving YeeHaw FC on a small droplet.
+# Keep a runaway from starving PostgreSQL on a small droplet.
 Environment=NODE_OPTIONS=--max-old-space-size=320
 MemoryMax=512M
 ExecStart=/usr/bin/node .next/standalone/server.js

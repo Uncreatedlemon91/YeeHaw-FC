@@ -1,9 +1,8 @@
 # Ravenfall HQ
 
 Operations portal and Discord companion for **Ravenfall PMC**, a milsim
-community, served at [ravenfallpmc.com](https://ravenfallpmc.com). It
-shares the droplet with YeeHaw FC but nothing else: its own user, directory,
-database, port and Discord application.
+community, served at [ravenfallpmc.com](https://ravenfallpmc.com). It runs on its
+own droplet user, directory, database, port and Discord application.
 
 Next.js 15 (App Router, TypeScript), Tailwind v4 with shadcn/ui-style
 components, PostgreSQL via Prisma, NextAuth with Discord.
@@ -289,7 +288,7 @@ as a redirect on the Discord application and set
 ## Discord setup
 
 Create a **new** application at <https://discord.com/developers/applications>.
-Don't reuse YeeHaw FC's: each app has exactly one interactions endpoint.
+Don't reuse another bot's: each app has exactly one interactions endpoint.
 
 1. **OAuth2** → copy Client ID and Client Secret. Add the redirect
    `https://ravenfallpmc.com/api/auth/callback/discord`.
@@ -330,10 +329,9 @@ page; after that the page is the one source.
 
 ---
 
-## Deploying on the droplet (alongside YeeHaw FC)
+## Deploying on the droplet
 
-Everything below is run as root over SSH. YeeHaw FC keeps running
-throughout; the only shared piece is Caddy's config.
+Everything below is run as root over SSH.
 
 ### 1. DNS
 
@@ -343,7 +341,7 @@ Point two A records at the droplet's IP: `ravenfallpmc.com` and
 ### 2. Swap (once)
 
 A Next.js build wants more than the $6 droplet's 1 GB of RAM. A swapfile
-keeps it from being OOM-killed (and gives YeeHaw FC headroom while it runs):
+keeps it from being OOM-killed:
 
 ```bash
 fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
@@ -351,7 +349,7 @@ echo '/swapfile none swap sw 0 0' >> /etc/fstab
 ```
 
 At runtime the site uses roughly 120–200 MB and PostgreSQL about 50–100 MB.
-Both sites fit in 1 GB. If `free -h` shows swap in steady use, resize the
+It fits in 1 GB. If `free -h` shows swap in steady use, resize the
 droplet to 2 GB.
 
 ### 3. Node.js 22 and PostgreSQL
@@ -406,8 +404,7 @@ sudo -u ravenfall bash -c 'cd /opt/ravenfall/ravenfall && npm run db:seed'   # o
 
 ### 7. Caddy
 
-The repo's `deploy/Caddyfile` carries both sites. Copy it from **either**
-clone (they're the same repo) and reload:
+The repo's `deploy/Caddyfile` carries the site. Copy it and reload:
 
 ```bash
 cp /opt/ravenfall/deploy/Caddyfile /etc/caddy/Caddyfile
@@ -455,9 +452,7 @@ gunzip -c /opt/ravenfall/backups/ravenfall-XXXX.sql.gz | sudo -u ravenfall psql 
 sudo -u ravenfall tar -xzf /opt/ravenfall/backups/ravenfall-uploads-XXXX.tar.gz -C /opt/ravenfall/uploads   # restore images
 ```
 
-Copy them off the droplet too, for example with `rclone` (YeeHaw FC's
-`backup.sh` does it when `BACKUP_REMOTE` is set: see "Backups" in
-`yeehaw/README.md`).
+Copy them off the droplet too, for example with `rclone`.
 
 ## Troubleshooting
 
