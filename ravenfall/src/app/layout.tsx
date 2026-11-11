@@ -15,6 +15,11 @@ export const metadata: Metadata = {
   description: UNIT.description,
 };
 
+// No app-wide loading.tsx: with one, Next.js (15.5, production builds only)
+// left most in-page links stuck -- the ops Calendar/Training tabs and month
+// arrows, the roster List tab, library folders. The click fetched the page but
+// never showed it. Without it, a click keeps the current page up until the next
+// one is ready (a fraction of a second).
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   return (
