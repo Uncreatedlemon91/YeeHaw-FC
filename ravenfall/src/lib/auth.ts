@@ -64,13 +64,9 @@ export const authOptions: NextAuthOptions = {
           create: { discordId: p.id, discordUsername: p.username, avatar: p.avatar ?? null, lastLoginAt: new Date() },
           update: { discordUsername: p.username, avatar: p.avatar ?? null, lastLoginAt: new Date() },
         });
-        // Someone who already holds a member role on Discord is a member here
-        // too, even if they joined before the site existed.
-        if (hasPerm(perms, "OPERATOR") && user.status === "CANDIDATE") {
-          await prisma.user.update({ where: { id: user.id }, data: { status: "ACTIVE" } });
-        }
-        // Fill rank, squad and billets from their Discord roles where the
-        // file has none yet. Best-effort: never block a sign-in on it.
+        // Signing in never makes anyone a member: that takes enlisting. For
+        // members, fill rank, squad and billets from their Discord roles where
+        // the file has none yet. Best-effort: never block a sign-in on it.
         if (member) await importMember(member, roleConfig).catch(() => {});
         token.userId = user.id;
         token.discordId = p.id;

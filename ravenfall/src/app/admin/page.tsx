@@ -150,7 +150,7 @@ export default async function Admin() {
         />
         <ActionCard
           title="Personnel files from Discord"
-          description="Opens a personnel file for every member holding a mapped role, filling rank, squad, billets and callsign from their roles and nickname. Existing files only get blanks filled."
+          description="Fills blank rank, squad, billets and callsign on existing personnel files from Discord roles and nicknames. Never opens new files: those come from enlisting."
           action={syncProfiles}
           label="Sync profiles from Discord"
           pendingText="Syncing…"

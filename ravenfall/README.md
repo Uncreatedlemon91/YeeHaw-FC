@@ -13,14 +13,14 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   straight from the member's roles on the unit's server, re-read every five
   minutes, so a promotion on Discord reaches the site without signing out.
   Which Discord role means what is set on the **Admin** page.
-- **Personnel files from Discord roles.** Anyone holding a mapped role
-  (a permission, rank, squad, billet or Recruit) gets a personnel file
-  without signing in: rank, squad and billets are read from their roles and
-  the callsign from their nickname (`Sgt Viper` → Viper). The Admin page's
-  **Sync profiles from Discord** does the whole server at once, and with the
-  bot online it happens on its own whenever someone joins or their roles
-  change. Discord only fills blanks: once a file has a rank or squad, the
-  site owns it and pushes changes back out to Discord.
+- **Personnel files follow Discord roles.** A personnel file is only opened
+  by enlisting (an approved application); holding a Discord role or signing
+  in never opens one. Once a member has a file, blanks in it are filled from
+  their roles (rank, squad, billets) and nickname (`Sgt Viper` → Viper). The
+  Admin page's **Sync profiles from Discord** does every file at once, and
+  with the bot online it happens on its own whenever roles change. Discord
+  only fills blanks: once a file has a rank or squad, the site owns it and
+  pushes changes back out to Discord.
 - **Recruitment pipeline.** `/enlist` on Discord (or the pinned Enlist Now
   button in #welcome) → `/apply` questionnaire → an embed on
   #recruitment-board with **Approve / Deny / View Web Application** →
@@ -249,7 +249,7 @@ src/lib/library-notify.ts    library announcement embed and required-reading DMs
 src/lib/library-images.ts    library image storage on disk (LIBRARY_UPLOAD_DIR)
 src/lib/diff.ts              line diff for library revisions
 src/lib/role-config.ts       Discord role mapping (Admin page; .env fallback)
-src/lib/member-sync.ts       personnel files generated from Discord roles
+src/lib/member-sync.ts       personnel files filled in from Discord roles
 src/app/api/discord/interactions/route.ts   slash commands, buttons, modals
 src/app/api/internal/*       endpoints the gateway process calls
 scripts/gateway.mjs          gateway connection: bot presence + member events
@@ -295,8 +295,8 @@ Don't reuse another bot's: each app has exactly one interactions endpoint.
 2. **General Information** → copy the Public Key.
 3. **Bot** → Reset Token and copy it. Under **Privileged Gateway Intents**,
    turn on **Server Members Intent**: it lets the bot list members and see
-   role changes, which is how personnel files are generated. Without it the
-   bot still comes online, but files only fill in at sign-in.
+   role changes, which is how personnel files are kept in step. Without it
+   the bot still comes online, but files only fill in at sign-in.
 4. **Invite the bot**. Use OAuth2 → URL Generator, with scopes `bot` and
    `applications.commands`. Give it these permissions: View Channels, Send
    Messages, Embed Links, Manage Roles, Manage Nicknames.
@@ -315,7 +315,7 @@ Don't reuse another bot's: each app has exactly one interactions endpoint.
 8. On **Admin → Discord role mapping**, pick which Discord roles grant each
    site permission, the Candidate and Recruit roles, and (optionally) the
    roles for each rank, squad and billet. Save, then press **Sync profiles
-   from Discord** to open personnel files for everyone already in the unit.
+   from Discord** to fill existing personnel files from their roles.
    For any role the bot assigns, drag the bot's role above it first.
 For the S1 Desk, make the personnel board a leadership-only channel.
 

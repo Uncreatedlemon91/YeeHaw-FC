@@ -9,11 +9,10 @@ import { prisma } from "./prisma";
 import { CALLSIGN_RE } from "./recruitment";
 import { getRoleConfig, type RoleConfig } from "./role-config";
 
-// Personnel files generated from Discord roles. Anyone holding a mapped role
-// (a permission, rank, squad, billet or the Recruit role) gets a file without
-// having to sign in first. Discord only ever fills gaps: once a file exists,
-// the site is the source of truth for rank, squad and billets, and pushes
-// them back out to Discord (src/lib/personnel.ts syncUnitRoles).
+// Personnel files kept in step with Discord roles. A file is only ever opened
+// by enlisting; after that Discord fills gaps (rank, squad, billets, callsign)
+// and nothing more: the site is the source of truth for them, and pushes them
+// back out to Discord (src/lib/personnel.ts syncUnitRoles).
 
 export type FromRoles = {
   perms: Perm[];
@@ -50,7 +49,7 @@ export function callsignFromNick(nick: string | null | undefined): string | null
   return CALLSIGN_RE.test(c) ? c : null;
 }
 
-export type SyncOutcome = "created" | "updated" | "unchanged" | "skipped";
+export type SyncOutcome = "updated" | "unchanged" | "skipped";
 
 export async function importMember(m: GuildMember, cfg: RoleConfig, retried = false): Promise<SyncOutcome> {
   const u = m.user;
@@ -59,6 +58,11 @@ export async function importMember(m: GuildMember, cfg: RoleConfig, retried = fa
   const existing = await prisma.user.findUnique({ where: { discordId: u.id } });
   if (!read.member) return existing ? "unchanged" : "skipped";
 
+  // Personnel files are opened by enlisting (an approved application,
+  // src/lib/recruitment.ts), never from Discord roles. Someone without a file,
+  // or still a candidate, is left alone.
+  if (!existing || existing.status === "CANDIDATE") return existing ? "unchanged" : "skipped";
+
   let callsign = callsignFromNick(m.nick);
   if (callsign) {
     const taken = await prisma.user.findFirst({
@@ -66,43 +70,8 @@ export async function importMember(m: GuildMember, cfg: RoleConfig, retried = fa
     });
     if (taken) callsign = null;
   }
-  const joined = m.joined_at ? new Date(m.joined_at) : new Date();
 
   try {
-    if (!existing) {
-      const summary = [
-        read.rank && rankName(read.rank),
-        read.squad,
-        read.unitRole,
-        read.secondaryRoles.length ? `secondary ${read.secondaryRoles.join(", ")}` : null,
-        callsign && `callsign ${callsign}`,
-      ].filter(Boolean);
-      await prisma.user.create({
-        data: {
-          discordId: u.id,
-          discordUsername: u.username,
-          avatar: u.avatar ?? null,
-          callsign,
-          rank: read.rank,
-          rankSince: read.rank ? new Date() : null,
-          squad: read.squad,
-          unitRole: read.unitRole,
-          secondaryRoles: read.secondaryRoles,
-          status: "ACTIVE",
-          enlistedAt: joined,
-          serviceRecords: {
-            create: {
-              type: "ENLISTMENT",
-              title: "Personnel file opened from Discord roles",
-              description: summary.length ? `${summary.join(" · ")}.` : null,
-            },
-          },
-        },
-      });
-      if (read.rank) await applyNickname(u.id, read.rank, callsign, "Rank from Discord role");
-      return "created";
-    }
-
     // Fill gaps only. Discharged and inactive members are left as they are.
     const data: Prisma.UserUpdateInput = { discordUsername: u.username, avatar: u.avatar ?? null };
     const filled: string[] = [];
@@ -127,11 +96,6 @@ export async function importMember(m: GuildMember, cfg: RoleConfig, retried = fa
         filled.push(`secondary ${read.secondaryRoles.join(", ")}`);
       }
     }
-    if (existing.status === "CANDIDATE") {
-      data.status = "ACTIVE";
-      data.enlistedAt = existing.enlistedAt ?? joined;
-      filled.push("active status");
-    }
     if (filled.length) {
       data.serviceRecords = {
         create: { type: "NOTE", title: "Personnel file updated from Discord roles", description: `Added ${filled.join(" · ")}.` },
@@ -154,7 +118,7 @@ export type SyncSummary = Record<SyncOutcome, number> & { errors: string[]; left
 /** Every server member, for the Admin page's "Sync profiles" button. */
 export async function syncAllMembers(): Promise<SyncSummary> {
   const cfg = await getRoleConfig();
-  const summary: SyncSummary = { created: 0, updated: 0, unchanged: 0, skipped: 0, errors: [], left: 0 };
+  const summary: SyncSummary = { updated: 0, unchanged: 0, skipped: 0, errors: [], left: 0 };
   const members = await listMembers();
   for (const m of members) {
     try {
