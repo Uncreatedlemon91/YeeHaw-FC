@@ -1,6 +1,6 @@
 import { env } from "./env";
 
-// Thin Discord REST client. Everything the bot does — roles, nicknames,
+// Thin Discord REST client. Everything the bot does — roles, DMs,
 // embeds — goes through here. The gateway process (scripts/gateway.mjs)
 // only keeps the bot online and reports member changes back to the site.
 
@@ -115,10 +115,6 @@ export function listRoles(): Promise<Role[]> {
   return discord<Role[]>(`/guilds/${env.guildId}/roles`);
 }
 
-export function setNickname(userId: string, nick: string, reason?: string) {
-  return discord(`/guilds/${env.guildId}/members/${userId}`, { method: "PATCH", body: { nick }, reason });
-}
-
 export function addRole(userId: string, roleId: string, reason?: string) {
   return discord(`/guilds/${env.guildId}/members/${userId}/roles/${roleId}`, { method: "PUT", reason });
 }
@@ -192,7 +188,7 @@ export function explain(e: unknown): string {
         : `Discord refused (403): the bot can see channel ${channel} but isn't allowed to post there. Give the bot's role Send Messages and Embed Links in that channel (check the channel's permission overrides, and its category's).`;
     }
     if (e.status === 403 && e.route.includes("/members"))
-      return "Discord refused (403): the bot needs Manage Roles / Manage Nicknames, and its own role must sit above the roles it changes. It can never rename the server owner.";
+      return "Discord refused (403): the bot needs Manage Roles, and its own role must sit above the roles it changes.";
     if (e.status === 403 && e.route.includes("/commands"))
       return "Discord refused (403): the bot wasn't invited with the applications.commands scope. Re-invite it with scopes bot + applications.commands.";
     if (e.status === 403) return `Discord refused (403)${code === 50001 ? ": missing access" : ""}. Check the bot's permissions in the server.`;

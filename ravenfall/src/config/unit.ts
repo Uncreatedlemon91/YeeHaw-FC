@@ -162,12 +162,6 @@ export function rankShort(abbr: string | null | undefined): string | null {
   return RANKS.find((r) => r.abbr === abbr)?.short ?? null;
 }
 
-/** The member's Discord nickname: "Pvt Viper". Discord caps it at 32. */
-export function nickname(rank: string | null | undefined, name: string): string {
-  const short = rankShort(rank);
-  return (short ? `${short} ${name}` : name).slice(0, 32);
-}
-
 /**
  * A nickname with any rank prefix taken off: "Pvt Viper", "[PVT] Viper"
  * (the older format) and "Viper" all give "Viper".

@@ -24,9 +24,9 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
 - **Recruitment pipeline.** `/enlist` on Discord (or the pinned Enlist Now
   button in #welcome) → `/apply` questionnaire → an embed on
   #recruitment-board with **Approve / Deny / View Web Application** →
-  approving (on Discord or the website) sets the nickname to
-  `Rct Callsign`, adds the Recruit role, removes Candidate, creates the
-  member's profile and writes their ENLISTMENT service record. The board
+  approving (on Discord or the website) adds the Recruit role, removes
+  Candidate, creates the member's profile and writes their ENLISTMENT
+  service record. The board
   post updates itself, whichever side the decision came from.
 - **Public About pages.** `/about/ranks` (the rank ladder and what each
   promotion needs) and `/about/billets` (squads, slots, roles and their
@@ -70,7 +70,7 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   two secondaries), a callsign change or a leave of absence from their own
   file. Requests post to the personnel board on Discord with Approve / Deny
   and queue on the S1 Desk. Approving applies the change, writes the service
-  record, syncs squad and billet roles and the nickname on Discord, and DMs
+  record, syncs squad and billet roles on Discord, and DMs
   the member. Approved leave excuses them from every event in the window,
   and the AAR form pre-marks them Excused. The desk also has a promotion
   board (members meeting the next rank's criteria) and a leave roster.
@@ -86,7 +86,7 @@ components, PostgreSQL via Prisma, NextAuth with Discord.
   when an AAR they attended is filed). It posts to the personnel board with
   Approve / Deny and queues on the S1 Desk; only Command decides, never their
   own, and the member can't withdraw it. Approval re-checks their rank, sets
-  the new one, writes the PROMOTION record, syncs the rank role and nickname,
+  the new one, writes the PROMOTION record, syncs the rank role,
   DMs the member and posts in the **promotions channel**. A denied promotion
   isn't recommended again for 30 days. Command can still set a rank by hand
   on the personnel file; that is announced too and settles any pending
@@ -214,7 +214,7 @@ request.
 ### The bot
 
 Slash commands and button presses come in as signed HTTP requests to
-`/api/discord/interactions`, and roles, nicknames and embeds go out over
+`/api/discord/interactions`, and roles, DMs and embeds go out over
 Discord's REST API. Those work on their own.
 
 A small second service, `ravenfall-gateway` (`scripts/gateway.mjs`, no
@@ -299,10 +299,10 @@ Don't reuse another bot's: each app has exactly one interactions endpoint.
    the bot still comes online, but files only fill in at sign-in.
 4. **Invite the bot**. Use OAuth2 → URL Generator, with scopes `bot` and
    `applications.commands`. Give it these permissions: View Channels, Send
-   Messages, Embed Links, Manage Roles, Manage Nicknames.
+   Messages, Embed Links, Manage Roles. The bot never changes nicknames.
 5. **Server Settings → Roles**: drag the bot's role **above** Recruit and
-   Candidate (and above anyone it renames). Discord refuses with a 403
-   otherwise, and the site says so. It can never rename the server owner.
+   Candidate and every rank, squad and billet role it assigns. Discord
+   refuses with a 403 otherwise, and the site says so.
 6. With the site deployed and reachable, set **General Information →
    Interactions Endpoint URL** to
    `https://ravenfallpmc.com/api/discord/interactions`. Discord checks it as
@@ -472,7 +472,7 @@ Copy them off the droplet too, for example with `rclone`.
   `[interactions] <button> from <user>`, or why it was rejected. A press that
   logs nothing never reached the site: check the endpoint URL in the
   Developer Portal.
-- **Approved, but a warning about roles or the nickname**: see Discord
+- **Approved, but a warning about roles**: see Discord
   setup step 5. The approval itself still went through.
 - **Build killed partway**: out of memory. Add swap (step 2).
 - **502 on ravenfallpmc.com**: the app isn't running.

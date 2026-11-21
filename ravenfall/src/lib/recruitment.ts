@@ -1,5 +1,5 @@
 import type { RecruitmentApplication, RecruitStage, User } from "@prisma/client";
-import { APPLICATION_QUESTIONS, nickname, RANKS, RECRUIT_RANK, rankName, UNIT } from "@/config/unit";
+import { APPLICATION_QUESTIONS, RANKS, RECRUIT_RANK, rankName, UNIT } from "@/config/unit";
 import {
   addRole,
   ButtonStyle,
@@ -10,7 +10,6 @@ import {
   removeRole,
   row,
   sendMessage,
-  setNickname,
 } from "./discord";
 import { env } from "./env";
 import { prisma } from "./prisma";
@@ -157,8 +156,8 @@ export async function approveApplication(opts: {
   });
   if (!updated) return { ok: false, error: "Someone else decided this application first." };
 
-  // Discord side. Each step is independent: a failed nickname shouldn't stop
-  // the role from being granted. Failures come back as warnings.
+  // Discord side. Each step is independent: a failed role shouldn't stop
+  // the others. Failures come back as warnings.
   const warnings: string[] = [];
   const reason = `Application approved by ${by}`;
   const step = async (label: string, fn: () => Promise<unknown>) => {
@@ -169,7 +168,6 @@ export async function approveApplication(opts: {
     }
   };
   if (env.botToken) {
-    await step("Nickname", () => setNickname(app.discordId, nickname(rank, callsign), reason));
     const roles = await getRoleConfig();
     if (roles.recruit) await step("Recruit role", () => addRole(app.discordId, roles.recruit, reason));
     for (const id of roles.approval) {
@@ -188,7 +186,7 @@ export async function approveApplication(opts: {
       ),
     );
   } else {
-    warnings.push("DISCORD_BOT_TOKEN isn't set, so no Discord roles or nickname were changed.");
+    warnings.push("DISCORD_BOT_TOKEN isn't set, so no Discord roles were changed.");
   }
   return { ok: true, warnings };
 }

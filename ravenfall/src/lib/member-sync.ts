@@ -4,7 +4,6 @@ import { MAX_SECONDARY_ROLES, RANKS, rankName, ROLES, SQUADS, stripRank } from "
 import { getMember, listMembers, type GuildMember } from "./discord";
 import { memberReturned, reconcileDepartures } from "./member-left";
 import { permsFromRoles, type Perm } from "./permissions";
-import { applyNickname } from "./personnel";
 import { prisma } from "./prisma";
 import { CALLSIGN_RE } from "./recruitment";
 import { getRoleConfig, type RoleConfig } from "./role-config";
@@ -102,8 +101,6 @@ export async function importMember(m: GuildMember, cfg: RoleConfig, retried = fa
       };
     }
     await prisma.user.update({ where: { id: existing.id }, data });
-    // Given a rank just now: put it in front of their name on Discord.
-    if (!existing.rank && read.rank) await applyNickname(u.id, read.rank, existing.callsign ?? callsign, "Rank from Discord role");
     return filled.length ? "updated" : "unchanged";
   } catch (e) {
     // Signed in (or another event landed) between our read and write, or the

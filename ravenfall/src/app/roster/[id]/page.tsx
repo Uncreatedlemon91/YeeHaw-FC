@@ -692,7 +692,7 @@ export default async function Dossier({ params, searchParams }: { params: Promis
           </Section>
           <Section title="Callsign change">
             <RequestForm action={requestCallsign} pending={pendingTypes.has("CALLSIGN")} pendingNote="Your callsign request is with Command.">
-              <Field label="New callsign" htmlFor="new-callsign" help="Approved by Command. Your Discord nickname follows.">
+              <Field label="New callsign" htmlFor="new-callsign" help="Approved by Command.">
                 <Input id="new-callsign" name="callsign" required maxLength={24} placeholder={member.callsign ?? ""} />
               </Field>
               <Field label="Reason (optional)" htmlFor="cs-reason">
@@ -852,8 +852,8 @@ export default async function Dossier({ params, searchParams }: { params: Promis
             </div>
           </fieldset>
           <p className="text-xs text-muted-foreground">
-            Rank, element and status changes are written to the service record automatically. The Discord nickname follows
-            the rank and callsign, and squad / billet roles follow the assignment. Command may override billet caps and
+            Rank, element and status changes are written to the service record automatically. Rank, squad and billet roles
+            on Discord follow the file; Discord nicknames are never changed. Command may override billet caps and
             qualification gates here.
           </p>
           <SubmitButton size="sm" className="self-start">
